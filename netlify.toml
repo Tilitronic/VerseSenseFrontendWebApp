@@ -1,0 +1,13 @@
+[build]
+  command   = "pnpm build"
+  publish   = "dist/spa"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — serve index.html for any path not matching a static file
+# (belt-and-suspenders alongside hash-mode router)
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

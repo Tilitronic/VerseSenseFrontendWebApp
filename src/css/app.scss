@@ -1,0 +1,25 @@
+// app global css in SCSS form
+
+body.body--dark {
+  background-color: #121212;
+}
+
+body.body--light {
+  background-color: #ffffff;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+}
+
+/* Phonetic transcription styling */
+.phonetic-text,
+.word-transcription {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'ss01' on; // Alternate IPA glyphs if available
+}

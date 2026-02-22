@@ -1,0 +1,14 @@
+# Hashed assets — immutable, cache for 1 year
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML entry point — always revalidate
+/index.html
+  Cache-Control: no-cache
+
+# Security headers for all routes
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

@@ -1,0 +1,313 @@
+<template>
+  <q-page class="poetry-page" :style="pageStyle">
+    <!-- ── LEFT: Editor panel ─────────────────────────────────────── -->
+    <div class="panel panel--editor">
+      <div class="panel__header">
+        <h2 class="panel__title">Poetry Editor</h2>
+        <div class="panel__actions">
+          <!-- Row settings toggle -->
+          <button
+            v-if="appStore.toolbarMode === 'all'"
+            class="editor-settings-btn"
+            :class="{ 'editor-settings-btn--active': showRowSettings }"
+            :title="showRowSettings ? 'Hide row settings' : 'Show row settings'"
+            @click="showRowSettings = !showRowSettings"
+          >
+            <span
+              class="editor-settings-btn__dot"
+              :class="allLinesConfirmed ? 'editor-settings-btn__dot--ok' : 'editor-settings-btn__dot--pending'"
+            />
+            Rows
+          </button>
+
+          <!-- Font picker -->
+          <q-btn-dropdown
+            flat dense no-caps
+            icon="text_fields"
+            :label="currentFontLabel"
+            class="editor-font-btn"
+          >
+            <q-list style="min-width: 180px">
+              <q-item
+                v-for="opt in FONT_OPTIONS"
+                :key="opt.value"
+                clickable
+                v-close-popup
+                :active="appStore.fontFamily === opt.value"
+                @click="appStore.setFontFamily(opt.value)"
+              >
+                <q-item-section>
+                  <span :style="{ fontFamily: opt.family, fontSize: '0.95rem' }">
+                    {{ opt.label }}
+                  </span>
+                </q-item-section>
+                <q-item-section side v-if="appStore.fontFamily === opt.value">
+                  <q-icon name="check" color="primary" size="xs" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+
+          <!-- Toolbar mode toggle -->
+          <q-btn-toggle
+            v-model="toolbarModeModel"
+            flat dense no-caps
+            toggle-color="primary"
+            class="q-ml-xs"
+            :options="[
+              { value: 'active', slot: 'active' },
+              { value: 'all',    slot: 'all'    },
+            ]"
+          >
+            <template #active>
+              <q-icon name="highlight" size="16px" />
+              <q-tooltip>Active line only</q-tooltip>
+            </template>
+            <template #all>
+              <q-icon name="format_list_bulleted" size="16px" />
+              <q-tooltip>Every line</q-tooltip>
+            </template>
+          </q-btn-toggle>
+
+          <!-- Clear -->
+          <q-btn flat dense icon="delete_outline" color="negative" title="Clear" class="q-ml-xs" @click="clearText" />
+        </div>
+      </div>
+
+      <!-- Token-based editor replaces the old textarea -->
+      <div class="panel__body">
+        <PoetryEditor :show-row-settings="showRowSettings" />
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Phonetic panel ──────────────────────────────────── -->
+    <div class="panel panel--phonetic">
+      <div class="panel__header">
+        <h2 class="panel__title">Phonetic Transcription</h2>
+        <div class="panel__actions">
+          <!-- Sound web toggle -->
+          <button
+            class="panel__web-btn"
+            :class="{ 'panel__web-btn--active': showSoundWeb }"
+            title="Sound clustering web"
+            @click="showSoundWeb = !showSoundWeb"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="3"  cy="8"  r="1.8" fill="currentColor"/>
+              <circle cx="13" cy="3"  r="1.8" fill="currentColor"/>
+              <circle cx="13" cy="13" r="1.8" fill="currentColor"/>
+              <circle cx="8"  cy="2"  r="1.8" fill="currentColor"/>
+              <circle cx="8"  cy="14" r="1.8" fill="currentColor"/>
+              <line x1="3" y1="8" x2="13" y2="3"  stroke="currentColor" stroke-width="1.2"/>
+              <line x1="3" y1="8" x2="13" y2="13" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="3" y1="8" x2="8"  y2="2"  stroke="currentColor" stroke-width="1.2"/>
+              <line x1="3" y1="8" x2="8"  y2="14" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2"/>
+              <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            Web
+          </button>
+          <span class="panel__word-count">
+            {{ wordCount }} word{{ wordCount !== 1 ? 's' : '' }}
+          </span>
+        </div>
+      </div>
+      <div class="panel__body">
+        <PhoneticPanel v-model:showWeb="showSoundWeb" />
+      </div>
+    </div>
+  </q-page>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { useAppStore } from 'stores/app';
+import { usePoetryStore } from 'stores/poetry';
+import { getFontFamily, FONT_OPTIONS } from 'src/constants/fonts';
+import type { ToolbarMode } from 'stores/localConfig';
+import PoetryEditor from 'components/PoetryEditor.vue';
+import PhoneticPanel from 'components/PhoneticPanel.vue';
+
+const appStore = useAppStore();
+const poetryStore = usePoetryStore();
+
+const wordCount = computed(() => poetryStore.allWordTokens.length);
+const showSoundWeb    = ref(false);
+const showRowSettings = ref(true);
+
+const allLinesConfirmed = computed(() => {
+  const lines = poetryStore.document.lines;
+  const wordLines = lines.filter((l) => l.tokens.some((t) => t.kind === 'WORD'));
+  return wordLines.length > 0 && wordLines.every((l) => poetryStore.isLineConfirmed(l.id));
+});
+
+const currentFontLabel = computed(
+  () => FONT_OPTIONS.find((o) => o.value === appStore.fontFamily)?.label ?? 'Font',
+);
+
+const toolbarModeModel = computed<ToolbarMode>({
+  get: () => appStore.toolbarMode,
+  set: (v) => appStore.setToolbarMode(v),
+});
+
+function clearText() {
+  poetryStore.setRawText('');
+}
+
+const pageStyle = computed(() => ({
+  '--font-family': getFontFamily(appStore.fontFamily),
+}));
+</script>
+
+<style scoped lang="scss">
+.poetry-page {
+  display: flex;
+  align-items: stretch;
+  height: calc(100vh - 50px); /* subtract header height */
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+// ── Shared panel base ────────────────────────────────────────────────────────
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 50%;
+  overflow: hidden;
+
+  &--editor {
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: #12121c;
+  }
+
+  &--phonetic {
+    background: #ffffff;
+
+    .panel__header {
+      background: #12121c;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .panel__title {
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .panel__word-count {
+      color: rgba(255, 255, 255, 0.30);
+    }
+
+    .panel__web-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 0.68rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.40);
+        color: rgba(255, 255, 255, 0.70);
+      }
+
+      &--active {
+        background: rgba(255, 255, 255, 0.10);
+        border-color: rgba(255, 255, 255, 0.50);
+        color: rgba(255, 255, 255, 0.90);
+      }
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__word-count {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.3);
+  }
+
+  &__body {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+}
+
+// ── Row-settings toggle button ───────────────────────────────────────────────
+.editor-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.40);
+  font-size: 0.68rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.70);
+  }
+
+  &--active {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.30);
+    color: rgba(255, 255, 255, 0.80);
+  }
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.25s;
+
+    &--ok      { background: #4caf7d; }   // green  — all confirmed
+    &--pending { background: #e8a030; }   // orange — at least one unconfirmed
+  }
+}
+
+// ── Responsive stacking ──────────────────────────────────────────────────────
+@media (max-width: 900px) {
+  .poetry-page {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .panel {
+    width: 100%;
+    min-height: 50vh;
+  }
+}
+</style>
