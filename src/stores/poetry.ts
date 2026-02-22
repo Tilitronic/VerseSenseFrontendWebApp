@@ -13,19 +13,22 @@
 
 import { defineStore } from 'pinia';
 import { ref, watch, computed } from 'vue';
-import { detectDocumentLanguage, detectLanguage } from 'src/services/languageDetection/LanguageDetector';
+import {
+  detectDocumentLanguage,
+  detectLanguage,
+} from 'src/services/languageDetection/LanguageDetector';
 import { DEFAULT_LANGUAGE, type Language } from 'src/model/Language';
 import { parseDocument } from 'src/model/DocumentParser';
-import type { IPoetryDocument, IWordToken, ILine } from 'src/model/Token';
+import type { IPoetryDocument, IWordToken } from 'src/model/Token';
 import { getPhoneme } from 'src/services/poetryEngines/ua/Phonetizer';
 import { Sylabizer, type Syllable } from 'src/services/poetryEngines/ua/Sylabizer';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
 
-const STORAGE_KEY_TEXT        = 'verseSense_poemText';
-const STORAGE_KEY_DOC_LANG    = 'verseSense_docLanguage';
+const STORAGE_KEY_TEXT = 'verseSense_poemText';
+const STORAGE_KEY_DOC_LANG = 'verseSense_docLanguage';
 const STORAGE_KEY_ANNOTATIONS = 'verseSense_annotations';
-const DETECTION_DEBOUNCE_MS   = 600;
+const DETECTION_DEBOUNCE_MS = 600;
 
 /**
  * Bump this when the annotation format changes in a breaking way.
@@ -77,17 +80,15 @@ export const usePoetryStore = defineStore('poetry', () => {
    */
   const documentLanguage = ref<Language>(
     (localStorage.getItem(STORAGE_KEY_DOC_LANG) as Language | null) ??
-    detectDocumentLanguage(rawText.value) ??
-    DEFAULT_LANGUAGE,
+      detectDocumentLanguage(rawText.value) ??
+      DEFAULT_LANGUAGE,
   );
 
   /**
    * Whether the document language was manually set by the user.
    * When true, auto-detection will NOT override it on text changes.
    */
-  const documentLanguageManual = ref<boolean>(
-    localStorage.getItem(STORAGE_KEY_DOC_LANG) !== null,
-  );
+  const documentLanguageManual = ref<boolean>(localStorage.getItem(STORAGE_KEY_DOC_LANG) !== null);
 
   /**
    * Per-word language overrides.
@@ -162,7 +163,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         const { lockedLanguage } = getWordScriptInfo(tok.text);
         const langOverride = wordLanguages.value.get(tok.id);
         const ann: WordAnnotation = {
-          stress:    tok.stressIndex,
+          stress: tok.stressIndex,
           confirmed: lockedLanguage !== null || confirmedWords.value.has(tok.id),
         };
         if (langOverride !== undefined) ann.lang = langOverride;
@@ -176,7 +177,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     const blob: AnnotationsBlob = { version: ANNOTATIONS_VERSION, words };
     try {
       localStorage.setItem(STORAGE_KEY_ANNOTATIONS, JSON.stringify(blob));
-    } catch { /* quota exceeded — ignore */ }
+    } catch {
+      /* quota exceeded — ignore */
+    }
   }
 
   /** Load saved annotations and return them, or null if missing/version mismatch. */
@@ -218,21 +221,21 @@ export const usePoetryStore = defineStore('poetry', () => {
         const newTok: IWordToken = {
           ...tok,
           stressIndex: ann.stress ?? tok.stressIndex,
-          language:    ann.lang  ?? tok.language,
+          language: ann.lang ?? tok.language,
         };
         if (ann.lang) newLangMap.set(tok.id, ann.lang);
         if (ann.confirmed) newConfirmed.add(tok.id);
         newTokenIndex.set(tok.id, newTok);
         lineChanged = true;
-        anyChange   = true;
+        anyChange = true;
         return newTok;
       });
       return lineChanged ? { ...line, tokens: newTokens } : line;
     });
 
     if (anyChange) {
-      document.value   = { lines: newLines, tokenIndex: newTokenIndex };
-      wordLanguages.value  = newLangMap;
+      document.value = { lines: newLines, tokenIndex: newTokenIndex };
+      wordLanguages.value = newLangMap;
       confirmedWords.value = newConfirmed;
     }
   }
@@ -289,7 +292,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     const next = new Map(wordLanguages.value);
     next.delete(wordId);
     wordLanguages.value = next;
-    document.value = replaceTokenField(document.value, wordId, { language: documentLanguage.value });
+    document.value = replaceTokenField(document.value, wordId, {
+      language: documentLanguage.value,
+    });
     const sc = new Map(syllableCache.value);
     sc.delete(wordId);
     syllableCache.value = sc;
@@ -434,58 +439,121 @@ export const usePoetryStore = defineStore('poetry', () => {
 
   // ── Internal ───────────────────────────────────────────────────────────────
 
-  /** Canonical word-text for a line — used to detect whether a line was edited. */
-  function lineWordText(line: ILine): string {
-    return line.tokens
-      .filter((t) => t.kind === 'WORD')
-      .map((t) => t.text)
-      .join('\x00');
-  }
-
   function rebuildDocument(text: string) {
     syllableCache.value = new Map();
 
-    // ── Snapshot confirmed line texts before rebuild ─────────────────────────
-    // We key by line index (not id) because parseDocument generates new ids.
-    // We only need to snapshot lines that were confirmed — the rest don't matter.
-    const prevConfirmedTexts = new Map<number, string>();
-    document.value.lines.forEach((line, idx) => {
-      if (isLineConfirmed(line.id)) {
-        prevConfirmedTexts.set(idx, lineWordText(line));
+    // ── Snapshot per-word annotations keyed by positional "L{li}:W{wi}" ─────
+    // Using positional keys (not token IDs) means we survive re-parses that
+    // generate new IDs.  We also snapshot the word *text* so we can detect
+    // which words actually changed vs. which lines just shifted (e.g. an empty
+    // line was inserted above).
+    interface WordSnapshot {
+      text: string;
+      stressIndex: number | null;
+      lang: Language | undefined;
+      confirmed: boolean;
+    }
+    const prevByPos = new Map<string, WordSnapshot>(); // "L{li}:W{wi}" → snap
+    const prevByText = new Map<string, WordSnapshot>(); // word text → snap (first occurrence)
+
+    document.value.lines.forEach((line, li) => {
+      let wi = 0;
+      for (const tok of line.tokens) {
+        if (tok.kind !== 'WORD') continue;
+        const key = `L${li}:W${wi}`;
+        const { lockedLanguage } = getWordScriptInfo(tok.text);
+        const snap: WordSnapshot = {
+          text: tok.text,
+          stressIndex: tok.stressIndex,
+          lang: wordLanguages.value.get(tok.id),
+          confirmed: lockedLanguage !== null || confirmedWords.value.has(tok.id),
+        };
+        prevByPos.set(key, snap);
+        // Register first-occurrence text→snap for position-shift fallback
+        if (!prevByText.has(tok.text)) prevByText.set(tok.text, snap);
+        wi++;
       }
     });
 
     // Parse fresh — all tokens start with documentLanguage as default
-    let doc = parseDocument(text, documentLanguage.value);
-    // Re-apply per-word language overrides immutably
-    for (const [wordId, lang] of wordLanguages.value) {
-      doc = replaceTokenField(doc, wordId, { language: lang });
-    }
-    document.value = doc;
+    const doc = parseDocument(text, documentLanguage.value);
 
-    // ── Strip confirmation for lines whose text changed ─────────────────────
-    // New token IDs already orphaned old confirmedWords entries, but
-    // tryAutoConfirmLine (called by autoDetectAndStressWords) would immediately
-    // re-confirm script-locked lines (e.g. all-UA). We pre-populate
-    // confirmedWords with only unchanged lines so the auto-confirm guard
-    // (`next.has(tok.id)`) skips already-confirmed words while changed lines
-    // get no pre-seeded entries and must go through the normal confirm flow.
-    if (prevConfirmedTexts.size > 0) {
-      const next = new Set<string>();
-      doc.lines.forEach((line, idx) => {
-        const prev = prevConfirmedTexts.get(idx);
-        if (prev === undefined) return; // was not confirmed — nothing to restore
-        if (lineWordText(line) === prev) {
-          // Unchanged: pre-confirm all words on this line so auto-detect won't
-          // touch them and the UI still shows them as confirmed.
-          for (const tok of line.tokens) {
-            if (tok.kind === 'WORD') next.add(tok.id);
-          }
+    // ── Migrate annotations to new token IDs ─────────────────────────────────
+    // Primary:   match by positional key AND same text → preserve all annotations
+    // Fallback:  match by word text alone (handles empty-line insertion/deletion)
+    //            but only when the word text appears exactly once in old doc.
+    const newConfirmed = new Set<string>();
+    const newLangMap = new Map<string, Language>();
+    const stressPatches = new Map<string, number | null>(); // newId → stressIndex
+
+    // Track which text-based snaps were already consumed by a positional match
+    // so we don't double-apply them when the same word appears multiple times.
+    const posMatchedTexts = new Set<string>();
+    doc.lines.forEach((line, li) => {
+      let wi = 0;
+      for (const tok of line.tokens) {
+        if (tok.kind !== 'WORD') continue;
+        const key = `L${li}:W${wi}`;
+        const snap = prevByPos.get(key);
+        if (snap && snap.text === tok.text) {
+          posMatchedTexts.add(tok.text);
         }
-        // Changed: do NOT add to next — line becomes unconfirmed.
+        wi++;
+      }
+    });
+
+    doc.lines.forEach((line, li) => {
+      let wi = 0;
+      for (const tok of line.tokens) {
+        if (tok.kind !== 'WORD') continue;
+        const key = `L${li}:W${wi}`;
+        const posSnap = prevByPos.get(key);
+        let snap: WordSnapshot | undefined;
+
+        if (posSnap && posSnap.text === tok.text) {
+          // Exact positional + text match — best case
+          snap = posSnap;
+        } else if (!posMatchedTexts.has(tok.text)) {
+          // No positional match for this text: try text-based fallback
+          // (safe only when the word doesn't appear at its expected position,
+          // meaning the line structure shifted without word content changing)
+          snap = prevByText.get(tok.text);
+        }
+
+        if (snap) {
+          if (snap.stressIndex !== null) stressPatches.set(tok.id, snap.stressIndex);
+          if (snap.lang !== undefined) newLangMap.set(tok.id, snap.lang);
+          if (snap.confirmed) newConfirmed.add(tok.id);
+        }
+        // No matching snap → annotations cleared (word is new or changed)
+        wi++;
+      }
+    });
+
+    // Apply stress patches and language overrides onto the freshly parsed doc
+    const newTokenIndex = new Map(doc.tokenIndex);
+    const newLines = doc.lines.map((line) => {
+      let lineChanged = false;
+      const newTokens = line.tokens.map((tok) => {
+        if (tok.kind !== 'WORD') return tok;
+        const newStress = stressPatches.get(tok.id);
+        const newLang = newLangMap.get(tok.id);
+        if (newStress === undefined && newLang === undefined) return tok;
+        const newTok: IWordToken = {
+          ...tok,
+          stressIndex: newStress !== undefined ? newStress : tok.stressIndex,
+          language: newLang !== undefined ? newLang : tok.language,
+        };
+        newTokenIndex.set(tok.id, newTok);
+        lineChanged = true;
+        return newTok;
       });
-      confirmedWords.value = next;
-    }
+      return lineChanged ? { ...line, tokens: newTokens } : line;
+    });
+
+    document.value = { lines: newLines, tokenIndex: newTokenIndex };
+    wordLanguages.value = newLangMap;
+    confirmedWords.value = newConfirmed;
 
     autoDetectAndStressWords();
   }
@@ -524,19 +592,19 @@ export const usePoetryStore = defineStore('poetry', () => {
 
     type WordScript = 'cyrillic' | 'latin';
     const CYRILLIC_RE = /[\u0400-\u04FF]/;
-    const LATIN_RE    = /[a-zA-Z\u00C0-\u024F]/;
+    const LATIN_RE = /[a-zA-Z\u00C0-\u024F]/;
 
     /** Script of a word: cyrillic, latin, or null for mixed/other */
     function wordScript(text: string): WordScript | null {
       const hasCyrillic = CYRILLIC_RE.test(text);
-      const hasLatin    = LATIN_RE.test(text);
+      const hasLatin = LATIN_RE.test(text);
       if (hasCyrillic && !hasLatin) return 'cyrillic';
-      if (hasLatin    && !hasCyrillic) return 'latin';
+      if (hasLatin && !hasCyrillic) return 'latin';
       return null; // mixed or neither
     }
 
     /** Collect words of a given script from a line, joined as a string */
-    function scriptWords(line: typeof document.value.lines[0], script: WordScript): string {
+    function scriptWords(line: (typeof document.value.lines)[0], script: WordScript): string {
       return line.tokens
         .filter((t): t is IWordToken => t.kind === 'WORD' && wordScript(t.text) === script)
         .map((t) => t.text)
@@ -592,43 +660,44 @@ export const usePoetryStore = defineStore('poetry', () => {
     // Build sets of what needs to change before mutating, so we can
     // produce new object references for changed tokens/lines (Vue reactivity).
     const langChanges = new Map<string, Language>(); // tokenId → new language
-    const stressChanges = new Set<string>();          // tokenId → set stress 0
+    const stressChanges = new Set<string>(); // tokenId → set stress 0
 
     lines.forEach((line, lineIdx) => {
       for (const tok of line.tokens) {
         if (tok.kind !== 'WORD') continue;
 
-      // ── 1. Language detection (skip manual overrides) ─────────────────────
-      if (!wordLanguages.value.has(tok.id)) {
-        const scriptInfo = getWordScriptInfo(tok.text);
-        let detectedLang: Language;
-        if (scriptInfo.lockedLanguage) {
-          // Script uniquely determines language (UA-exclusive chars, PL diacritics)
-          detectedLang = scriptInfo.lockedLanguage;
-        } else if (scriptInfo.allowedLanguages.length > 0) {
-          // Ambiguous — look up the script-aware hint for this (line, script) pair.
-          // This guarantees a Cyrillic word only uses Cyrillic context and vice-versa.
-          const sc = wordScript(tok.text);
-          const lineHint = sc ? lineScriptHint.get(`${lineIdx}:${sc}`) : undefined;
-          if (lineHint && scriptInfo.allowedLanguages.includes(lineHint)) {
-            detectedLang = lineHint;
+        // ── 1. Language detection (skip manual overrides) ─────────────────────
+        if (!wordLanguages.value.has(tok.id)) {
+          const scriptInfo = getWordScriptInfo(tok.text);
+          let detectedLang: Language;
+          if (scriptInfo.lockedLanguage) {
+            // Script uniquely determines language (UA-exclusive chars, PL diacritics)
+            detectedLang = scriptInfo.lockedLanguage;
+          } else if (scriptInfo.allowedLanguages.length > 0) {
+            // Ambiguous — look up the script-aware hint for this (line, script) pair.
+            // This guarantees a Cyrillic word only uses Cyrillic context and vice-versa.
+            const sc = wordScript(tok.text);
+            const lineHint = sc ? lineScriptHint.get(`${lineIdx}:${sc}`) : undefined;
+            if (lineHint && scriptInfo.allowedLanguages.includes(lineHint)) {
+              detectedLang = lineHint;
+            } else {
+              const result = detectLanguage(tok.text);
+              detectedLang =
+                result.language && scriptInfo.allowedLanguages.includes(result.language)
+                  ? result.language
+                  : scriptInfo.allowedLanguages[0]!;
+            }
           } else {
+            // Mixed script or other — run franc directly, fall back to doc lang
             const result = detectLanguage(tok.text);
-            detectedLang = (result.language && scriptInfo.allowedLanguages.includes(result.language))
-              ? result.language
-              : scriptInfo.allowedLanguages[0]!;
+            detectedLang = result.language ?? docLang;
           }
-        } else {
-          // Mixed script or other — run franc directly, fall back to doc lang
-          const result = detectLanguage(tok.text);
-          detectedLang = result.language ?? docLang;
+          if (tok.language !== detectedLang) {
+            langChanges.set(tok.id, detectedLang);
+          }
         }
-        if (tok.language !== detectedLang) {
-          langChanges.set(tok.id, detectedLang);
-        }
-      }
 
-      // ── 2. Auto-stress monosyllabic words ─────────────────────────────────
+        // ── 2. Auto-stress monosyllabic words ─────────────────────────────────
         if (tok.stressIndex === null) {
           const effectiveLang = langChanges.get(tok.id) ?? tok.language;
           if (countVowels(tok.text, effectiveLang) === 1) {
@@ -647,12 +716,12 @@ export const usePoetryStore = defineStore('poetry', () => {
       let lineChanged = false;
       const newTokens = line.tokens.map((tok) => {
         if (tok.kind !== 'WORD') return tok;
-        const newLang  = langChanges.get(tok.id);
+        const newLang = langChanges.get(tok.id);
         const doStress = stressChanges.has(tok.id);
         if (!newLang && !doStress) return tok;
         const newTok = {
           ...tok,
-          language:    newLang  ?? tok.language,
+          language: newLang ?? tok.language,
           stressIndex: doStress ? 0 : tok.stressIndex,
         };
         newTokenIndex.set(tok.id, newTok);
@@ -681,11 +750,9 @@ export const usePoetryStore = defineStore('poetry', () => {
   }
 
   // Save annotations whenever the document or confirmed set changes
-  watch(
-    [() => document.value, () => confirmedWords.value],
-    () => scheduleSaveAnnotations(),
-    { deep: false },
-  );
+  watch([() => document.value, () => confirmedWords.value], () => scheduleSaveAnnotations(), {
+    deep: false,
+  });
 
   // Watch rawText — debounced auto-detection (skipped if user set language manually)
   watch(rawText, (newText) => {
@@ -776,6 +843,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     tryAutoConfirmLine,
     getSyllables,
     autoDetectAndStressWords,
-    setActiveLineIndex: (idx: number | null) => { activeLineIndex.value = idx; },
+    setActiveLineIndex: (idx: number | null) => {
+      activeLineIndex.value = idx;
+    },
   };
 });
