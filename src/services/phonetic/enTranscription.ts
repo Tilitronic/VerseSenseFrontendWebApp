@@ -1,10 +1,19 @@
 /**
  * enTranscription.ts
  *
- * English grapheme-to-IPA syllabification.
- * Strategy: rule-based grapheme clusters → IPA approximation, then split on vowels.
- * Covers the most common patterns well enough for poetry stress/syllable display.
+ * English grapheme → IPA syllabification.
+ *
+ * Primary source: CMU Pronouncing Dictionary (134k+ words, Carnegie Mellon).
+ * The CMU dict gives ARPABET phonemes with stress digits (0/1/2) embedded,
+ * e.g. "gold" → "G OW1 L D".  We convert ARPABET → IPA and extract the
+ * stressed syllable from the `1` (primary) digit.
+ *
+ * Fallback: rule-based grapheme→IPA for words not in the CMU dict
+ * (proper nouns, neologisms, unusual spellings).
  */
+
+import { dictionary as CMU } from 'cmu-pronouncing-dictionary';
+import { tokenizeIPA } from './ipaTokenizer';
 
 export interface EnSyllable {
   /** IPA phonetic string for this syllable */
@@ -15,132 +24,324 @@ export interface EnSyllable {
   isOpen: boolean;
 }
 
-// ── Digraph / trigraph replacements (order matters — longer first) ────────────
+// ── ARPABET → IPA symbol map ──────────────────────────────────────────────────
+// Each ARPABET phoneme may appear with a trailing stress digit (0/1/2) for
+// vowels; consonants have no digit.  We strip the digit separately.
+// Source: https://en.wikipedia.org/wiki/ARPABET
+const ARPABET_TO_IPA: Record<string, string> = {
+  // Vowels
+  AA: 'ɑ',
+  AE: 'æ',
+  AH: 'ʌ',
+  AO: 'ɔ',
+  AW: 'aʊ',
+  AX: 'ə',
+  AY: 'aɪ',
+  EH: 'ɛ',
+  ER: 'ɜr',
+  EY: 'eɪ',
+  IH: 'ɪ',
+  IX: 'ɨ',
+  IY: 'iː',
+  OW: 'oʊ',
+  OY: 'ɔɪ',
+  UH: 'ʊ',
+  UW: 'uː',
+  UX: 'ʉ',
+  // Consonants
+  B: 'b',
+  CH: 'tʃ',
+  D: 'd',
+  DH: 'ð',
+  DX: 'ɾ',
+  EL: 'l̩',
+  EM: 'm̩',
+  EN: 'n̩',
+  F: 'f',
+  G: 'g',
+  HH: 'h',
+  JH: 'dʒ',
+  K: 'k',
+  L: 'l',
+  M: 'm',
+  N: 'n',
+  NG: 'ŋ',
+  NX: 'ɾ̃',
+  P: 'p',
+  Q: 'ʔ',
+  R: 'r',
+  S: 's',
+  SH: 'ʃ',
+  T: 't',
+  TH: 'θ',
+  V: 'v',
+  W: 'w',
+  WH: 'ʍ',
+  Y: 'j',
+  Z: 'z',
+  ZH: 'ʒ',
+};
+
+/**
+ * Convert a single ARPABET token (possibly with stress digit) to IPA.
+ * Returns [ipaSymbol, stressLevel] where stressLevel is 0|1|2 for vowels, -1 for consonants.
+ */
+function arpabetTokenToIpa(token: string): [string, number] {
+  const m = token.match(/^([A-Z]+)([012]?)$/);
+  if (!m) return [token.toLowerCase(), -1];
+  const base = m[1]!;
+  const digit = m[2];
+  const stress = digit ? parseInt(digit, 10) : -1;
+
+  // AH with stress 0 → schwa (unstressed function-word vowel)
+  const ipa = base === 'AH' && stress === 0 ? 'ə' : (ARPABET_TO_IPA[base] ?? base.toLowerCase());
+
+  return [ipa, stress];
+}
+
+// ── IPA vowel set (for nucleus detection) ─────────────────────────────────────
+const IPA_VOWEL_TOKENS = new Set([
+  'a',
+  'e',
+  'i',
+  'o',
+  'u',
+  'æ',
+  'ɛ',
+  'ɪ',
+  'ɒ',
+  'ʌ',
+  'ɑ',
+  'ɔ',
+  'ə',
+  'ɜ',
+  'ʊ',
+  'ɨ',
+  'ʉ',
+  'iː',
+  'uː',
+  'aː',
+  'eː',
+  'oː',
+  'ɑː',
+  'ɔː',
+  'ɜː',
+  'eɪ',
+  'aɪ',
+  'ɔɪ',
+  'aʊ',
+  'oʊ',
+  'ɪə',
+  'eə',
+  'ʊə',
+  'ɜr', // rhotic centre vowel from CMU ER
+]);
+
+// ── CMU-based transcription ───────────────────────────────────────────────────
+
+interface CmuResult {
+  ipaTokens: string[];
+  /** -1 = consonant, 0 = unstressed vowel, 1 = primary stress, 2 = secondary stress */
+  stresses: number[];
+}
+
+function transcribeFromCmu(word: string): CmuResult | null {
+  const key = word.toLowerCase().replace(/['']/g, "'");
+  const arpabet = (CMU as Record<string, string>)[key];
+  if (!arpabet) return null;
+
+  const ipaTokens: string[] = [];
+  const stresses: number[] = [];
+
+  for (const p of arpabet.split(' ')) {
+    const [ipa, stress] = arpabetTokenToIpa(p);
+    ipaTokens.push(ipa);
+    stresses.push(stress);
+  }
+
+  return { ipaTokens, stresses };
+}
+
+/**
+ * Build syllables from a CmuResult.
+ * Stress digit 1 in the ARPABET marks primary-stressed vowel → stressed syllable.
+ */
+function syllabifyFromCmu(result: CmuResult): { ipa: string; stressed: boolean }[] {
+  const { ipaTokens, stresses } = result;
+
+  // Collect vowel positions and identify primary-stress syllable index
+  const vowelIndices: number[] = [];
+  let primaryVowelPos = -1; // position in vowelIndices array
+
+  for (let i = 0; i < ipaTokens.length; i++) {
+    if (stresses[i]! >= 0) {
+      if (stresses[i] === 1) primaryVowelPos = vowelIndices.length;
+      vowelIndices.push(i);
+    }
+  }
+
+  if (vowelIndices.length === 0) {
+    return [{ ipa: ipaTokens.join(''), stressed: false }];
+  }
+  if (vowelIndices.length === 1) {
+    // Monosyllable: stressed if primary or if it's the only vowel
+    return [
+      {
+        ipa: ipaTokens.join(''),
+        stressed: primaryVowelPos === 0 || stresses[vowelIndices[0]!]! >= 0,
+      },
+    ];
+  }
+
+  // Split into syllables
+  const ranges: Array<[number, number]> = [];
+  let rangeStart = 0;
+
+  for (let vi = 0; vi < vowelIndices.length; vi++) {
+    const nucEnd = vowelIndices[vi]! + 1;
+    const nextNuc = vowelIndices[vi + 1] ?? ipaTokens.length;
+    const between = nextNuc - nucEnd;
+    const codaEnd =
+      vi < vowelIndices.length - 1 ? (between > 1 ? nucEnd + 1 : nucEnd) : ipaTokens.length;
+
+    ranges.push([rangeStart, codaEnd]);
+    rangeStart = codaEnd;
+  }
+
+  return ranges.map(([s, e], sylIdx) => ({
+    ipa: ipaTokens.slice(s, e).join(''),
+    stressed: sylIdx === primaryVowelPos,
+  }));
+}
+
+// ── Rule-based fallback ───────────────────────────────────────────────────────
+// Used only for words not found in the CMU dictionary.
+
 const GRAPHEME_RULES: [RegExp, string][] = [
-  // Trigraphs
-  [/tch/g,  'tʃ'],
-  [/sch/g,  'ʃ'],
-  // Digraphs — consonant clusters
-  [/ph/g,   'f'],
-  [/ch/g,   'tʃ'],
-  [/sh/g,   'ʃ'],
-  [/th/g,   'ð'],  // default voiced; voiceless in "think" but voiced more common in poetry
-  [/wh/g,   'w'],
-  [/gh/g,   ''],   // silent in "night", "light"
-  [/ng/g,   'ŋ'],
-  [/nk/g,   'ŋk'],
-  [/qu/g,   'kw'],
-  [/ck/g,   'k'],
-  [/dg/g,   'dʒ'],
-  [/ge/g,   'dʒ'],
-  [/gi/g,   'dʒ'],
-  // Digraphs — vowels
-  [/ee/g,   'iː'],
-  [/ea/g,   'iː'],
-  [/oo/g,   'uː'],
-  [/ou/g,   'aʊ'],
-  [/ow/g,   'aʊ'],
-  [/oi/g,   'ɔɪ'],
-  [/oy/g,   'ɔɪ'],
-  [/au/g,   'ɔː'],
-  [/aw/g,   'ɔː'],
-  [/ai/g,   'eɪ'],
-  [/ay/g,   'eɪ'],
-  [/igh/g,  'aɪ'],
-  [/ie/g,   'iː'],
-  // Magic-e patterns (very common): vowel + consonant(s) + e
+  [/tch/g, 'tʃ'],
+  [/sch/g, 'ʃ'],
+  [/ph/g, 'f'],
+  [/ch/g, 'tʃ'],
+  [/sh/g, 'ʃ'],
+  [/th/g, 'θ'],
+  [/wh/g, 'w'],
+  [/gh/g, ''],
+  [/ng/g, 'ŋ'],
+  [/nk/g, 'ŋk'],
+  [/qu/g, 'kw'],
+  [/ck/g, 'k'],
+  [/dg/g, 'dʒ'],
+  [/ee/g, 'iː'],
+  [/ea/g, 'iː'],
+  [/oo/g, 'uː'],
+  [/ou/g, 'aʊ'],
+  [/ow/g, 'aʊ'],
+  [/oi/g, 'ɔɪ'],
+  [/oy/g, 'ɔɪ'],
+  [/au/g, 'ɔː'],
+  [/aw/g, 'ɔː'],
+  [/ai/g, 'eɪ'],
+  [/ay/g, 'eɪ'],
+  [/igh/g, 'aɪ'],
+  [/ie/g, 'iː'],
   [/a([bcdfghjklmnpqrstvwxyz])e\b/gi, 'eɪ$1'],
   [/i([bcdfghjklmnpqrstvwxyz])e\b/gi, 'aɪ$1'],
   [/o([bcdfghjklmnpqrstvwxyz])e\b/gi, 'oʊ$1'],
   [/u([bcdfghjklmnpqrstvwxyz])e\b/gi, 'juː$1'],
-  // Single vowels (context-free approximation)
-  [/\ba\b/g,  'ə'],   // "a" as article
-  [/\bthe\b/g,'ðə'],
-  // Simple vowel maps (fall-through for remaining letters)
+  [/^y(?=[aeiouæɛɪɒʌɑɔəɜʊ])/i, 'j'],
 ];
 
-// Single-letter IPA approximations (applied after digraph rules)
 const LETTER_IPA: Record<string, string> = {
-  a: 'æ', e: 'ɛ', i: 'ɪ', o: 'ɒ', u: 'ʌ',
+  a: 'æ',
+  e: 'ɛ',
+  i: 'ɪ',
+  o: 'ɒ',
+  u: 'ʌ',
   y: 'ɪ',
-  b: 'b', c: 'k', d: 'd', f: 'f', g: 'g',
-  h: 'h', j: 'dʒ', k: 'k', l: 'l', m: 'm',
-  n: 'n', p: 'p', q: 'k', r: 'r', s: 's',
-  t: 't', v: 'v', w: 'w', x: 'ks', z: 'z',
+  b: 'b',
+  c: 'k',
+  d: 'd',
+  f: 'f',
+  g: 'g',
+  h: 'h',
+  j: 'dʒ',
+  k: 'k',
+  l: 'l',
+  m: 'm',
+  n: 'n',
+  p: 'p',
+  q: 'k',
+  r: 'r',
+  s: 's',
+  t: 't',
+  v: 'v',
+  w: 'w',
+  x: 'ks',
+  z: 'z',
 };
 
-// IPA symbols that are vowel nuclei for splitting
-const IPA_VOWELS_RE = /[æɛɪɒʌaeiouɑɔəɜʊuː]+/;
-
 function graphemesToIPA(word: string): string {
-  let s = word.toLowerCase();
-  for (const [re, rep] of GRAPHEME_RULES) {
-    s = s.replace(re, rep);
-  }
-  // Map remaining plain letters
-  s = s.split('').map((ch) => LETTER_IPA[ch] ?? ch).join('');
+  let s = word.toLowerCase().replace(/['']/g, "'");
+  for (const [re, rep] of GRAPHEME_RULES) s = s.replace(re, rep);
+  s = s
+    .split('')
+    .map((ch) => LETTER_IPA[ch] ?? ch)
+    .join('');
   return s;
 }
 
-/**
- * Split an IPA string into syllable strings.
- * Simple rule: each vowel cluster is a nucleus; consonants before it are onset,
- * consonants after it are coda (shared with next onset by one).
- */
 function splitIpaToSyllables(ipa: string): string[] {
   if (!ipa) return [];
-
-  // Find positions of vowel nuclei
-  const nuclei: number[] = [];
-  let i = 0;
-  while (i < ipa.length) {
-    const sub = ipa.slice(i);
-    const m = sub.match(/^[æɛɪɒʌaeiouɑɔəɜʊuː]+/);
-    if (m) {
-      nuclei.push(i);
-      i += m[0].length;
-    } else {
-      i++;
-    }
+  const tokens = tokenizeIPA(ipa);
+  const nucleiIdx: number[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (IPA_VOWEL_TOKENS.has(tokens[i]!)) nucleiIdx.push(i);
   }
+  if (nucleiIdx.length <= 1) return [ipa];
 
-  if (nuclei.length === 0) return [ipa]; // no vowels — whole word is one syllable
-
-  const syllables: string[] = [];
-  let prev = 0;
-
-  for (let ni = 0; ni < nuclei.length; ni++) {
-    const nucStart = nuclei[ni]!;
-
-    // Find end of this nucleus
-    const afterNuc = ipa.slice(nucStart).match(/^[æɛɪɒʌaeiouɑɔəɜʊuː]+/);
-    const nucEnd = nucStart + (afterNuc ? afterNuc[0].length : 1);
-
-    // Find end of coda (consonants after nucleus, until next nucleus or end)
-    const nextNucStart = nuclei[ni + 1] ?? ipa.length;
-    const betweenConsonants = ipa.slice(nucEnd, nextNucStart);
-
-    let codaEnd: number;
-    if (ni < nuclei.length - 1) {
-      // Single consonant → onset of next; cluster → split 1 to coda, rest to next onset
-      codaEnd = betweenConsonants.length > 1 ? nucEnd + 1 : nucEnd;
-    } else {
-      codaEnd = ipa.length; // last syllable takes all trailing consonants
-    }
-
-    syllables.push(ipa.slice(prev, codaEnd));
-    prev = codaEnd;
+  const ranges: Array<[number, number]> = [];
+  let rangeStart = 0;
+  for (let ni = 0; ni < nucleiIdx.length; ni++) {
+    const nucEnd = nucleiIdx[ni]! + 1;
+    const nextNuc = nucleiIdx[ni + 1] ?? tokens.length;
+    const between = nextNuc - nucEnd;
+    const codaEnd = ni < nucleiIdx.length - 1 ? (between > 1 ? nucEnd + 1 : nucEnd) : tokens.length;
+    ranges.push([rangeStart, codaEnd]);
+    rangeStart = codaEnd;
   }
-
-  return syllables.filter((s) => s.length > 0);
+  return ranges.map(([s, e]) => tokens.slice(s, e).join('')).filter(Boolean);
 }
 
+// ── Public API ────────────────────────────────────────────────────────────────
+
 /**
- * Transcribe an English word into syllables with IPA.
+ * Transcribe an English word into IPA syllables.
+ * Uses CMU pronouncing dictionary when available; falls back to rule-based.
  * @param word        - original English word text
- * @param stressIndex - 0-based index of stressed syllable
+ * @param stressIndex - 0-based override for stressed syllable (used only for CMU-missing fallback)
  */
 export function transcribeEnglish(word: string, stressIndex: number): EnSyllable[] {
+  // ── CMU path ──────────────────────────────────────────────────────────────
+  const cmu = transcribeFromCmu(word);
+  if (cmu) {
+    const syllables = syllabifyFromCmu(cmu);
+    // Monosyllables in CMU don't always have stress=1 (e.g. function words).
+    // If no syllable is marked stressed, fall back to stressIndex.
+    const hasExplicitStress = syllables.some((s) => s.stressed);
+    return syllables.map((s, idx) => {
+      const stressed = hasExplicitStress
+        ? s.stressed
+        : idx === Math.min(stressIndex, syllables.length - 1);
+      const lastToken = tokenizeIPA(s.ipa).at(-1) ?? '';
+      return {
+        ipa: s.ipa,
+        stressed,
+        isOpen: IPA_VOWEL_TOKENS.has(lastToken),
+      };
+    });
+  }
+
+  // ── Rule-based fallback ───────────────────────────────────────────────────
   const ipa = graphemesToIPA(word);
   const parts = splitIpaToSyllables(ipa);
 
@@ -148,9 +349,12 @@ export function transcribeEnglish(word: string, stressIndex: number): EnSyllable
     return [{ ipa: ipa || word, stressed: true, isOpen: false }];
   }
 
-  return parts.map((part, idx) => ({
-    ipa:      part,
-    stressed: idx === stressIndex,
-    isOpen:   IPA_VOWELS_RE.test(part[part.length - 1] ?? ''),
-  }));
+  return parts.map((part, idx) => {
+    const lastToken = tokenizeIPA(part).at(-1) ?? '';
+    return {
+      ipa: part,
+      stressed: idx === stressIndex,
+      isOpen: IPA_VOWEL_TOKENS.has(lastToken),
+    };
+  });
 }

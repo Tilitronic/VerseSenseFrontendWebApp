@@ -21,6 +21,7 @@
     "@codemirror/view": "^6.39.15",
     "@quasar/extras": "^1.16.4",
     "axios": "^1.2.1",
+    "cmu-pronouncing-dictionary": "^3.0.0",
     "codemirror": "^6.0.2",
     "franc": "^6.2.0",
     "ipa-symbols": "^1.0.8",
