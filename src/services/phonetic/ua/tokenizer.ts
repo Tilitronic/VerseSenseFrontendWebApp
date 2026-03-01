@@ -329,7 +329,20 @@ export function tokenize(word: string): PhoneticToken[] {
       continue;
     }
 
-    // ── 8. Unknown character → pass through as consonant (safety) ────────
+    // ── 8. Unknown character → skip non-letter characters (punctuation,
+    //        digits, spaces) silently so they don't become phantom tokens
+    //        that confuse positional allophone rules (e.g. в before '!' would
+    //        incorrectly trigger the pre-consonant allophone instead of the
+    //        word-final one).
+    const codePoint = ch.codePointAt(0) ?? 0;
+    const isCyrillicLetter = (codePoint >= 0x0400 && codePoint <= 0x04FF) ||
+                             (codePoint >= 0x0500 && codePoint <= 0x052F);
+    if (!isCyrillicLetter) {
+      i++;
+      continue;
+    }
+
+    // Truly unknown Cyrillic → pass through as consonant (safety)
     tokens.push({
       ipa: ch,
       source: ch,

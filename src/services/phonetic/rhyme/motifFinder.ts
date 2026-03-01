@@ -44,7 +44,7 @@ import {
 /** Minimum motif length in IPA tokens */
 const MIN_LEN = 2;
 /** Maximum motif length in IPA tokens */
-const MAX_LEN = 7;
+const MAX_LEN = 16;
 /** Minimum occurrences for a motif to be reported */
 const MIN_OCCURRENCES = 2;
 
@@ -52,8 +52,8 @@ const MIN_OCCURRENCES = 2;
  * DTW similarity thresholds (0 = identical, 1 = completely different).
  * Normalised by sequence length so longer matches aren't penalised.
  */
-const NEAR_DTW_THRESHOLD       = 0.30; // allow up to 30% average substitution cost
-const STRUCTURAL_DTW_THRESHOLD = 0.60;
+const NEAR_DTW_THRESHOLD = 0.3; // allow up to 30% average substitution cost
+const STRUCTURAL_DTW_THRESHOLD = 0.6;
 
 // ── Flat token ────────────────────────────────────────────────────────────────
 
@@ -69,8 +69,8 @@ export interface FlatToken {
   /** Word token id */
   wordId: string;
   lineIdx: number;
-  codeExact:      number;
-  codeFuzzy:      number;
+  codeExact: number;
+  codeFuzzy: number;
   codeStructural: number;
 }
 
@@ -89,8 +89,8 @@ interface RawCandidate {
 // ── Pass 1/2: N-gram hashing ──────────────────────────────────────────────────
 
 function codeKey(layer: EncodingLayer, tok: FlatToken): number {
-  if (layer === 'exact')      return tok.codeExact;
-  if (layer === 'fuzzy')      return tok.codeFuzzy;
+  if (layer === 'exact') return tok.codeExact;
+  if (layer === 'fuzzy') return tok.codeFuzzy;
   return tok.codeStructural;
 }
 
@@ -98,13 +98,13 @@ function codeKey(layer: EncodingLayer, tok: FlatToken): number {
  * Rolling polynomial hash of a fixed-length integer window.
  * Base chosen to minimise collisions for typical IPA code ranges (~200 values).
  */
-const HASH_BASE  = 131;
-const HASH_MOD   = 0x7fffffff; // 2^31 - 1
+const HASH_BASE = 131;
+const HASH_MOD = 0x7fffffff; // 2^31 - 1
 
 function polyHash(codes: number[]): number {
   let h = 0;
   for (const c of codes) {
-    h = ((h * HASH_BASE) + c) & HASH_MOD;
+    h = (h * HASH_BASE + c) & HASH_MOD;
   }
   return h;
 }
@@ -176,7 +176,10 @@ function isCoveredBy(
     // at position p where p <= s and p + longerLen >= s + shorterLen
     let covered = false;
     for (let offset = 0; offset <= longerLen - shorterLen; offset++) {
-      if (longerSet.has(s - offset)) { covered = true; break; }
+      if (longerSet.has(s - offset)) {
+        covered = true;
+        break;
+      }
     }
     if (!covered) return false;
   }
@@ -196,7 +199,8 @@ function isCoveredBy(
  * Standard DTW O(n·m) DP with deletion/insertion cost = 0.5 (half a substitution).
  */
 function dtwDistance(a: string[], b: string[]): number {
-  const n = a.length, m = b.length;
+  const n = a.length,
+    m = b.length;
   if (n === 0 || m === 0) return 1;
 
   // Flat DP table
@@ -208,11 +212,13 @@ function dtwDistance(a: string[], b: string[]): number {
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
       const cost = substitutionCost(a[i - 1]!, b[j - 1]!);
-      dp[idx(i, j)] = cost + Math.min(
-        dp[idx(i - 1, j - 1)]!,  // match / substitute
-        dp[idx(i - 1, j)]! + 0.5, // deletion
-        dp[idx(i, j - 1)]! + 0.5, // insertion
-      );
+      dp[idx(i, j)] =
+        cost +
+        Math.min(
+          dp[idx(i - 1, j - 1)]!, // match / substitute
+          dp[idx(i - 1, j)]! + 0.5, // deletion
+          dp[idx(i, j - 1)]! + 0.5, // insertion
+        );
     }
   }
 
@@ -226,6 +232,8 @@ function dtwDistance(a: string[], b: string[]): number {
 export interface FoundMotif {
   /** Original IPA token strings of the canonical occurrence */
   canonicalTokens: string[];
+  /** Encoded pattern (for dedup/merging) */
+  encodedPattern: number[];
   /** All start positions (flat indices into the `flat` array) */
   occurrenceStarts: number[];
   /** How many tokens each occurrence spans */
@@ -244,29 +252,37 @@ export interface FoundMotif {
 export function findMotifs(flat: FlatToken[]): FoundMotif[] {
   const allFound: FoundMotif[] = [];
 
-  // Track which flat positions are already claimed by an exact motif,
-  // so we don't emit redundant near/structural motifs for the same positions.
-  const claimedByExact = new Set<string>(); // `${start}:${len}` keys
+  // ── Pass 1 & 2: collect ALL candidates at all lengths, all tiers ──────────
+  // No inter-tier blocking here — we let Pass 3 deduplicate.
+  // Within the exact tier only: track positions already claimed by a LONGER
+  // exact motif so we don't emit both "ʋiʋɑrɔstɪ̞slɑu̯" (len=12) and "ʋiʋɑ"
+  // (len=4) as separate exact motifs when every occurrence of the shorter is
+  // fully contained in the longer.
+  //
+  // Near/structural motifs are NEVER blocked by exact claims — a sub-sequence
+  // that is part of a long exact repeat may still form a near-rhyme with a
+  // different word on a different line (e.g. ɑu̯ inside the long repeat still
+  // near-rhymes with ɑw on the next line).
 
-  // ── Pass 1 & 2: scan all window sizes ──────────────────────────────────────
+  // exact span set: start → length, for coverage checks within exact tier only
+  const exactSpans: Array<{ start: number; len: number }> = [];
+
   for (let len = MAX_LEN; len >= MIN_LEN; len--) {
     // --- Exact layer ---
     const exactCandidates = ngramPass(flat, len, 'exact');
     for (const cand of exactCandidates.values()) {
-      // Deduplicate: remove occurrences already fully covered by a longer exact motif
-      const uncoveredStarts = cand.occurrenceStarts.filter((s) => {
-        // Check if this position was claimed at a longer length
-        for (let longer = len + 1; longer <= MAX_LEN; longer++) {
-          if (claimedByExact.has(`${s}:${longer}`)) return false;
-        }
-        return true;
-      });
+      // Within the exact tier: drop occurrences whose start position is
+      // already fully contained inside a previously found LONGER exact span.
+      const uncoveredStarts = cand.occurrenceStarts.filter(
+        (s) => !exactSpans.some((sp) => sp.start <= s && sp.start + sp.len >= s + len),
+      );
       if (uncoveredStarts.length < MIN_OCCURRENCES) continue;
 
-      for (const s of uncoveredStarts) claimedByExact.add(`${s}:${len}`);
+      for (const s of uncoveredStarts) exactSpans.push({ start: s, len });
 
       allFound.push({
         canonicalTokens: cand.canonicalTokens,
+        encodedPattern: cand.encodedPattern,
         occurrenceStarts: uncoveredStarts,
         length: len,
         tier: 'exact',
@@ -276,17 +292,17 @@ export function findMotifs(flat: FlatToken[]): FoundMotif[] {
     // --- Fuzzy layer (→ near motifs) ---
     const fuzzyCandidates = ngramPass(flat, len, 'fuzzy');
     for (const cand of fuzzyCandidates.values()) {
-      // Skip any candidate whose positions are all already exact-claimed
-      const newStarts = cand.occurrenceStarts.filter(
-        (s) => !claimedByExact.has(`${s}:${len}`),
-      );
+      // Drop occurrences that are already covered by an exact motif at the same length
+      const exactStartsAtLen = new Set<number>();
+      for (const ec of ngramPass(flat, len, 'exact').values()) {
+        for (const s of ec.occurrenceStarts) exactStartsAtLen.add(s);
+      }
+      const newStarts = cand.occurrenceStarts.filter((s) => !exactStartsAtLen.has(s));
       if (newStarts.length < MIN_OCCURRENCES) continue;
 
-      // DTW-verify pairwise similarity between occurrence token strings
+      // DTW-verify pairwise similarity
+      const occurrenceTokens = newStarts.map((s) => flat.slice(s, s + len).map((t) => t.token));
       const verifiedStarts: number[] = [];
-      const occurrenceTokens = newStarts.map((s) =>
-        flat.slice(s, s + len).map((t) => t.token),
-      );
       for (let a = 0; a < occurrenceTokens.length; a++) {
         for (let b = a + 1; b < occurrenceTokens.length; b++) {
           const dist = dtwDistance(occurrenceTokens[a]!, occurrenceTokens[b]!);
@@ -300,6 +316,7 @@ export function findMotifs(flat: FlatToken[]): FoundMotif[] {
 
       allFound.push({
         canonicalTokens: cand.canonicalTokens,
+        encodedPattern: cand.encodedPattern,
         occurrenceStarts: verifiedStarts,
         length: len,
         tier: 'near',
@@ -307,19 +324,18 @@ export function findMotifs(flat: FlatToken[]): FoundMotif[] {
     }
 
     // --- Structural layer ---
+    if (len < 3) continue; // avoid noise for very short structural patterns
+
     const structCandidates = ngramPass(flat, len, 'structural');
     for (const cand of structCandidates.values()) {
-      const newStarts = cand.occurrenceStarts.filter(
-        (s) => !claimedByExact.has(`${s}:${len}`),
-      );
+      const fuzzyStartsAtLen = new Set<number>();
+      for (const fc of ngramPass(flat, len, 'fuzzy').values()) {
+        for (const s of fc.occurrenceStarts) fuzzyStartsAtLen.add(s);
+      }
+      const newStarts = cand.occurrenceStarts.filter((s) => !fuzzyStartsAtLen.has(s));
       if (newStarts.length < MIN_OCCURRENCES) continue;
 
-      // Structural motifs need length ≥ 3 to avoid noise (V+C combos appear everywhere)
-      if (len < 3) continue;
-
-      const occurrenceTokens = newStarts.map((s) =>
-        flat.slice(s, s + len).map((t) => t.token),
-      );
+      const occurrenceTokens = newStarts.map((s) => flat.slice(s, s + len).map((t) => t.token));
       const verifiedStarts: number[] = [];
       for (let a = 0; a < occurrenceTokens.length; a++) {
         for (let b = a + 1; b < occurrenceTokens.length; b++) {
@@ -334,6 +350,7 @@ export function findMotifs(flat: FlatToken[]): FoundMotif[] {
 
       allFound.push({
         canonicalTokens: cand.canonicalTokens,
+        encodedPattern: cand.encodedPattern,
         occurrenceStarts: verifiedStarts,
         length: len,
         tier: 'structural',
@@ -341,31 +358,74 @@ export function findMotifs(flat: FlatToken[]): FoundMotif[] {
     }
   }
 
-  // ── Pass 3: Global maximal-repeat deduplication ───────────────────────────
-  // Remove any motif whose every occurrence is a sub-span of a longer motif
-  // in the same tier.
+  // ── Pass 3: Deduplication within each tier ────────────────────────────────
+  //
+  // Rule: within a tier, remove motif A if EVERY one of A's occurrences is
+  // fully contained inside some occurrence of a longer motif B of the SAME tier.
+  //
+  // We deliberately do NOT absorb across tiers: a near-rhyme motif (ɑu̯ ~ ɑw)
+  // must survive even if ɑu̯ also appears inside a long exact repeat, because
+  // it has occurrences (ɑw on line 2) that are NOT inside the exact repeat.
+  //
+  // IMPORTANT: when we absorb a short motif into a long one, we track the
+  // absorbed short motifs so that in Pass 4 we can "promote" their positions
+  // into any surviving motif with the same canonical tokens (e.g. slɑu̯ on
+  // lines 1/16 is absorbed into the long ʋiʋɑrɔstɪ̞slɑu̯ repeat, but slɑu̯ on
+  // lines 3/14 survives — so we then inject lines 1/16 into that survivor).
+  interface AbsorbedRecord {
+    encodedPattern: number[];
+    occurrenceStarts: number[];
+    length: number;
+    tier: 'exact' | 'near' | 'structural';
+  }
+  const absorbed: AbsorbedRecord[] = [];
+
   const deduplicated: FoundMotif[] = [];
   for (let i = 0; i < allFound.length; i++) {
     const cand = allFound[i]!;
-    let absorbed = false;
+    let isAbsorbed = false;
     for (let j = 0; j < allFound.length; j++) {
       if (i === j) continue;
       const other = allFound[j]!;
+      if (other.tier !== cand.tier) continue; // same tier only
       if (other.length <= cand.length) continue;
-      if (other.tier !== cand.tier) continue;
-      if (
-        isCoveredBy(
-          cand.occurrenceStarts,
-          cand.length,
-          other.occurrenceStarts,
-          other.length,
-        )
-      ) {
-        absorbed = true;
+      if (isCoveredBy(cand.occurrenceStarts, cand.length, other.occurrenceStarts, other.length)) {
+        isAbsorbed = true;
         break;
       }
     }
-    if (!absorbed) deduplicated.push(cand);
+    if (!isAbsorbed) {
+      deduplicated.push(cand);
+    } else {
+      absorbed.push({
+        encodedPattern: cand.encodedPattern,
+        occurrenceStarts: cand.occurrenceStarts,
+        length: cand.length,
+        tier: cand.tier,
+      });
+    }
+  }
+
+  // ── Pass 4: Promote absorbed sub-motifs into surviving kin ───────────────
+  //
+  // For each absorbed motif, check if a surviving motif has the SAME encoded
+  // pattern (same tier, same length). If so, merge the absorbed starts into
+  // the survivor. This handles the case where slɑu̯ on lines 1/16 is swallowed
+  // by the long whole-phrase exact repeat, but the identical slɑu̯ on lines 3/14
+  // survives — after promotion all four lines share the same motif.
+  for (const abs of absorbed) {
+    const patKey = abs.encodedPattern.join(',');
+    const survivor = deduplicated.find(
+      (m) =>
+        m.tier === abs.tier && m.length === abs.length && m.encodedPattern.join(',') === patKey,
+    );
+    if (survivor) {
+      for (const s of abs.occurrenceStarts) {
+        if (!survivor.occurrenceStarts.includes(s)) {
+          survivor.occurrenceStarts.push(s);
+        }
+      }
+    }
   }
 
   return deduplicated;

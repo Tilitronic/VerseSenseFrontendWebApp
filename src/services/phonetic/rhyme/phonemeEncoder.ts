@@ -40,7 +40,7 @@ import {
 
 export const WORD_BOUNDARY = 0;
 export const LINE_BOUNDARY = 1;
-const FIRST_PHONEME_CODE  = 2;
+const FIRST_PHONEME_CODE = 2;
 
 // ── Consonant fuzzy-class mapping ─────────────────────────────────────────────
 //
@@ -48,18 +48,43 @@ const FIRST_PHONEME_CODE  = 2;
 // collapses voiced/voiceless and soft/hard pairs.
 
 const VOICED_TO_VOICELESS: Record<string, string> = {
-  b: 'p', d: 't', g: 'k', v: 'f', z: 's', ʒ: 'ʃ',
-  ɣ: 'x', ʁ: 'χ', ð: 'θ', dz: 'ts', dʒ: 'tʃ', dʑ: 'tɕ', dʐ: 'tʂ',
-  β: 'ɸ', ɦ: 'h',
+  b: 'p',
+  d: 't',
+  g: 'k',
+  v: 'f',
+  z: 's',
+  ʒ: 'ʃ',
+  ɣ: 'x',
+  ʁ: 'χ',
+  ð: 'θ',
+  dz: 'ts',
+  dʒ: 'tʃ',
+  dʑ: 'tɕ',
+  dʐ: 'tʂ',
+  β: 'ɸ',
+  ɦ: 'h',
 };
 
 const SOFT_TO_HARD: Record<string, string> = {
-  lʲ: 'l', nʲ: 'n', rʲ: 'r', sʲ: 's', zʲ: 'z', tʲ: 't', dʲ: 'd',
+  lʲ: 'l',
+  nʲ: 'n',
+  rʲ: 'r',
+  sʲ: 's',
+  zʲ: 'z',
+  tʲ: 't',
+  dʲ: 'd',
+};
+
+// Glide equivalences: u̯ (non-syllabic u, Ukrainian word-final allophone of в)
+// and w are the same sound — voiced labio-velar approximant.
+// Map both to 'w' so they fuzz-match each other.
+const GLIDE_ROOT: Record<string, string> = {
+  u̯: 'w', // non-syllabic u (U+0075 + U+032F)
 };
 
 // Root of a consonant symbol (for fuzzy matching)
 function consonantRoot(sym: string): string {
-  return SOFT_TO_HARD[sym] ?? VOICED_TO_VOICELESS[sym] ?? sym;
+  return GLIDE_ROOT[sym] ?? SOFT_TO_HARD[sym] ?? VOICED_TO_VOICELESS[sym] ?? sym;
 }
 
 // ── Vowel fuzzy-class mapping ─────────────────────────────────────────────────
@@ -67,12 +92,24 @@ function consonantRoot(sym: string): string {
 // Long vowels → short; diphthongs → first component monophthong.
 
 const DIPHTHONG_ROOT: Record<string, string> = {
-  'eɪ': 'e', 'aɪ': 'a', 'ɔɪ': 'ɔ', 'aʊ': 'a', 'oʊ': 'o',
-  'ɪə': 'ɪ', 'eə': 'e', 'ʊə': 'ʊ',
+  eɪ: 'e',
+  aɪ: 'a',
+  ɔɪ: 'ɔ',
+  aʊ: 'a',
+  oʊ: 'o',
+  ɪə: 'ɪ',
+  eə: 'e',
+  ʊə: 'ʊ',
 };
 const LONG_VOWEL_ROOT: Record<string, string> = {
-  'iː': 'i', 'uː': 'u', 'aː': 'a', 'eː': 'e', 'oː': 'o',
-  'ɑː': 'ɑ', 'ɔː': 'ɔ', 'ɜː': 'ɜ',
+  iː: 'i',
+  uː: 'u',
+  aː: 'a',
+  eː: 'e',
+  oː: 'o',
+  ɑː: 'ɑ',
+  ɔː: 'ɔ',
+  ɜː: 'ɜ',
 };
 
 function vowelRoot(sym: string): string {
@@ -83,12 +120,12 @@ function vowelRoot(sym: string): string {
 //
 // All vowels share one structural code; consonants are grouped by broad manner.
 
-export const STRUCT_VOWEL   = 'V';
-export const STRUCT_STOP    = 'C_stop';
-export const STRUCT_FRIC    = 'C_fric';
-export const STRUCT_NASAL   = 'C_nasal';
-export const STRUCT_SONOR   = 'C_sonor';
-export const STRUCT_OTHER   = 'C_other';
+export const STRUCT_VOWEL = 'V';
+export const STRUCT_STOP = 'C_stop';
+export const STRUCT_FRIC = 'C_fric';
+export const STRUCT_NASAL = 'C_nasal';
+export const STRUCT_SONOR = 'C_sonor';
+export const STRUCT_OTHER = 'C_other';
 
 function consonantStructClass(manner: string): string {
   if (manner === 'PLOSIVE' || manner === 'IMPLOSIVE') return STRUCT_STOP;
@@ -127,8 +164,8 @@ interface TokenCodes {
 
 function buildCodeMaps(): Map<string, TokenCodes> {
   // Phase 1: collect all unique exact, fuzzy-root, and struct-class strings
-  const exactStrings  = new Set<string>();
-  const fuzzyStrings  = new Set<string>();
+  const exactStrings = new Set<string>();
+  const fuzzyStrings = new Set<string>();
   const structStrings = new Set<string>();
 
   for (const c of CONSONANTS) {
@@ -137,7 +174,7 @@ function buildCodeMaps(): Map<string, TokenCodes> {
     structStrings.add(consonantStructClass(c.manner));
   }
   // Also add soft/hard and voiced/voiceless variants that appear in real transcription
-  for (const [from] of Object.entries({ ...SOFT_TO_HARD, ...VOICED_TO_VOICELESS })) {
+  for (const [from] of Object.entries({ ...SOFT_TO_HARD, ...VOICED_TO_VOICELESS, ...GLIDE_ROOT })) {
     exactStrings.add(from);
     fuzzyStrings.add(consonantRoot(from));
   }
@@ -156,8 +193,8 @@ function buildCodeMaps(): Map<string, TokenCodes> {
 
   // Phase 2: assign stable integer codes (sorted for determinism)
   let next = FIRST_PHONEME_CODE;
-  const exactCode  = new Map<string, number>([...exactStrings].sort().map((s) => [s, next++]));
-  const fuzzyCode  = new Map<string, number>([...fuzzyStrings].sort().map((s) => [s, next++]));
+  const exactCode = new Map<string, number>([...exactStrings].sort().map((s) => [s, next++]));
+  const fuzzyCode = new Map<string, number>([...fuzzyStrings].sort().map((s) => [s, next++]));
   const structCode = new Map<string, number>([...structStrings].sort().map((s) => [s, next++]));
 
   // Phase 3: build combined map for every exact symbol
@@ -167,16 +204,17 @@ function buildCodeMaps(): Map<string, TokenCodes> {
     ...exactStrings,
     ...Object.keys(SOFT_TO_HARD),
     ...Object.keys(VOICED_TO_VOICELESS),
+    ...Object.keys(GLIDE_ROOT),
     ...Object.keys(DIPHTHONG_ROOT),
     ...Object.keys(LONG_VOWEL_ROOT),
   ]);
 
   for (const sym of allSymbols) {
-    const isVowel = VOWELS.some((v) => v.symbol === sym) ||
-                    sym in DIPHTHONG_ROOT || sym in LONG_VOWEL_ROOT;
+    const isVowel =
+      VOWELS.some((v) => v.symbol === sym) || sym in DIPHTHONG_ROOT || sym in LONG_VOWEL_ROOT;
     const consonantEntry = CONSONANTS.find((c) => c.symbol === sym);
 
-    const fRoot  = isVowel ? vowelRoot(sym) : consonantRoot(sym);
+    const fRoot = isVowel ? vowelRoot(sym) : consonantRoot(sym);
     const sClass = isVowel
       ? STRUCT_VOWEL
       : consonantEntry
@@ -184,9 +222,9 @@ function buildCodeMaps(): Map<string, TokenCodes> {
         : STRUCT_OTHER;
 
     // Fall back to fresh codes for unknown symbols so nothing crashes
-    const ec = exactCode.get(sym)  ?? (next++);
-    const fc = fuzzyCode.get(fRoot) ?? (next++);
-    const sc = structCode.get(sClass) ?? (next++);
+    const ec = exactCode.get(sym) ?? next++;
+    const fc = fuzzyCode.get(fRoot) ?? next++;
+    const sc = structCode.get(sClass) ?? next++;
 
     result.set(sym, { exactCode: ec, fuzzyCode: fc, structCode: sc });
   }
@@ -207,8 +245,8 @@ export type EncodingLayer = 'exact' | 'fuzzy' | 'structural';
 export function encodeToken(token: string, layer: EncodingLayer): number {
   const entry = CODE_MAP.get(token);
   if (entry) {
-    if (layer === 'exact')      return entry.exactCode;
-    if (layer === 'fuzzy')      return entry.fuzzyCode;
+    if (layer === 'exact') return entry.exactCode;
+    if (layer === 'fuzzy') return entry.fuzzyCode;
     return entry.structCode;
   }
   // Unknown token: hash to a stable code outside the reserved range

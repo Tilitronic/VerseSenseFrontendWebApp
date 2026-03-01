@@ -83,7 +83,11 @@
                               ? 'pp-cell__token--vowel'
                               : 'pp-cell__token--consonant'
                           "
-                          :style="showSounds ? (tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined) : undefined"
+                          :style="
+                            showSounds
+                              ? (tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined)
+                              : undefined
+                          "
                           >{{ token }}</span
                         >
                       </div>
@@ -264,8 +268,8 @@ function sylMotifs(wordId: string, sylIdx: number, tokenCount: number): PhonemeM
   return [...seen].map((id) => motifs.find((m) => m.id === id)!).filter(Boolean);
 }
 
-const BAR_H   = 5;  // px — height of each rhyme bar
-const BAR_GAP = 2;  // px — gap between stacked bars
+const BAR_H = 5; // px — height of each rhyme bar
+const BAR_GAP = 2; // px — gap between stacked bars
 
 /**
  * Inline style for one rhyme bar inside a syllable cell.
@@ -275,8 +279,7 @@ const BAR_GAP = 2;  // px — gap between stacked bars
 function rhymeBarStyle(motif: PhonemeMotif, stackIndex: number): Record<string, string> {
   const bottom = stackIndex * (BAR_H + BAR_GAP);
   const radius =
-    motif.tier === 'exact' ? '2px 2px 0 0' :
-    motif.tier === 'near'  ? '1px 1px 0 0' : '0';
+    motif.tier === 'exact' ? '2px 2px 0 0' : motif.tier === 'near' ? '1px 1px 0 0' : '0';
   return {
     background: motif.color,
     height: `${BAR_H}px`,

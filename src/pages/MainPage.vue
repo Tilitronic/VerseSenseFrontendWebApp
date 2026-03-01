@@ -119,10 +119,51 @@
             title="Highlight recurring phoneme patterns (rhymes)"
             @click="showRhymes = !showRhymes"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M2 12 Q2 4 8 4 Q14 4 14 8 Q14 12 8 12" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-              <rect x="3" y="13" width="4" height="2" rx="1" fill="currentColor" />
-              <rect x="9" y="13" width="4" height="2" rx="1" fill="currentColor" />
+            <svg width="28" height="14" viewBox="0 0 28 14" fill="none" style="font-family: serif">
+              <text
+                x="0"
+                y="11"
+                font-size="8"
+                font-family="Georgia,serif"
+                font-weight="700"
+                fill="currentColor"
+                opacity="1.0"
+              >
+                A
+              </text>
+              <text
+                x="7"
+                y="11"
+                font-size="8"
+                font-family="Georgia,serif"
+                font-weight="700"
+                fill="currentColor"
+                opacity="0.55"
+              >
+                B
+              </text>
+              <text
+                x="14"
+                y="11"
+                font-size="8"
+                font-family="Georgia,serif"
+                font-weight="700"
+                fill="currentColor"
+                opacity="0.55"
+              >
+                B
+              </text>
+              <text
+                x="21"
+                y="11"
+                font-size="8"
+                font-family="Georgia,serif"
+                font-weight="700"
+                fill="currentColor"
+                opacity="1.0"
+              >
+                A
+              </text>
             </svg>
             Rhymes highlight
           </button>
@@ -139,15 +180,60 @@
             </svg>
             Sounds highlight
           </button>
+          <!-- Rhymes panel toggle -->
+          <button
+            class="panel__web-btn"
+            :class="{ 'panel__web-btn--active': showRhymesPanel }"
+            title="Open rhyme groups panel"
+            @click="showRhymesPanel = !showRhymesPanel"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect
+                x="1"
+                y="2"
+                width="14"
+                height="3"
+                rx="1.5"
+                fill="currentColor"
+                fill-opacity="0.9"
+              />
+              <rect
+                x="1"
+                y="7"
+                width="10"
+                height="3"
+                rx="1.5"
+                fill="currentColor"
+                fill-opacity="0.65"
+              />
+              <rect
+                x="1"
+                y="12"
+                width="7"
+                height="2"
+                rx="1"
+                fill="currentColor"
+                fill-opacity="0.4"
+              />
+            </svg>
+            Rhymes panel
+          </button>
         </div>
       </div>
-      <div class="panel__body">
+      <div class="panel__body panel__body--split" ref="splitBodyRef">
         <PhoneticPanel
+          class="panel__split-main"
           v-model:showWeb="showSoundWeb"
           v-model:alignRight="showAlignRight"
           v-model:showRhymes="showRhymes"
           v-model:showSounds="showSounds"
         />
+        <Transition name="rp-slide">
+          <div v-if="showRhymesPanel" class="panel__rp-wrap">
+            <div class="panel__rp-divider" @pointerdown="onRpDividerPointerDown" />
+            <RhymesPanel class="panel__split-side" :style="rhymesPanelStyle" />
+          </div>
+        </Transition>
       </div>
     </div>
   </q-page>
@@ -160,6 +246,7 @@ import { usePoetryStore } from 'stores/poetry';
 import type { ToolbarMode } from 'stores/localConfig';
 import PoetryEditor from 'components/PoetryEditor.vue';
 import PhoneticPanel from 'components/PhoneticPanel.vue';
+import RhymesPanel from 'components/RhymesPanel.vue';
 
 const appStore = useAppStore();
 const poetryStore = usePoetryStore();
@@ -169,7 +256,41 @@ const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
 const showRhymes = ref(false);
 const showSounds = ref(true);
+const showRhymesPanel = ref(false);
 const showRowSettings = ref(true);
+
+// ── Resizable rhymes panel ───────────────────────────────────────────────────
+const splitBodyRef = ref<HTMLElement | null>(null);
+const rhymesPanelPx = ref(220);
+
+const rhymesPanelStyle = computed(() => ({ width: `${rhymesPanelPx.value}px` }));
+
+let rpDragStartX = 0;
+let rpDragStartPx = 0;
+
+function onRpDividerPointerDown(e: PointerEvent) {
+  e.preventDefault();
+  rpDragStartX = e.clientX;
+  rpDragStartPx = rhymesPanelPx.value;
+  window.addEventListener('pointermove', onRpDividerPointerMove);
+  window.addEventListener('pointerup', onRpDividerPointerUp);
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+}
+
+function onRpDividerPointerMove(e: PointerEvent) {
+  // dragging left = bigger panel (divider is on the LEFT of the panel)
+  const delta = rpDragStartX - e.clientX;
+  const containerW = splitBodyRef.value?.clientWidth ?? window.innerWidth;
+  rhymesPanelPx.value = Math.min(containerW * 0.6, Math.max(140, rpDragStartPx + delta));
+}
+
+function onRpDividerPointerUp() {
+  window.removeEventListener('pointermove', onRpDividerPointerMove);
+  window.removeEventListener('pointerup', onRpDividerPointerUp);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+}
 
 const allLinesConfirmed = computed(() => {
   const lines = poetryStore.document.lines;
@@ -288,7 +409,70 @@ function clearText() {
     flex: 1;
     overflow: hidden;
     position: relative;
+
+    // Split layout: IPA grid + rhymes panel side-by-side
+    &--split {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+    }
   }
+
+  &__split-main {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__split-side {
+    // width is set inline via rhymesPanelStyle
+    flex-shrink: 0;
+    overflow: hidden;
+    min-width: 140px;
+  }
+
+  &__rp-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  &__rp-divider {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+    transition: background 0.15s;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0 2px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 1px;
+      transition: background 0.15s;
+    }
+
+    &:hover::after {
+      background: rgba(255, 255, 255, 0.28);
+    }
+  }
+}
+
+// ── Rhymes panel slide transition ─────────────────────────────────────────────
+.rp-slide-enter-active,
+.rp-slide-leave-active {
+  transition:
+    width 0.22s ease,
+    opacity 0.18s ease;
+  overflow: hidden;
+}
+.rp-slide-enter-from,
+.rp-slide-leave-to {
+  width: 0 !important;
+  opacity: 0;
 }
 
 // ── Row-settings toggle button ───────────────────────────────────────────────
