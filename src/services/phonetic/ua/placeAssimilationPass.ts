@@ -47,9 +47,9 @@ for (const p of consonantData.phonemes) {
 // ── Build sibilant assimilation lookup ──────────────────────────────────────
 
 interface SibilantRule {
-  target: string;    // IPA of the token that changes
-  trigger: string;   // IPA of the following token that causes the change
-  result: string;    // IPA the target becomes
+  target: string; // IPA of the token that changes
+  trigger: string; // IPA of the following token that causes the change
+  result: string; // IPA the target becomes
 }
 
 const sibilantRules: SibilantRule[] = placeData.sibilantAssimilation.rules.map((r) => ({
@@ -61,9 +61,9 @@ const sibilantRules: SibilantRule[] = placeData.sibilantAssimilation.rules.map((
 // ── Build affricate assimilation lookup ─────────────────────────────────────
 
 interface AffricateRule {
-  first: string;   // IPA of first token
-  second: string;  // IPA of second token
-  result: string;  // IPA that replaces the first token (second removed)
+  first: string; // IPA of first token
+  second: string; // IPA of second token
+  result: string; // IPA that replaces the first token (second removed)
 }
 
 const affricateRules: AffricateRule[] = placeData.affricateAssimilation.rules.map((r) => ({

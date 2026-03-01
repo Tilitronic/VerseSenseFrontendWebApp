@@ -22,9 +22,9 @@ import type { PhoneticToken } from './types';
 import graphemeData from './data/graphemes';
 
 const vAllophones = graphemeData.vAllophones;
-const V_DEFAULT = vAllophones.default;                     // ʋ
+const V_DEFAULT = vAllophones.default; // ʋ
 const V_POST_VOCALIC_PRE_C = vAllophones.postVocalicPreConsonantal; // w
-const V_WORD_FINAL = vAllophones.wordFinalPostVocalic;     // u̯
+const V_WORD_FINAL = vAllophones.wordFinalPostVocalic; // u̯
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

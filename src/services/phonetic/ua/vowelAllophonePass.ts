@@ -20,8 +20,8 @@ import type { PhoneticToken } from './types';
 const HIGH_VOWELS = new Set(['u', 'i']);
 
 /** Allophone mappings */
-const UNSTRESSED_E = 'ɛ̝';  // [еи] — е pulling toward и
-const UNSTRESSED_Y = 'ɪ̞';  // [ие] — и pulling toward е
+const UNSTRESSED_E = 'ɛ̝'; // [еи] — е pulling toward и
+const UNSTRESSED_Y = 'ɪ̞'; // [ие] — и pulling toward е
 const UNSTRESSED_O_BEFORE_HIGH = 'ɔ̝'; // [оу] — о narrowing toward у
 
 // ── Pass implementation ─────────────────────────────────────────────────────
@@ -33,10 +33,7 @@ const UNSTRESSED_O_BEFORE_HIGH = 'ɔ̝'; // [оу] — о narrowing toward у
  * @param stressedVowelIndex - 0-based index of the stressed vowel in the word
  *                             (among vowels only, not all tokens)
  */
-export function applyVowelAllophones(
-  tokens: PhoneticToken[],
-  stressedVowelIndex: number,
-): void {
+export function applyVowelAllophones(tokens: PhoneticToken[], stressedVowelIndex: number): void {
   // ── Step 1: Assign stress flag ──────────────────────────────────────────
   for (const tok of tokens) {
     if (tok.type === 'vowel') {
@@ -82,10 +79,7 @@ export function applyVowelAllophones(
 
       case 'ɔ':
         // Unstressed /о/ → [ɔ̝] only if the stressed vowel is high (/у/ or /і/)
-        if (
-          tok.vowelIndex < stressedVowelIndex &&
-          HIGH_VOWELS.has(stressedIpa)
-        ) {
+        if (tok.vowelIndex < stressedVowelIndex && HIGH_VOWELS.has(stressedIpa)) {
           tok.ipa = UNSTRESSED_O_BEFORE_HIGH;
           if (tok.vowelFeatures) {
             tok.vowelFeatures = {

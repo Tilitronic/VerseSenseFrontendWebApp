@@ -10,7 +10,7 @@ export default {
     note: 'This file is the single source of truth for grapheme-to-phoneme conversion. Portable to Python via json.load().',
   },
 
-  apostropheChars: ["'", "\u02bc", "\u2019", "\u0027", "\u2018", "\u0060"] as string[],
+  apostropheChars: ["'", '\u02bc', '\u2019', '\u0027', '\u2018', '\u0060'] as string[],
   softSign: 'ь',
 
   vowelGraphemes: ['а', 'е', 'є', 'и', 'і', 'ї', 'о', 'у', 'ю', 'я'] as string[],
@@ -65,8 +65,24 @@ export default {
   } as Record<string, string[]>,
 
   softenableConsonants: [
-    'd', 'dʲ', 't', 'tʲ', 'z', 'zʲ', 's', 'sʲ',
-    'dz', 'dzʲ', 'ts', 'tsʲ', 'l', 'lʲ', 'n', 'nʲ', 'r', 'rʲ',
+    'd',
+    'dʲ',
+    't',
+    'tʲ',
+    'z',
+    'zʲ',
+    's',
+    'sʲ',
+    'dz',
+    'dzʲ',
+    'ts',
+    'tsʲ',
+    'l',
+    'lʲ',
+    'n',
+    'nʲ',
+    'r',
+    'rʲ',
   ] as string[],
 
   softMap: {

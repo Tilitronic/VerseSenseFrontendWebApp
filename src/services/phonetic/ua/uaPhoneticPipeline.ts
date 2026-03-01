@@ -58,9 +58,7 @@ export function transcribeUkrainianPipeline(
 
   // Clamp stress index to valid range
   const totalVowels = tokens.filter((t) => t.type === 'vowel').length;
-  const safeStress = totalVowels > 0
-    ? Math.min(Math.max(0, stressIndex), totalVowels - 1)
-    : 0;
+  const safeStress = totalVowels > 0 ? Math.min(Math.max(0, stressIndex), totalVowels - 1) : 0;
 
   // ── Pass 2: Palatalization propagation ────────────────────────────────
   applyPalatalization(tokens);

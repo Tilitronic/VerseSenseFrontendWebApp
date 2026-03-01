@@ -59,10 +59,7 @@ export function applyGeminates(tokens: PhoneticToken[]): PhoneticToken[] {
     const current = tokens[i]!;
 
     // Only merge consonant-type tokens (consonant, glide, glottal)
-    if (
-      current.type !== 'consonant' &&
-      current.type !== 'glide'
-    ) {
+    if (current.type !== 'consonant' && current.type !== 'glide') {
       tokens[writeIdx++] = current;
       continue;
     }
@@ -76,9 +73,7 @@ export function applyGeminates(tokens: PhoneticToken[]): PhoneticToken[] {
     ) {
       // Merge: take the more palatalized variant
       const useSoft = current.palatalized || next.palatalized;
-      const mergedIpa = useSoft
-        ? baseIpa(current.ipa) + 'ʲː'
-        : baseIpa(current.ipa) + 'ː';
+      const mergedIpa = useSoft ? baseIpa(current.ipa) + 'ʲː' : baseIpa(current.ipa) + 'ː';
 
       current.ipa = mergedIpa;
       current.source = current.source + next.source;

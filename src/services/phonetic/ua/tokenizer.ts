@@ -19,11 +19,7 @@
  * Data-driven: all mapping tables imported from JSON data files.
  */
 
-import type {
-  PhoneticToken,
-  ConsonantFeatures,
-  VowelFeatures,
-} from './types';
+import type { PhoneticToken, ConsonantFeatures, VowelFeatures } from './types';
 
 import graphemeData from './data/graphemes';
 import consonantData from './data/consonants';
@@ -86,11 +82,7 @@ const softenableSet = new Set(graphemeData.softenableConsonants);
 
 // ── Helper: create tokens ───────────────────────────────────────────────────
 
-function makeConsonantToken(
-  ipa: string,
-  source: string,
-  palatalized = false,
-): PhoneticToken {
+function makeConsonantToken(ipa: string, source: string, palatalized = false): PhoneticToken {
   // Look up features — if palatalized, try the ʲ variant first
   const lookupIpa = palatalized && !ipa.endsWith('ʲ') ? ipa + 'ʲ' : ipa;
   const features = consonantFeatureMap.get(lookupIpa) ?? consonantFeatureMap.get(ipa) ?? null;
@@ -109,11 +101,7 @@ function makeConsonantToken(
   };
 }
 
-function makeVowelToken(
-  ipa: string,
-  source: string,
-  vowelIndex: number,
-): PhoneticToken {
+function makeVowelToken(ipa: string, source: string, vowelIndex: number): PhoneticToken {
   const features = vowelFeatureMap.get(ipa) ?? null;
   return {
     ipa,

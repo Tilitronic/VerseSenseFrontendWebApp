@@ -1,4 +1,5 @@
 # Phonetic & IPA Libraries Research
+
 ## VerseSense — UA / EN / PL across Python and TypeScript/JavaScript
 
 **Date:** February 2026  
@@ -9,11 +10,11 @@
 
 ## The Three Capabilities Needed
 
-| Capability | Description |
-|---|---|
-| **G2P** | word → IPA string (`"gold"` → `"goʊld"`) |
-| **Phoneme features** | IPA symbol → feature object (`"ʃ"` → `{place: postalveolar, manner: fricative, voiced: false, …}`) |
-| **Syllabification + stress** | IPA string → syllables with stressed syllable index |
+| Capability                   | Description                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| **G2P**                      | word → IPA string (`"gold"` → `"goʊld"`)                                                           |
+| **Phoneme features**         | IPA symbol → feature object (`"ʃ"` → `{place: postalveolar, manner: fricative, voiced: false, …}`) |
+| **Syllabification + stress** | IPA string → syllables with stressed syllable index                                                |
 
 No single library covers all three for all three languages on both platforms.
 
@@ -21,7 +22,7 @@ No single library covers all three for all three languages on both platforms.
 
 ## 1. Phoneme Feature Databases
 
-These answer: *"given IPA symbol `ʃ`, what are its articulatory features?"*
+These answer: _"given IPA symbol `ʃ`, what are its articulatory features?"_
 
 ### `panphon` — ⭐ Recommended for Python
 
@@ -60,7 +61,7 @@ These answer: *"given IPA symbol `ʃ`, what are its articulatory features?"*
 
 ### `cmu-pronouncing-dictionary` — ⭐ Already in project (TS)
 
-- **Install:** `pnpm add cmu-pronouncing-dictionary` *(already installed)*
+- **Install:** `pnpm add cmu-pronouncing-dictionary` _(already installed)_
 - **Coverage:** 134,000 words, Carnegie Mellon quality
 - **Format:** ARPABET with embedded stress digits — `G OW1 L D` (digit `1` = primary stress, `2` = secondary, `0` = unstressed)
 - **Stress:** fully encoded — no separate stress detection needed
@@ -166,21 +167,21 @@ This is the honest state of the ecosystem as of early 2026.
 
 ### Python
 
-| Library | Languages | Notes |
-|---|---|---|
-| `pyphen` | 70+ incl. UA, PL | Hyphenation-based; good approximation of syllable boundaries |
-| `phonemizer` | EN + espeak langs | Returns syllabified IPA directly; most accurate |
-| `gruut` | EN + 9 others | Syllabified IPA output with stress |
-| `syllapy` | EN only | Fast, dictionary-based EN syllable counter |
+| Library      | Languages         | Notes                                                        |
+| ------------ | ----------------- | ------------------------------------------------------------ |
+| `pyphen`     | 70+ incl. UA, PL  | Hyphenation-based; good approximation of syllable boundaries |
+| `phonemizer` | EN + espeak langs | Returns syllabified IPA directly; most accurate              |
+| `gruut`      | EN + 9 others     | Syllabified IPA output with stress                           |
+| `syllapy`    | EN only           | Fast, dictionary-based EN syllable counter                   |
 
 ### TypeScript
 
-| Library | Languages | Notes |
-|---|---|---|
-| `hypher` + dict | 30+ langs | Hyphenation only, not IPA-level |
-| `syllable` | EN only | Simple word-level counter |
-| `Sylabizer.ts` (custom) | UA | In project — needs the nucleus-detection bug fix |
-| `splitIpaToSyllables` | EN/UA | In `enTranscription.ts` — fixed in current session |
+| Library                 | Languages | Notes                                              |
+| ----------------------- | --------- | -------------------------------------------------- |
+| `hypher` + dict         | 30+ langs | Hyphenation only, not IPA-level                    |
+| `syllable`              | EN only   | Simple word-level counter                          |
+| `Sylabizer.ts` (custom) | UA        | In project — needs the nucleus-detection bug fix   |
+| `splitIpaToSyllables`   | EN/UA     | In `enTranscription.ts` — fixed in current session |
 
 ### Recommendation
 
@@ -236,6 +237,7 @@ dzʲ,-1,-1,1,-1,1,-1,-1,1,-1,-1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 ```
 
 ### Python usage
+
 ```python
 ft = panphon.FeatureTable()
 ft.add_segment_from_file('shared-phonetics/ua_extensions.csv')
@@ -244,12 +246,11 @@ ft.fts('nʲ').hamming_feature_edit_distance(ft.fts('n'))  # → 1 (palatalizatio
 ```
 
 ### TypeScript usage (build-time merge)
+
 ```typescript
-import base   from './ipa_bases.json';      // exported from panphon CSV
-import uaExt  from './ua_extensions.json';  // your CSV converted to JSON
-const registry = new Map(
-  [...base, ...uaExt].map(r => [r.ipa, r])
-);
+import base from './ipa_bases.json'; // exported from panphon CSV
+import uaExt from './ua_extensions.json'; // your CSV converted to JSON
+const registry = new Map([...base, ...uaExt].map((r) => [r.ipa, r]));
 ```
 
 ---
@@ -262,21 +263,21 @@ The grapheme-to-IPA rules for UA and PL are the primary source of duplication. E
 # shared-phonetics/g2p-ua.yaml
 language: uk
 rules:
-  - grapheme: "дж"
-    ipa: "dʒ"
+  - grapheme: 'дж'
+    ipa: 'dʒ'
     context: null
     priority: 10
-  - grapheme: "дз"
-    ipa: "dz"
+  - grapheme: 'дз'
+    ipa: 'dz'
     context: null
     priority: 10
-  - grapheme: "ть"
-    ipa: "tʲ"
+  - grapheme: 'ть'
+    ipa: 'tʲ'
     context: word_final
     priority: 8
-  - grapheme: "а"
-    ipa_stressed: "ɑ"
-    ipa_unstressed: "ɐ"
+  - grapheme: 'а'
+    ipa_stressed: 'ɑ'
+    ipa_unstressed: 'ɐ'
     priority: 1
 ```
 
@@ -286,25 +287,26 @@ Both sides implement a ~50-line rule-application engine. The rules never diverge
 
 ## 9. Cross-Platform Compatibility Matrix
 
-| Capability | Python | TypeScript | Shared? |
-|---|---|---|---|
-| **EN G2P** | `pronouncing` (CMU) | `cmu-pronouncing-dictionary` | ✅ Same CMU source |
-| **EN features** | `panphon` | `ipa_bases.json` from panphon | ✅ Same CSV |
-| **EN syllabification** | `gruut` / `phonemizer` | `splitIpaToSyllables.ts` | ⚠️ Algorithm shared, impl separate |
-| **UA G2P** | `epitran` + custom rules | `Phonetizer.ts` + custom rules | ✅ Rules in shared YAML |
-| **UA stress** | `ukrainian-word-stress` (ML) | rule-based fallback | ❌ ML not portable to browser |
-| **UA features** | `panphon` + `ua_extensions.csv` | `ua_extensions.json` | ✅ Same CSV |
-| **UA syllabification** | `pyphen` | `Sylabizer.ts` (custom) | ⚠️ Algorithm shared, impl separate |
-| **PL G2P** | `phonemizer` / `epitran` | rule-based `plTranscription.ts` | ✅ Rules in shared YAML |
-| **PL features** | `panphon` (mostly covered) | `ipa_bases.json` | ✅ |
-| **ARPABET→IPA** | inline table | `enTranscription.ts` | ✅ `arpabet_to_ipa.json` |
-| **Similarity** | `panphon` hamming distance | custom `similarity.ts` | ✅ Same algorithm |
+| Capability             | Python                          | TypeScript                      | Shared?                            |
+| ---------------------- | ------------------------------- | ------------------------------- | ---------------------------------- |
+| **EN G2P**             | `pronouncing` (CMU)             | `cmu-pronouncing-dictionary`    | ✅ Same CMU source                 |
+| **EN features**        | `panphon`                       | `ipa_bases.json` from panphon   | ✅ Same CSV                        |
+| **EN syllabification** | `gruut` / `phonemizer`          | `splitIpaToSyllables.ts`        | ⚠️ Algorithm shared, impl separate |
+| **UA G2P**             | `epitran` + custom rules        | `Phonetizer.ts` + custom rules  | ✅ Rules in shared YAML            |
+| **UA stress**          | `ukrainian-word-stress` (ML)    | rule-based fallback             | ❌ ML not portable to browser      |
+| **UA features**        | `panphon` + `ua_extensions.csv` | `ua_extensions.json`            | ✅ Same CSV                        |
+| **UA syllabification** | `pyphen`                        | `Sylabizer.ts` (custom)         | ⚠️ Algorithm shared, impl separate |
+| **PL G2P**             | `phonemizer` / `epitran`        | rule-based `plTranscription.ts` | ✅ Rules in shared YAML            |
+| **PL features**        | `panphon` (mostly covered)      | `ipa_bases.json`                | ✅                                 |
+| **ARPABET→IPA**        | inline table                    | `enTranscription.ts`            | ✅ `arpabet_to_ipa.json`           |
+| **Similarity**         | `panphon` hamming distance      | custom `similarity.ts`          | ✅ Same algorithm                  |
 
 ---
 
 ## 10. Recommended Stack — Final Decision
 
 ### Python Backend
+
 ```
 panphon                   # phoneme features + similarity
 pronouncing               # EN G2P (same CMU dict as frontend)
@@ -315,6 +317,7 @@ pymorphy2 + dicts-uk      # UA morphological context (optional)
 ```
 
 ### TypeScript Frontend
+
 ```
 cmu-pronouncing-dictionary   # EN G2P — already installed
 # ipa_bases.json             — exported from panphon at project setup (one-time)
@@ -324,6 +327,7 @@ cmu-pronouncing-dictionary   # EN G2P — already installed
 ```
 
 ### Shared Data — `shared-phonetics/` folder
+
 ```
 ipa_bases.json          ← panphon CSV exported to JSON (one-time script)
 ua_extensions.csv       ← palatalized UA consonants (hand-authored, ~10 rows)
@@ -337,12 +341,12 @@ g2p-pl.yaml             ← PL grapheme rules (Phase 10)
 
 ## 11. What Must Be Duplicated (Unavoidable)
 
-| Logic | Why not shareable | Mitigation |
-|---|---|---|
-| UA stress prediction | ML model not runnable in browser | Rule-based approximation on frontend is acceptable for display |
-| Syllabification engine | Different data structures per runtime | Both use the same vowel-nucleus algorithm; test with shared fixtures |
-| Allophone selection | Internal language logic, not IPA-level | Lives entirely in each engine; not in shared data |
-| G2P rule application engine | ~50 lines trivial to reimplement | Rules themselves live in shared YAML |
+| Logic                       | Why not shareable                      | Mitigation                                                           |
+| --------------------------- | -------------------------------------- | -------------------------------------------------------------------- |
+| UA stress prediction        | ML model not runnable in browser       | Rule-based approximation on frontend is acceptable for display       |
+| Syllabification engine      | Different data structures per runtime  | Both use the same vowel-nucleus algorithm; test with shared fixtures |
+| Allophone selection         | Internal language logic, not IPA-level | Lives entirely in each engine; not in shared data                    |
+| G2P rule application engine | ~50 lines trivial to reimplement       | Rules themselves live in shared YAML                                 |
 
 ---
 

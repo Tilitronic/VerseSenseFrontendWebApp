@@ -66,11 +66,16 @@ function sonority(t: PhoneticToken): number {
   // Sonorants by manner
   if (f.voicePower === 'sonorant') {
     switch (f.manner) {
-      case 'trill':       return 6; // р, рь
-      case 'lateral':     return 5; // л, ль
-      case 'nasal':       return 4; // м, н, нь
-      case 'approximant': return 5; // ʋ (в) — between lateral and trill
-      default:            return 4;
+      case 'trill':
+        return 6; // р, рь
+      case 'lateral':
+        return 5; // л, ль
+      case 'nasal':
+        return 4; // м, н, нь
+      case 'approximant':
+        return 5; // ʋ (в) — between lateral and trill
+      default:
+        return 4;
     }
   }
 
