@@ -30,7 +30,7 @@
         />
       </svg>
 
-      <div class="pp-lines">
+      <div class="pp-lines" :class="{ 'pp-lines--right': alignRight }">
         <template v-for="(line, lineIdx) in store.document.lines" :key="line.id">
           <!-- Empty line (no tokens at all) → blank row -->
           <div v-if="line.tokens.length === 0" class="pp-blank-row" />
@@ -63,8 +63,8 @@
 
             <div class="pp-cells">
               <template v-for="tok in line.tokens" :key="tok.id">
-                <!-- TAB → empty indent cell -->
-                <div v-if="tok.kind === 'TAB'" class="pp-cell pp-cell--tab" />
+                <!-- TAB → empty indent cell (hidden in right-align mode) -->
+                <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
 
                 <!-- Word → syllable cells (punctuation-only words skipped) -->
                 <template v-else-if="tok.kind === 'WORD' && !isPunctuation(tok.text)">
@@ -110,6 +110,9 @@ import type { ILine, IToken, IWordToken } from 'src/model/Token';
 import { transcribeWord, type TranscribedWord } from 'src/services/phonetic/wordTranscription';
 import { analyzeSoundPatterns } from 'src/services/phonetic/soundPatternAnalyzer';
 import { ipaTokenColor, ipaTokenStyle, type TokenVisual } from 'src/services/phonetic/ipaColorMap';
+
+const showWeb = defineModel<boolean>('showWeb', { default: false });
+const alignRight = defineModel<boolean>('alignRight', { default: false });
 
 const store = usePoetryStore();
 
@@ -234,7 +237,6 @@ const tokenStyleMap = computed<Map<string, TokenVisual>>(() => {
 });
 
 // ── Clustering web ───────────────────────────────────────────────────────────
-const showWeb = defineModel<boolean>('showWeb', { default: false });
 const gridContainer = ref<HTMLElement | null>(null);
 
 /** renderKey → span element (set by :ref callbacks in template) */
@@ -391,6 +393,14 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   display: flex;
   flex-direction: column;
   gap: 5px;
+
+  &--right {
+    align-items: flex-end;
+
+    .pp-row {
+      flex-direction: row-reverse;
+    }
+  }
 }
 
 .pp-blank-row {
@@ -488,8 +498,9 @@ $consonant-col: rgba(0, 0, 0, 0.75);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 1 1 0; // grow/shrink equally — all tokens share the cell width
-    min-width: 0;
+    flex: 0 0 auto; // natural content size — no forced filling
+    padding: 0 3px; // horizontal breathing room for the color label
+    min-width: 1.1em; // never narrower than one character
     // height is driven by the inline TokenVisual.height (% of parent __tokens)
     // when no style is applied fall back to 'auto' via the style binding
     height: auto;

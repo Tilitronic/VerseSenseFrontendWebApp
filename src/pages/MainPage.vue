@@ -47,6 +47,11 @@
             </template>
           </q-btn-toggle>
 
+          <!-- Word count -->
+          <span class="panel__word-count q-ml-xs">
+            {{ wordCount }} word{{ wordCount !== 1 ? 's' : '' }}
+          </span>
+
           <!-- Clear -->
           <q-btn
             flat
@@ -93,13 +98,24 @@
             </svg>
             Web
           </button>
-          <span class="panel__word-count">
-            {{ wordCount }} word{{ wordCount !== 1 ? 's' : '' }}
-          </span>
+          <!-- Right-align toggle -->
+          <button
+            class="panel__web-btn"
+            :class="{ 'panel__web-btn--active': showAlignRight }"
+            title="Right-align rows (ignore leading tabs)"
+            @click="showAlignRight = !showAlignRight"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" />
+              <rect x="6" y="7" width="8" height="2" rx="1" fill="currentColor" />
+              <rect x="4" y="11" width="10" height="2" rx="1" fill="currentColor" />
+            </svg>
+            Right
+          </button>
         </div>
       </div>
       <div class="panel__body">
-        <PhoneticPanel v-model:showWeb="showSoundWeb" />
+        <PhoneticPanel v-model:showWeb="showSoundWeb" v-model:alignRight="showAlignRight" />
       </div>
     </div>
   </q-page>
@@ -118,6 +134,7 @@ const poetryStore = usePoetryStore();
 
 const wordCount = computed(() => poetryStore.allWordTokens.length);
 const showSoundWeb = ref(false);
+const showAlignRight = ref(false);
 const showRowSettings = ref(true);
 
 const allLinesConfirmed = computed(() => {
