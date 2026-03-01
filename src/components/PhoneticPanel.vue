@@ -60,13 +60,9 @@
             :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
           >
             <span class="pp-row__num">{{ lineIdx + 1 }}</span>
-
             <div class="pp-cells">
               <template v-for="tok in line.tokens" :key="tok.id">
-                <!-- TAB → empty indent cell (hidden in right-align mode) -->
                 <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
-
-                <!-- Word → syllable cells (punctuation-only words skipped) -->
                 <template v-else-if="tok.kind === 'WORD' && !isPunctuation(tok.text)">
                   <template v-for="(syl, si) in transcribedWord(tok).syllables" :key="si">
                     <div
@@ -87,10 +83,21 @@
                               ? 'pp-cell__token--vowel'
                               : 'pp-cell__token--consonant'
                           "
-                          :style="tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined"
+                          :style="showSounds ? (tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined) : undefined"
                           >{{ token }}</span
                         >
                       </div>
+                      <!-- Rhyme bars: one per motif matching this syllable -->
+                      <template v-if="showRhymes">
+                        <div
+                          v-for="(motif, mi) in sylMotifs(tok.id, si, syl.ipaTokens.length)"
+                          :key="motif.id"
+                          class="pp-cell__rhyme-bar"
+                          :class="`pp-cell__rhyme-bar--${motif.tier}`"
+                          :style="rhymeBarStyle(motif, mi)"
+                          :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
+                        />
+                      </template>
                     </div>
                   </template>
                 </template>
@@ -110,9 +117,13 @@ import type { ILine, IToken, IWordToken } from 'src/model/Token';
 import { transcribeWord, type TranscribedWord } from 'src/services/phonetic/wordTranscription';
 import { analyzeSoundPatterns } from 'src/services/phonetic/soundPatternAnalyzer';
 import { ipaTokenColor, ipaTokenStyle, type TokenVisual } from 'src/services/phonetic/ipaColorMap';
+import { analyzeRhymes } from 'src/services/phonetic/rhyme/rhymeAnalyzer';
+import type { PhonemeMotif, RhymeAnalysis } from 'src/services/phonetic/rhyme/types';
 
 const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
+const showRhymes = defineModel<boolean>('showRhymes', { default: false });
+const showSounds = defineModel<boolean>('showSounds', { default: true });
 
 const store = usePoetryStore();
 
@@ -235,6 +246,44 @@ const tokenStyleMap = computed<Map<string, TokenVisual>>(() => {
   }
   return map;
 });
+
+// ── Rhyme analysis ────────────────────────────────────────────────────────────
+
+const rhymeAnalysis = computed<RhymeAnalysis>(() => {
+  if (!showRhymes.value) return { motifs: [], cellMotifs: new Map() };
+  return analyzeRhymes(store.document, store.isLineConfirmed);
+});
+
+/** All motifs that touch any token of this syllable cell. */
+function sylMotifs(wordId: string, sylIdx: number, tokenCount: number): PhonemeMotif[] {
+  const { cellMotifs, motifs } = rhymeAnalysis.value;
+  const seen = new Set<string>();
+  for (let ti = 0; ti < tokenCount; ti++) {
+    cellMotifs.get(`${wordId}:${sylIdx}:${ti}`)?.forEach((id) => seen.add(id));
+  }
+  return [...seen].map((id) => motifs.find((m) => m.id === id)!).filter(Boolean);
+}
+
+const BAR_H   = 5;  // px — height of each rhyme bar
+const BAR_GAP = 2;  // px — gap between stacked bars
+
+/**
+ * Inline style for one rhyme bar inside a syllable cell.
+ * Bars stack from the bottom upward; each is a thin colored strip
+ * in the same visual language as phoneme area shapes.
+ */
+function rhymeBarStyle(motif: PhonemeMotif, stackIndex: number): Record<string, string> {
+  const bottom = stackIndex * (BAR_H + BAR_GAP);
+  const radius =
+    motif.tier === 'exact' ? '2px 2px 0 0' :
+    motif.tier === 'near'  ? '1px 1px 0 0' : '0';
+  return {
+    background: motif.color,
+    height: `${BAR_H}px`,
+    bottom: `${bottom}px`,
+    borderRadius: radius,
+  };
+}
 
 // ── Clustering web ───────────────────────────────────────────────────────────
 const gridContainer = ref<HTMLElement | null>(null);
@@ -466,6 +515,16 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   box-sizing: border-box;
   background: $cell-bg;
   border: 1px solid $border-col;
+  position: relative; // rhyme bars are absolute children
+
+  // ── rhyme bar: thin colored strip at the bottom of the cell ───────────────
+  &__rhyme-bar {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    pointer-events: none;
+    // height and bottom are set inline via rhymeBarStyle()
+  }
 
   // TAB indent cell — same dimensions as syllable cell, visually empty
   &--tab {

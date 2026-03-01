@@ -96,7 +96,7 @@
               <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
               <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
             </svg>
-            Web
+            Sounds web
           </button>
           <!-- Right-align toggle -->
           <button
@@ -112,10 +112,42 @@
             </svg>
             Right
           </button>
+          <!-- Rhyme motif detection toggle -->
+          <button
+            class="panel__web-btn"
+            :class="{ 'panel__web-btn--active': showRhymes }"
+            title="Highlight recurring phoneme patterns (rhymes)"
+            @click="showRhymes = !showRhymes"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M2 12 Q2 4 8 4 Q14 4 14 8 Q14 12 8 12" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+              <rect x="3" y="13" width="4" height="2" rx="1" fill="currentColor" />
+              <rect x="9" y="13" width="4" height="2" rx="1" fill="currentColor" />
+            </svg>
+            Rhymes highlight
+          </button>
+          <!-- Sound pattern colours toggle -->
+          <button
+            class="panel__web-btn"
+            :class="{ 'panel__web-btn--active': showSounds }"
+            title="Show / hide sound-pattern colour highlights"
+            @click="showSounds = !showSounds"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="5" cy="8" r="3" fill="currentColor" fill-opacity="0.6" />
+              <circle cx="11" cy="8" r="3" fill="currentColor" fill-opacity="0.85" />
+            </svg>
+            Sounds highlight
+          </button>
         </div>
       </div>
       <div class="panel__body">
-        <PhoneticPanel v-model:showWeb="showSoundWeb" v-model:alignRight="showAlignRight" />
+        <PhoneticPanel
+          v-model:showWeb="showSoundWeb"
+          v-model:alignRight="showAlignRight"
+          v-model:showRhymes="showRhymes"
+          v-model:showSounds="showSounds"
+        />
       </div>
     </div>
   </q-page>
@@ -135,6 +167,8 @@ const poetryStore = usePoetryStore();
 const wordCount = computed(() => poetryStore.allWordTokens.length);
 const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
+const showRhymes = ref(false);
+const showSounds = ref(true);
 const showRowSettings = ref(true);
 
 const allLinesConfirmed = computed(() => {
