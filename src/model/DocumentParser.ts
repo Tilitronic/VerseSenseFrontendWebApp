@@ -56,18 +56,26 @@ export function parseDocument(
 
     // 4. Split on whitespace runs → chunks, then split each chunk on hyphens
     // e.g. "Pegging-потяг" → WORD("Pegging") HYPHEN WORD("потяг")
+    // Chunks with no letter characters (e.g. "—", ";") are skipped entirely.
+    const HAS_LETTER = /\p{L}/u;
     const chunks = trimmedLine.split(/\s+/).filter((w) => w.length > 0);
 
-    chunks.forEach((chunk, chunkIdx) => {
-      // GAP before every chunk except the first
-      if (chunkIdx > 0) {
+    let wordEmitted = false; // tracks whether any WORD has been emitted (for GAP placement)
+    chunks.forEach((chunk) => {
+      // Skip purely punctuation / symbol chunks (no letter content)
+      if (!HAS_LETTER.test(chunk)) return;
+
+      // GAP between word-bearing chunks
+      if (wordEmitted) {
         tokens.push(addToken<IGapToken>({ id: makeId(), kind: 'GAP' }));
       }
 
-      // Split the chunk on hyphens, keeping non-empty parts
+      // Split the chunk on hyphens, keeping non-empty parts with letter content
       // A leading/trailing hyphen (e.g. "-word" or "word-") is kept as-is
       // to avoid creating empty WORD tokens.
-      const parts = chunk.split('-').filter((p) => p.length > 0);
+      const parts = chunk.split('-').filter((p) => p.length > 0 && HAS_LETTER.test(p));
+
+      if (parts.length === 0) return; // chunk was all hyphens / punctuation
 
       if (parts.length <= 1) {
         // No hyphen — emit single WORD
@@ -75,6 +83,7 @@ export function parseDocument(
           id: makeId(), kind: 'WORD',
           text: chunk, language: defaultLanguage, stressIndex: null,
         }));
+        wordEmitted = true;
       } else {
         // Multiple parts — emit WORD HYPHEN WORD HYPHEN …
         parts.forEach((part, partIdx) => {
@@ -86,6 +95,7 @@ export function parseDocument(
             text: part, language: defaultLanguage, stressIndex: null,
           }));
         });
+        wordEmitted = true;
       }
     });
 

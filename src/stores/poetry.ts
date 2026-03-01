@@ -56,11 +56,16 @@ interface AnnotationsBlob {
   words: Record<string, WordAnnotation>;
 }
 
+/** Strip leading spaces (not tabs) from every line of raw poem text */
+function normalizeLeadingSpaces(text: string): string {
+  return text.split('\n').map((line) => line.replace(/^ +/, '')).join('\n');
+}
+
 export const usePoetryStore = defineStore('poetry', () => {
   // ── State ──────────────────────────────────────────────────────────────────
 
   /** Raw text as typed by the user */
-  const rawText = ref<string>(localStorage.getItem(STORAGE_KEY_TEXT) ?? '');
+  const rawText = ref<string>(normalizeLeadingSpaces(localStorage.getItem(STORAGE_KEY_TEXT) ?? ''));
 
   /**
    * 0-based index of the line currently active in the editor (cursor position).
@@ -244,9 +249,12 @@ export const usePoetryStore = defineStore('poetry', () => {
 
   /** Update raw text, persist, re-parse document */
   function setRawText(text: string) {
-    rawText.value = text;
-    localStorage.setItem(STORAGE_KEY_TEXT, text);
-    rebuildDocument(text);
+    // Strip leading spaces (but not tabs) from every line — leading spaces were
+    // never intentional (artifact of old broken indentWithTab that inserted spaces).
+    const normalized = normalizeLeadingSpaces(text);
+    rawText.value = normalized;
+    localStorage.setItem(STORAGE_KEY_TEXT, normalized);
+    rebuildDocument(normalized);
   }
 
   /**

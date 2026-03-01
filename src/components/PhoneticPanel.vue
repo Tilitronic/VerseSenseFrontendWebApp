@@ -32,10 +32,13 @@
 
       <div class="pp-lines">
         <template v-for="(line, lineIdx) in store.document.lines" :key="line.id">
-          <!-- Empty line → blank row -->
-          <div v-if="wordTokensInLine(line).length === 0" class="pp-blank-row" />
+          <!-- Empty line (no tokens at all) → blank row -->
+          <div v-if="line.tokens.length === 0" class="pp-blank-row" />
 
-          <!-- Unconfirmed line → dim placeholder -->
+          <!-- TAB-only line with no words → compact blank row (indented empty line) -->
+          <div v-else-if="wordTokensInLine(line).length === 0 && !store.isLineConfirmed(line.id)" class="pp-blank-row" />
+
+          <!-- Unconfirmed line that has words → dim placeholder -->
           <div
             v-else-if="!store.isLineConfirmed(line.id)"
             :ref="(el) => setRowRef(lineIdx, el)"
@@ -57,8 +60,11 @@
 
             <div class="pp-cells">
               <template v-for="tok in line.tokens" :key="tok.id">
-                <!-- Word → syllable cells (spacing tokens ignored — strict grid) -->
-                <template v-if="tok.kind === 'WORD'">
+                <!-- TAB → empty indent cell -->
+                <div v-if="tok.kind === 'TAB'" class="pp-cell pp-cell--tab" />
+
+                <!-- Word → syllable cells (punctuation-only words skipped) -->
+                <template v-else-if="tok.kind === 'WORD' && !isPunctuation(tok.text)">
                   <template v-for="(syl, si) in transcribedWord(tok).syllables" :key="si">
                     <div
                       class="pp-cell"
@@ -120,8 +126,16 @@ watch(
   },
 );
 
+/** True when a word token is purely punctuation / dash with no phonetic content */
+function isPunctuation(text: string): boolean {
+  // Strip every character that is a letter or apostrophe; if nothing remains → punctuation
+  return !/[\p{L}]/u.test(text);
+}
+
 function wordTokensInLine(line: ILine): IWordToken[] {
-  return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
+  return line.tokens.filter(
+    (t): t is IWordToken => t.kind === 'WORD' && !isPunctuation(t.text),
+  );
 }
 
 function transcribedWord(tok: IToken): TranscribedWord {
@@ -186,6 +200,7 @@ const indexedTokens = computed<IndexedToken[]>(() => {
     if (!store.isLineConfirmed(line.id)) continue;
     for (const tok of line.tokens) {
       if (tok.kind !== 'WORD') continue;
+      if (isPunctuation((tok as IWordToken).text)) continue;
       const tw = transcribeWord(tok as IWordToken);
       for (let si = 0; si < tw.syllables.length; si++) {
         const syl = tw.syllables[si]!;
@@ -421,8 +436,9 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
-  // collapse shared borders between adjacent cells
-  > .pp-cell + .pp-cell {
+  // collapse shared borders between adjacent syllable cells only;
+  // tab cells keep their own dashed border so multiple tabs stay visible
+  > .pp-cell:not(.pp-cell--tab) + .pp-cell:not(.pp-cell--tab) {
     border-left: none;
   }
 }
@@ -439,6 +455,12 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   box-sizing: border-box;
   background: $cell-bg;
   border: 1px solid $border-col;
+
+  // TAB indent cell — same dimensions as syllable cell, visually empty
+  &--tab {
+    border: 1px dashed rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.04);
+  }
 
   // word boundary — right border 3× bolder than inter-syllable borders
   &--word-last {

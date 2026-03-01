@@ -7,7 +7,6 @@
           v-model="text"
           :extensions="extensions"
           :autofocus="true"
-          :indent-with-tab="true"
           :tab-size="1"
           class="poetry-editor__cm"
           @change="onChange"
@@ -46,7 +45,7 @@ import {
   highlightActiveLineGutter,
 } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { history, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { indentOnInput } from '@codemirror/language';
 import { keymap, lineNumbers } from '@codemirror/view';
 import { usePoetryStore } from 'src/stores/poetry';
@@ -227,6 +226,63 @@ const fontTheme = EditorView.theme({
   '&.cm-focused .cm-selectionBackground': { background: 'rgba(100,180,255,0.25) !important' },
 });
 
+/**
+ * Tab key behaviour:
+ * - Collapsed cursor at column 0 → insert literal \t at line start
+ * - Selection spanning one or more lines → prepend \t to the start of every
+ *   line that is at least partially covered by any selection range
+ * - Anything else (cursor mid-line, no selection) → not handled (falls through)
+ *
+ * Shift-Tab: remove one leading \t from every touched line (same coverage rule).
+ */
+const insertLiteralTab = {
+  key: 'Tab',
+  run(view: EditorView): boolean {
+    const { state } = view;
+
+    // Collect unique line numbers touched by any selection range.
+    // For a collapsed cursor this is just the cursor's line.
+    // For a spanning selection it covers every line from anchor to head.
+    const lineNums = new Set<number>();
+    for (const r of state.selection.ranges) {
+      const fromLine = state.doc.lineAt(r.from).number;
+      const toLine   = state.doc.lineAt(r.to).number;
+      for (let n = fromLine; n <= toLine; n++) lineNums.add(n);
+    }
+
+    // Prepend \t to the start of every touched line
+    const changes = [...lineNums].map((n) => {
+      const line = state.doc.line(n);
+      return { from: line.from, to: line.from, insert: '\t' };
+    });
+    view.dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'input' }));
+    return true; // always consume Tab — never fall through to defaultKeymap
+  },
+  shift(view: EditorView): boolean {
+    const { state } = view;
+
+    // Collect unique line numbers touched by any selection range
+    const lineNums = new Set<number>();
+    for (const r of state.selection.ranges) {
+      const fromLine = state.doc.lineAt(r.from).number;
+      const toLine   = state.doc.lineAt(r.to).number;
+      for (let n = fromLine; n <= toLine; n++) lineNums.add(n);
+    }
+
+    // Remove one leading \t from every touched line that has one
+    const changes: { from: number; to: number; insert: string }[] = [];
+    for (const n of lineNums) {
+      const line = state.doc.line(n);
+      if (line.text.startsWith('\t')) {
+        changes.push({ from: line.from, to: line.from + 1, insert: '' });
+      }
+    }
+    if (changes.length === 0) return true; // consume Shift-Tab even if nothing to remove
+    view.dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'delete' }));
+    return true;
+  },
+};
+
 const baseExtensions = [
   lineNumbers(),
   drawSelection(),
@@ -234,7 +290,7 @@ const baseExtensions = [
   highlightActiveLineGutter(),
   history(),
   indentOnInput(),
-  keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+  keymap.of([insertLiteralTab, ...defaultKeymap, ...historyKeymap]),
   EditorState.tabSize.of(1),
   EditorView.lineWrapping,
   // Prevent consecutive spaces (LaTeX/Markdown convention)

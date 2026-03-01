@@ -69,7 +69,7 @@
     <!-- ── RIGHT: Phonetic panel ──────────────────────────────────── -->
     <div class="panel panel--phonetic">
       <div class="panel__header">
-        <h2 class="panel__title">Phonetic Transcription</h2>
+        <h2 class="panel__title">Patterns Visualization</h2>
         <div class="panel__actions">
           <!-- Sound web toggle -->
           <button

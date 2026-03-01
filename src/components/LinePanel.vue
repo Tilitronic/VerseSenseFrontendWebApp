@@ -114,9 +114,12 @@ const lineConfirmed = computed(() => store.isLineConfirmed(props.line.id));
 
 /** Whether every word on this line has stress set (auto or manual).
  *  Zero-vowel words (e.g. "з", "в") report 'auto' in wordStressStatus
- *  so they never block this check. */
+ *  so they never block this check.
+ *  Punctuation-only tokens (e.g. "—") are excluded. */
 const lineAllStressesSet = computed(() => {
-  const words = props.line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
+  const words = props.line.tokens.filter(
+    (t): t is IWordToken => t.kind === 'WORD' && /\p{L}/u.test(t.text),
+  );
   if (words.length === 0) return false;
   return words.every((w) => store.wordStressStatus.get(w.id) !== 'unset');
 });
