@@ -335,8 +335,8 @@ export function tokenize(word: string): PhoneticToken[] {
     //        incorrectly trigger the pre-consonant allophone instead of the
     //        word-final one).
     const codePoint = ch.codePointAt(0) ?? 0;
-    const isCyrillicLetter = (codePoint >= 0x0400 && codePoint <= 0x04FF) ||
-                             (codePoint >= 0x0500 && codePoint <= 0x052F);
+    const isCyrillicLetter =
+      (codePoint >= 0x0400 && codePoint <= 0x04ff) || (codePoint >= 0x0500 && codePoint <= 0x052f);
     if (!isCyrillicLetter) {
       i++;
       continue;

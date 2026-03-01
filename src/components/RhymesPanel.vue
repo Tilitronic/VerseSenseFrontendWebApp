@@ -8,11 +8,7 @@
 
     <!-- Rhyme skeleton: one row per poem line, only rhyming phonemes shown -->
     <div v-else class="rp-scroll">
-      <div
-        v-for="row in lineRows"
-        :key="row.lineIdx"
-        class="rp-line"
-      >
+      <div v-for="row in lineRows" :key="row.lineIdx" class="rp-line">
         <!-- Rhyme groups on this line, right-aligned -->
         <div class="rp-line__body">
           <template v-if="row.groups.length > 0">
@@ -22,7 +18,8 @@
               class="rp-pill"
               :style="pillStyle(group.motif)"
               :title="`[${TIER_LABEL[group.motif.tier]}] ${group.motif.canonicalTokens.join('')}`"
-            >{{ group.tokens.join('') }}</span>
+              >{{ group.tokens.join('') }}</span
+            >
           </template>
           <!-- Line has no rhymes: show a faint dash -->
           <span v-else class="rp-line__empty">—</span>
@@ -46,8 +43,8 @@ import type { IWordToken } from 'src/model/Token';
 const store = usePoetryStore();
 
 const TIER_LABEL: Record<MotifTier, string> = {
-  exact:      'Exact',
-  near:       'Near',
+  exact: 'Exact',
+  near: 'Near',
   structural: 'Structural',
 };
 
@@ -113,9 +110,7 @@ const lineRows = computed<LineRow[]>(() => {
           if (!motif) continue;
 
           // Find the span on this line that contains this renderKey
-          const span = motif.spans.find(
-            (s) => s.lineIdx === lineIdx && s.renderKeys.includes(rk),
-          );
+          const span = motif.spans.find((s) => s.lineIdx === lineIdx && s.renderKeys.includes(rk));
           if (!span) continue;
 
           // Collect all renderKeys in this span as actual IPA tokens
@@ -154,7 +149,7 @@ function pillStyle(motif: PhonemeMotif): Record<string, string> {
   flex-direction: column;
   height: 100%;
   background: #f7f7fa;
-  border-left: 1px solid rgba(0, 0, 0, 0.10);
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
