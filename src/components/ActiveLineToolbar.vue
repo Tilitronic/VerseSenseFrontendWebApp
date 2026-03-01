@@ -1,11 +1,7 @@
 <template>
   <!-- ── 'active' mode: single panel for the cursor line ──────────────── -->
   <transition name="toolbar-slide">
-    <div
-      v-if="mode === 'active' && activeLine"
-      class="alt-root"
-      :style="fontStyle"
-    >
+    <div v-if="mode === 'active' && activeLine" class="alt-root" :style="fontStyle">
       <LinePanel :line="activeLine" />
     </div>
   </transition>
@@ -33,8 +29,7 @@
 import { computed, ref, watch } from 'vue';
 import LinePanel from './LinePanel.vue';
 import { usePoetryStore } from 'src/stores/poetry';
-import { useAppStore } from 'src/stores/app';
-import { getFontFamily } from 'src/constants/fonts';
+import { EDITOR_FONT_FAMILY } from 'src/constants/fonts';
 import type { ILine } from 'src/model/Token';
 import type { ToolbarMode } from 'src/stores/localConfig';
 
@@ -45,8 +40,7 @@ const { mode } = defineProps<{
   cmScrollTop?: number;
 }>();
 
-const store    = usePoetryStore();
-const appStore = useAppStore();
+const store = usePoetryStore();
 
 // Active line index comes from the shared store (written by PoetryEditor)
 const activeLineIndex = computed(() => store.activeLineIndex);
@@ -62,17 +56,14 @@ function setLineRef(docIndex: number, el: unknown) {
 }
 
 // Auto-scroll the active line into view when cursor moves
-watch(
-  activeLineIndex,
-  (idx) => {
-    if (idx === null) return;
-    const el = lineRefs.get(idx);
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  },
-);
+watch(activeLineIndex, (idx) => {
+  if (idx === null) return;
+  const el = lineRefs.get(idx);
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
 
 const fontStyle = computed(() => ({
-  fontFamily: getFontFamily(appStore.fontFamily),
+  fontFamily: EDITOR_FONT_FAMILY,
 }));
 
 // ── Active line (for 'active' mode) ─────────────────────────────────────────
@@ -114,7 +105,7 @@ const allLines = computed<{ line: ILine; docIndex: number; hasWords: boolean }[]
 
   // Active line highlight in 'all' mode
   &--active {
-    border-left: 2px solid rgba(100, 180, 255, 0.40);
+    border-left: 2px solid rgba(100, 180, 255, 0.4);
     background: rgba(100, 180, 255, 0.06);
   }
 }
@@ -127,7 +118,7 @@ const allLines = computed<{ line: ILine; docIndex: number; hasWords: boolean }[]
   overflow-y: auto;
   overflow-x: hidden;
   height: 100%;
-  width: 100%;        // fill whatever the parent pe-pane--settings gives us
+  width: 100%; // fill whatever the parent pe-pane--settings gives us
   flex-shrink: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.07);
   padding: 16px 0;
@@ -150,7 +141,9 @@ const allLines = computed<{ line: ILine; docIndex: number; hasWords: boolean }[]
 
 .toolbar-slide-enter-active,
 .toolbar-slide-leave-active {
-  transition: max-height 0.18s ease, opacity 0.15s ease;
+  transition:
+    max-height 0.18s ease,
+    opacity 0.15s ease;
   max-height: 100px;
   overflow: hidden;
 }

@@ -1,5 +1,5 @@
 <template>
-  <q-page class="poetry-page" :style="pageStyle">
+  <q-page class="poetry-page">
     <!-- ── LEFT: Editor panel ─────────────────────────────────────── -->
     <div class="panel panel--editor">
       <div class="panel__header">
@@ -15,48 +15,26 @@
           >
             <span
               class="editor-settings-btn__dot"
-              :class="allLinesConfirmed ? 'editor-settings-btn__dot--ok' : 'editor-settings-btn__dot--pending'"
+              :class="
+                allLinesConfirmed
+                  ? 'editor-settings-btn__dot--ok'
+                  : 'editor-settings-btn__dot--pending'
+              "
             />
             Rows
           </button>
 
-          <!-- Font picker -->
-          <q-btn-dropdown
-            flat dense no-caps
-            icon="text_fields"
-            :label="currentFontLabel"
-            class="editor-font-btn"
-          >
-            <q-list style="min-width: 180px">
-              <q-item
-                v-for="opt in FONT_OPTIONS"
-                :key="opt.value"
-                clickable
-                v-close-popup
-                :active="appStore.fontFamily === opt.value"
-                @click="appStore.setFontFamily(opt.value)"
-              >
-                <q-item-section>
-                  <span :style="{ fontFamily: opt.family, fontSize: '0.95rem' }">
-                    {{ opt.label }}
-                  </span>
-                </q-item-section>
-                <q-item-section side v-if="appStore.fontFamily === opt.value">
-                  <q-icon name="check" color="primary" size="xs" />
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-
           <!-- Toolbar mode toggle -->
           <q-btn-toggle
             v-model="toolbarModeModel"
-            flat dense no-caps
+            flat
+            dense
+            no-caps
             toggle-color="primary"
             class="q-ml-xs"
             :options="[
               { value: 'active', slot: 'active' },
-              { value: 'all',    slot: 'all'    },
+              { value: 'all', slot: 'all' },
             ]"
           >
             <template #active>
@@ -70,7 +48,15 @@
           </q-btn-toggle>
 
           <!-- Clear -->
-          <q-btn flat dense icon="delete_outline" color="negative" title="Clear" class="q-ml-xs" @click="clearText" />
+          <q-btn
+            flat
+            dense
+            icon="delete_outline"
+            color="negative"
+            title="Clear"
+            class="q-ml-xs"
+            @click="clearText"
+          />
         </div>
       </div>
 
@@ -93,17 +79,17 @@
             @click="showSoundWeb = !showSoundWeb"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="3"  cy="8"  r="1.8" fill="currentColor"/>
-              <circle cx="13" cy="3"  r="1.8" fill="currentColor"/>
-              <circle cx="13" cy="13" r="1.8" fill="currentColor"/>
-              <circle cx="8"  cy="2"  r="1.8" fill="currentColor"/>
-              <circle cx="8"  cy="14" r="1.8" fill="currentColor"/>
-              <line x1="3" y1="8" x2="13" y2="3"  stroke="currentColor" stroke-width="1.2"/>
-              <line x1="3" y1="8" x2="13" y2="13" stroke="currentColor" stroke-width="1.2"/>
-              <line x1="3" y1="8" x2="8"  y2="2"  stroke="currentColor" stroke-width="1.2"/>
-              <line x1="3" y1="8" x2="8"  y2="14" stroke="currentColor" stroke-width="1.2"/>
-              <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2"/>
-              <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2"/>
+              <circle cx="3" cy="8" r="1.8" fill="currentColor" />
+              <circle cx="13" cy="3" r="1.8" fill="currentColor" />
+              <circle cx="13" cy="13" r="1.8" fill="currentColor" />
+              <circle cx="8" cy="2" r="1.8" fill="currentColor" />
+              <circle cx="8" cy="14" r="1.8" fill="currentColor" />
+              <line x1="3" y1="8" x2="13" y2="3" stroke="currentColor" stroke-width="1.2" />
+              <line x1="3" y1="8" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" />
+              <line x1="3" y1="8" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
+              <line x1="3" y1="8" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
+              <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
+              <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
             </svg>
             Web
           </button>
@@ -123,7 +109,6 @@
 import { computed, ref } from 'vue';
 import { useAppStore } from 'stores/app';
 import { usePoetryStore } from 'stores/poetry';
-import { getFontFamily, FONT_OPTIONS } from 'src/constants/fonts';
 import type { ToolbarMode } from 'stores/localConfig';
 import PoetryEditor from 'components/PoetryEditor.vue';
 import PhoneticPanel from 'components/PhoneticPanel.vue';
@@ -132,7 +117,7 @@ const appStore = useAppStore();
 const poetryStore = usePoetryStore();
 
 const wordCount = computed(() => poetryStore.allWordTokens.length);
-const showSoundWeb    = ref(false);
+const showSoundWeb = ref(false);
 const showRowSettings = ref(true);
 
 const allLinesConfirmed = computed(() => {
@@ -140,10 +125,6 @@ const allLinesConfirmed = computed(() => {
   const wordLines = lines.filter((l) => l.tokens.some((t) => t.kind === 'WORD'));
   return wordLines.length > 0 && wordLines.every((l) => poetryStore.isLineConfirmed(l.id));
 });
-
-const currentFontLabel = computed(
-  () => FONT_OPTIONS.find((o) => o.value === appStore.fontFamily)?.label ?? 'Font',
-);
 
 const toolbarModeModel = computed<ToolbarMode>({
   get: () => appStore.toolbarMode,
@@ -153,10 +134,6 @@ const toolbarModeModel = computed<ToolbarMode>({
 function clearText() {
   poetryStore.setRawText('');
 }
-
-const pageStyle = computed(() => ({
-  '--font-family': getFontFamily(appStore.fontFamily),
-}));
 </script>
 
 <style scoped lang="scss">
@@ -194,7 +171,7 @@ const pageStyle = computed(() => ({
     }
 
     .panel__word-count {
-      color: rgba(255, 255, 255, 0.30);
+      color: rgba(255, 255, 255, 0.3);
     }
 
     .panel__web-btn {
@@ -209,17 +186,20 @@ const pageStyle = computed(() => ({
       font-size: 0.68rem;
       cursor: pointer;
       user-select: none;
-      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      transition:
+        background 0.12s,
+        color 0.12s,
+        border-color 0.12s;
 
       &:hover {
-        border-color: rgba(255, 255, 255, 0.40);
-        color: rgba(255, 255, 255, 0.70);
+        border-color: rgba(255, 255, 255, 0.4);
+        color: rgba(255, 255, 255, 0.7);
       }
 
       &--active {
-        background: rgba(255, 255, 255, 0.10);
-        border-color: rgba(255, 255, 255, 0.50);
-        color: rgba(255, 255, 255, 0.90);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 255, 255, 0.9);
       }
     }
   }
@@ -269,21 +249,24 @@ const pageStyle = computed(() => ({
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 4px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.40);
+  color: rgba(255, 255, 255, 0.4);
   font-size: 0.68rem;
   cursor: pointer;
   user-select: none;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
 
   &:hover {
     border-color: rgba(255, 255, 255, 0.35);
-    color: rgba(255, 255, 255, 0.70);
+    color: rgba(255, 255, 255, 0.7);
   }
 
   &--active {
     background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.30);
-    color: rgba(255, 255, 255, 0.80);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
   }
 
   &__dot {
@@ -293,8 +276,12 @@ const pageStyle = computed(() => ({
     flex-shrink: 0;
     transition: background 0.25s;
 
-    &--ok      { background: #4caf7d; }   // green  — all confirmed
-    &--pending { background: #e8a030; }   // orange — at least one unconfirmed
+    &--ok {
+      background: #4caf7d;
+    } // green  — all confirmed
+    &--pending {
+      background: #e8a030;
+    } // orange — at least one unconfirmed
   }
 }
 

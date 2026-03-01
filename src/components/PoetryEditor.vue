@@ -1,6 +1,5 @@
 <template>
   <div class="poetry-editor" :class="{ 'poetry-editor--all': appStore.toolbarMode === 'all' }">
-
     <!-- ── CM editor pane ─────────────────────────────────────── -->
     <div class="pe-pane pe-pane--editor" :style="editorPaneStyle">
       <div class="poetry-editor__cm-wrap">
@@ -16,10 +15,7 @@
         />
       </div>
       <!-- 'active' mode: toolbar docks below the editor -->
-      <ActiveLineToolbar
-        v-if="appStore.toolbarMode === 'active'"
-        mode="active"
-      />
+      <ActiveLineToolbar v-if="appStore.toolbarMode === 'active'" mode="active" />
     </div>
 
     <!-- ── Drag divider (only in 'all' mode when row settings visible) ── -->
@@ -35,27 +31,32 @@
       class="pe-pane pe-pane--settings"
       :style="settingsPaneStyle"
     >
-      <ActiveLineToolbar
-        mode="all"
-        :cm-scroll-top="cmScrollTop"
-      />
+      <ActiveLineToolbar mode="all" :cm-scroll-top="cmScrollTop" />
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, shallowRef, watch, computed, onUnmounted } from 'vue';
 import { Codemirror } from 'vue-codemirror';
-import { EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
+import {
+  EditorView,
+  drawSelection,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+} from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { indentOnInput } from '@codemirror/language';
 import { keymap, lineNumbers } from '@codemirror/view';
 import { usePoetryStore } from 'src/stores/poetry';
 import { useAppStore } from 'src/stores/app';
-import { getFontFamily } from 'src/constants/fonts';
-import { poetryEditorExtension, setStressStatusEffect, type StressLineStatus } from './poetryEditorExtension';
+import { EDITOR_FONT_FAMILY } from 'src/constants/fonts';
+import {
+  poetryEditorExtension,
+  setStressStatusEffect,
+  type StressLineStatus,
+} from './poetryEditorExtension';
 import ActiveLineToolbar from './ActiveLineToolbar.vue';
 import type { IWordToken } from 'src/model/Token';
 
@@ -97,12 +98,16 @@ function onReady(payload: { view: EditorView; state: unknown; container: unknown
 
   // Mirror CM scroll position into cmScrollTop so the toolbar can sync
   const scroller = payload.view.scrollDOM;
-  const onScroll = () => { cmScrollTop.value = scroller.scrollTop; };
+  const onScroll = () => {
+    cmScrollTop.value = scroller.scrollTop;
+  };
   scroller.addEventListener('scroll', onScroll, { passive: true });
   _scrollCleanup = () => scroller.removeEventListener('scroll', onScroll);
 }
 
-onUnmounted(() => { _scrollCleanup?.(); });
+onUnmounted(() => {
+  _scrollCleanup?.();
+});
 
 /** Compute per-line stress status from the store and push it into CM */
 function pushStressStatus(view: EditorView) {
@@ -123,7 +128,9 @@ function pushStressStatus(view: EditorView) {
 // Re-push whenever store data changes (document rebuilt, stress updated, or language confirmed)
 watch(
   () => [poetryStore.wordStressStatus, poetryStore.confirmedWords] as const,
-  () => { if (cmView.value) pushStressStatus(cmView.value); },
+  () => {
+    if (cmView.value) pushStressStatus(cmView.value);
+  },
   { deep: false },
 );
 
@@ -156,12 +163,12 @@ let containerWidth = 0;
 
 function onDividerPointerDown(e: PointerEvent) {
   e.preventDefault();
-  dragStartX    = e.clientX;
-  dragStartPct  = editorPct.value;
+  dragStartX = e.clientX;
+  dragStartPct = editorPct.value;
   const el = (e.currentTarget as HTMLElement).parentElement;
   containerWidth = el ? el.clientWidth : window.innerWidth;
   window.addEventListener('pointermove', onDividerPointerMove);
-  window.addEventListener('pointerup',   onDividerPointerUp);
+  window.addEventListener('pointerup', onDividerPointerUp);
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
 }
@@ -174,53 +181,51 @@ function onDividerPointerMove(e: PointerEvent) {
 
 function onDividerPointerUp() {
   window.removeEventListener('pointermove', onDividerPointerMove);
-  window.removeEventListener('pointerup',   onDividerPointerUp);
+  window.removeEventListener('pointerup', onDividerPointerUp);
   document.body.style.cursor = '';
   document.body.style.userSelect = '';
 }
 
-// Dynamic font theme — rebuilt when appStore.fontFamily changes
-const fontTheme = computed(() =>
-  EditorView.theme({
-    '&': {
-      height: '100%',
-      fontFamily: getFontFamily(appStore.fontFamily),
-      fontSize: '1rem',
-    },
-    '.cm-content': {
-      fontFamily: 'inherit',
-      lineHeight: '1.9',
-      padding: '16px 20px',
-      caretColor: '#c9d1d9',
-    },
-    '.cm-line': { padding: '0' },
-    '.cm-gutters': {
-      background: 'transparent',
-      border: 'none',
-      color: 'rgba(255,255,255,0.18)',
-      padding: '0',
-    },
-    /* Line-number cells: flex-center to match the stress dot column */
-    '.cm-lineNumbers .cm-gutterElement': {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      padding: '0 4px 0 0 !important',
-      lineHeight: '1.9',
-    },
-    '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.04)' },
-    /* Stress gutter must never get the active-line tint */
-    '.cm-stress-gutter .cm-activeLineGutter': { background: 'transparent !important' },
-    '.cm-activeLine': { background: 'rgba(255,255,255,0.04)' },
-    // Tab / newline special chars
-    '.cm-specialChar': { color: 'rgba(255,255,255,0.22)' },
-    // Cursor
-    '.cm-cursor': { borderLeftColor: '#c9d1d9' },
-    // Selection
-    '.cm-selectionBackground': { background: 'rgba(100,180,255,0.18) !important' },
-    '&.cm-focused .cm-selectionBackground': { background: 'rgba(100,180,255,0.25) !important' },
-  }),
-);
+// Static font theme — JetBrains Mono applied once at editor creation
+const fontTheme = EditorView.theme({
+  '&': {
+    height: '100%',
+    fontFamily: EDITOR_FONT_FAMILY,
+    fontSize: '1rem',
+  },
+  '.cm-content': {
+    fontFamily: 'inherit',
+    lineHeight: '1.9',
+    padding: '16px 20px',
+    caretColor: '#c9d1d9',
+  },
+  '.cm-line': { padding: '0' },
+  '.cm-gutters': {
+    background: 'transparent',
+    border: 'none',
+    color: 'rgba(255,255,255,0.18)',
+    padding: '0',
+  },
+  /* Line-number cells: flex-center to match the stress dot column */
+  '.cm-lineNumbers .cm-gutterElement': {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: '0 4px 0 0 !important',
+    lineHeight: '1.9',
+  },
+  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.04)' },
+  /* Stress gutter must never get the active-line tint */
+  '.cm-stress-gutter .cm-activeLineGutter': { background: 'transparent !important' },
+  '.cm-activeLine': { background: 'rgba(255,255,255,0.04)' },
+  // Tab / newline special chars
+  '.cm-specialChar': { color: 'rgba(255,255,255,0.22)' },
+  // Cursor
+  '.cm-cursor': { borderLeftColor: '#c9d1d9' },
+  // Selection
+  '.cm-selectionBackground': { background: 'rgba(100,180,255,0.18) !important' },
+  '&.cm-focused .cm-selectionBackground': { background: 'rgba(100,180,255,0.25) !important' },
+});
 
 const baseExtensions = [
   lineNumbers(),
@@ -251,9 +256,10 @@ const baseExtensions = [
   }),
   activeLineTracker,
   ...poetryEditorExtension(),
+  fontTheme,
 ];
 
-const extensions = computed(() => [...baseExtensions, fontTheme.value]);
+const extensions = baseExtensions;
 </script>
 
 <style scoped lang="scss">
@@ -285,7 +291,7 @@ const extensions = computed(() => [...baseExtensions, fontTheme.value]);
 
   &--settings {
     flex-shrink: 0;
-    overflow-x: auto;   // horizontal scroll if content is wider
+    overflow-x: auto; // horizontal scroll if content is wider
     overflow-y: hidden;
   }
 }
@@ -327,6 +333,6 @@ const extensions = computed(() => [...baseExtensions, fontTheme.value]);
 
 :deep(.cm-scroller) {
   overflow-y: auto;
-  overflow-x: auto;   // horizontal scroll enabled
+  overflow-x: auto; // horizontal scroll enabled
 }
 </style>
