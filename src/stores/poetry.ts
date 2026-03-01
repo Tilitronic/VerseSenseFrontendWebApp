@@ -58,7 +58,10 @@ interface AnnotationsBlob {
 
 /** Strip leading spaces (not tabs) from every line of raw poem text */
 function normalizeLeadingSpaces(text: string): string {
-  return text.split('\n').map((line) => line.replace(/^ +/, '')).join('\n');
+  return text
+    .split('\n')
+    .map((line) => line.replace(/^ +/, ''))
+    .join('\n');
 }
 
 export const usePoetryStore = defineStore('poetry', () => {

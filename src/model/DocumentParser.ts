@@ -13,7 +13,15 @@
  */
 
 import { makeId } from './Token';
-import type { IWordToken, IGapToken, ITabToken, IHyphenToken, IToken, ILine, IPoetryDocument } from './Token';
+import type {
+  IWordToken,
+  IGapToken,
+  ITabToken,
+  IHyphenToken,
+  IToken,
+  ILine,
+  IPoetryDocument,
+} from './Token';
 import type { Language } from './Language';
 import { DEFAULT_LANGUAGE } from './Language';
 
@@ -79,10 +87,15 @@ export function parseDocument(
 
       if (parts.length <= 1) {
         // No hyphen — emit single WORD
-        tokens.push(addToken<IWordToken>({
-          id: makeId(), kind: 'WORD',
-          text: chunk, language: defaultLanguage, stressIndex: null,
-        }));
+        tokens.push(
+          addToken<IWordToken>({
+            id: makeId(),
+            kind: 'WORD',
+            text: chunk,
+            language: defaultLanguage,
+            stressIndex: null,
+          }),
+        );
         wordEmitted = true;
       } else {
         // Multiple parts — emit WORD HYPHEN WORD HYPHEN …
@@ -90,10 +103,15 @@ export function parseDocument(
           if (partIdx > 0) {
             tokens.push(addToken<IHyphenToken>({ id: makeId(), kind: 'HYPHEN' }));
           }
-          tokens.push(addToken<IWordToken>({
-            id: makeId(), kind: 'WORD',
-            text: part, language: defaultLanguage, stressIndex: null,
-          }));
+          tokens.push(
+            addToken<IWordToken>({
+              id: makeId(),
+              kind: 'WORD',
+              text: part,
+              language: defaultLanguage,
+              stressIndex: null,
+            }),
+          );
         });
         wordEmitted = true;
       }

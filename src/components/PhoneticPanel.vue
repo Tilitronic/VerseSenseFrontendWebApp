@@ -36,7 +36,10 @@
           <div v-if="line.tokens.length === 0" class="pp-blank-row" />
 
           <!-- TAB-only line with no words → compact blank row (indented empty line) -->
-          <div v-else-if="wordTokensInLine(line).length === 0 && !store.isLineConfirmed(line.id)" class="pp-blank-row" />
+          <div
+            v-else-if="wordTokensInLine(line).length === 0 && !store.isLineConfirmed(line.id)"
+            class="pp-blank-row"
+          />
 
           <!-- Unconfirmed line that has words → dim placeholder -->
           <div
@@ -133,9 +136,7 @@ function isPunctuation(text: string): boolean {
 }
 
 function wordTokensInLine(line: ILine): IWordToken[] {
-  return line.tokens.filter(
-    (t): t is IWordToken => t.kind === 'WORD' && !isPunctuation(t.text),
-  );
+  return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD' && !isPunctuation(t.text));
 }
 
 function transcribedWord(tok: IToken): TranscribedWord {

@@ -246,7 +246,7 @@ const insertLiteralTab = {
     const lineNums = new Set<number>();
     for (const r of state.selection.ranges) {
       const fromLine = state.doc.lineAt(r.from).number;
-      const toLine   = state.doc.lineAt(r.to).number;
+      const toLine = state.doc.lineAt(r.to).number;
       for (let n = fromLine; n <= toLine; n++) lineNums.add(n);
     }
 
@@ -265,7 +265,7 @@ const insertLiteralTab = {
     const lineNums = new Set<number>();
     for (const r of state.selection.ranges) {
       const fromLine = state.doc.lineAt(r.from).number;
-      const toLine   = state.doc.lineAt(r.to).number;
+      const toLine = state.doc.lineAt(r.to).number;
       for (let n = fromLine; n <= toLine; n++) lineNums.add(n);
     }
 
