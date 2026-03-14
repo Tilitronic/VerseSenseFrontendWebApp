@@ -47,11 +47,11 @@ import {
 // ── Psychoacoustic groups ─────────────────────────────────────────────────────
 
 type PsychoGroup =
-  | 'nasal'         // m n ŋ — humming resonance                → amber  42°
-  | 'trill'         // r ɾ ʀ — vibrating/rolling trill/tap      → copper 28°
-  | 'lateral'       // l ɬ ɭ — lateral sonorant                 → gold   55°
-  | 'glide'         // j w ɹ — semi-vowel / vowel-bridge        → cyan  195°
-  | 'labial-stop'   // p b — lip pop                            → red     0°
+  | 'nasal' // m n ŋ — humming resonance                → amber  42°
+  | 'trill' // r ɾ ʀ — vibrating/rolling trill/tap      → copper 28°
+  | 'lateral' // l ɬ ɭ — lateral sonorant                 → gold   55°
+  | 'glide' // j w ɹ — semi-vowel / vowel-bridge        → cyan  195°
+  | 'labial-stop' // p b — lip pop                            → red     0°
   | 'coronal-stop' // t d — tongue click                   → orange
   | 'velar-stop' // k g q ʔ — deep thump                 → indigo
   | 'labial-fric' // f v ɸ β — breath at lips             → coral
@@ -68,11 +68,11 @@ interface GroupColor {
   s: number;
 }
 const GROUP: Record<PsychoGroup, GroupColor> = {
-  nasal:           { h: 42,  s: 72 }, // amber          — humming resonance
-  trill:           { h: 28,  s: 80 }, // copper-bronze  — vibrating roll
-  lateral:         { h: 55,  s: 62 }, // warm gold      — lateral flow
-  glide:           { h: 195, s: 45 }, // cool cyan      — semi-vowel bridge
-  'labial-stop':   { h: 0,   s: 88 }, // red
+  nasal: { h: 42, s: 72 }, // amber          — humming resonance
+  trill: { h: 28, s: 80 }, // copper-bronze  — vibrating roll
+  lateral: { h: 55, s: 62 }, // warm gold      — lateral flow
+  glide: { h: 195, s: 45 }, // cool cyan      — semi-vowel bridge
+  'labial-stop': { h: 0, s: 88 }, // red
   'coronal-stop': { h: 22, s: 88 }, // orange
   'velar-stop': { h: 252, s: 80 }, // indigo
   'labial-fric': { h: 10, s: 70 }, // coral/salmon

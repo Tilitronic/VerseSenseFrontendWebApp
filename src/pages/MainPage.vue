@@ -6,24 +6,24 @@
         <h2 class="panel__title">Poetry Editor</h2>
         <div class="panel__actions">
           <div class="panel__action-group">
-          <!-- Row settings toggle -->
-          <button
-            v-if="appStore.toolbarMode === 'all'"
-            class="editor-settings-btn"
-            :class="{ 'editor-settings-btn--active': showRowSettings }"
-            :title="showRowSettings ? 'Hide row settings' : 'Show row settings'"
-            @click="showRowSettings = !showRowSettings"
-          >
-            <span
-              class="editor-settings-btn__dot"
-              :class="
-                allLinesConfirmed
-                  ? 'editor-settings-btn__dot--ok'
-                  : 'editor-settings-btn__dot--pending'
-              "
-            />
-            Rows
-          </button>
+            <!-- Row settings toggle -->
+            <button
+              v-if="appStore.toolbarMode === 'all'"
+              class="editor-settings-btn"
+              :class="{ 'editor-settings-btn--active': showRowSettings }"
+              :title="showRowSettings ? 'Hide row settings' : 'Show row settings'"
+              @click="showRowSettings = !showRowSettings"
+            >
+              <span
+                class="editor-settings-btn__dot"
+                :class="
+                  allLinesConfirmed
+                    ? 'editor-settings-btn__dot--ok'
+                    : 'editor-settings-btn__dot--pending'
+                "
+              />
+              Rows
+            </button>
 
             <!-- Toolbar mode toggle -->
             <q-btn-toggle
@@ -79,42 +79,42 @@
         <h2 class="panel__title">Patterns Visualization</h2>
         <div class="panel__actions">
           <div class="panel__action-group">
-          <!-- Sound web toggle -->
-          <button
-            class="panel__web-btn"
-            :class="{ 'panel__web-btn--active': showSoundWeb }"
-            title="Sound clustering web"
-            @click="showSoundWeb = !showSoundWeb"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="3" cy="8" r="1.8" fill="currentColor" />
-              <circle cx="13" cy="3" r="1.8" fill="currentColor" />
-              <circle cx="13" cy="13" r="1.8" fill="currentColor" />
-              <circle cx="8" cy="2" r="1.8" fill="currentColor" />
-              <circle cx="8" cy="14" r="1.8" fill="currentColor" />
-              <line x1="3" y1="8" x2="13" y2="3" stroke="currentColor" stroke-width="1.2" />
-              <line x1="3" y1="8" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" />
-              <line x1="3" y1="8" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
-              <line x1="3" y1="8" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
-              <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
-              <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
-            </svg>
-            Sounds web
-          </button>
-          <!-- Right-align toggle -->
-          <button
-            class="panel__web-btn"
-            :class="{ 'panel__web-btn--active': showAlignRight }"
-            title="Right-align rows (ignore leading tabs)"
-            @click="showAlignRight = !showAlignRight"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" />
-              <rect x="6" y="7" width="8" height="2" rx="1" fill="currentColor" />
-              <rect x="4" y="11" width="10" height="2" rx="1" fill="currentColor" />
-            </svg>
-            Right
-          </button>
+            <!-- Sound web toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showSoundWeb }"
+              title="Sound clustering web"
+              @click="showSoundWeb = !showSoundWeb"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="3" cy="8" r="1.8" fill="currentColor" />
+                <circle cx="13" cy="3" r="1.8" fill="currentColor" />
+                <circle cx="13" cy="13" r="1.8" fill="currentColor" />
+                <circle cx="8" cy="2" r="1.8" fill="currentColor" />
+                <circle cx="8" cy="14" r="1.8" fill="currentColor" />
+                <line x1="3" y1="8" x2="13" y2="3" stroke="currentColor" stroke-width="1.2" />
+                <line x1="3" y1="8" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" />
+                <line x1="3" y1="8" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
+                <line x1="3" y1="8" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
+                <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
+                <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
+              </svg>
+              Sounds web
+            </button>
+            <!-- Right-align toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showAlignRight }"
+              title="Right-align rows (ignore leading tabs)"
+              @click="showAlignRight = !showAlignRight"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" />
+                <rect x="6" y="7" width="8" height="2" rx="1" fill="currentColor" />
+                <rect x="4" y="11" width="10" height="2" rx="1" fill="currentColor" />
+              </svg>
+              Right
+            </button>
             <!-- Rhyme motif detection toggle -->
             <button
               class="panel__web-btn"
@@ -122,53 +122,59 @@
               title="Highlight recurring phoneme patterns (rhymes)"
               @click="showRhymes = !showRhymes"
             >
-            <svg width="28" height="14" viewBox="0 0 28 14" fill="none" style="font-family: serif">
-              <text
-                x="0"
-                y="11"
-                font-size="8"
-                font-family="Georgia,serif"
-                font-weight="700"
-                fill="currentColor"
-                opacity="1.0"
+              <svg
+                width="28"
+                height="14"
+                viewBox="0 0 28 14"
+                fill="none"
+                style="font-family: serif"
               >
-                A
-              </text>
-              <text
-                x="7"
-                y="11"
-                font-size="8"
-                font-family="Georgia,serif"
-                font-weight="700"
-                fill="currentColor"
-                opacity="0.55"
-              >
-                B
-              </text>
-              <text
-                x="14"
-                y="11"
-                font-size="8"
-                font-family="Georgia,serif"
-                font-weight="700"
-                fill="currentColor"
-                opacity="0.55"
-              >
-                B
-              </text>
-              <text
-                x="21"
-                y="11"
-                font-size="8"
-                font-family="Georgia,serif"
-                font-weight="700"
-                fill="currentColor"
-                opacity="1.0"
-              >
-                A
-              </text>
-            </svg>
-            Rhymes highlight
+                <text
+                  x="0"
+                  y="11"
+                  font-size="8"
+                  font-family="Georgia,serif"
+                  font-weight="700"
+                  fill="currentColor"
+                  opacity="1.0"
+                >
+                  A
+                </text>
+                <text
+                  x="7"
+                  y="11"
+                  font-size="8"
+                  font-family="Georgia,serif"
+                  font-weight="700"
+                  fill="currentColor"
+                  opacity="0.55"
+                >
+                  B
+                </text>
+                <text
+                  x="14"
+                  y="11"
+                  font-size="8"
+                  font-family="Georgia,serif"
+                  font-weight="700"
+                  fill="currentColor"
+                  opacity="0.55"
+                >
+                  B
+                </text>
+                <text
+                  x="21"
+                  y="11"
+                  font-size="8"
+                  font-family="Georgia,serif"
+                  font-weight="700"
+                  fill="currentColor"
+                  opacity="1.0"
+                >
+                  A
+                </text>
+              </svg>
+              Rhymes highlight
             </button>
           </div>
           <div class="panel__action-group">
@@ -179,12 +185,12 @@
               title="Show / hide sound-pattern colour highlights"
               @click="showSounds = !showSounds"
             >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="5" cy="8" r="3" fill="currentColor" fill-opacity="0.6" />
-              <circle cx="11" cy="8" r="3" fill="currentColor" fill-opacity="0.85" />
-            </svg>
-            Sounds highlight
-          </button>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="5" cy="8" r="3" fill="currentColor" fill-opacity="0.6" />
+                <circle cx="11" cy="8" r="3" fill="currentColor" fill-opacity="0.85" />
+              </svg>
+              Sounds highlight
+            </button>
           </div>
           <div class="panel__action-group">
             <!-- Rhymes panel toggle -->
@@ -194,36 +200,36 @@
               title="Open rhyme groups panel"
               @click="showRhymesPanel = !showRhymesPanel"
             >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <rect
-                x="1"
-                y="2"
-                width="14"
-                height="3"
-                rx="1.5"
-                fill="currentColor"
-                fill-opacity="0.9"
-              />
-              <rect
-                x="1"
-                y="7"
-                width="10"
-                height="3"
-                rx="1.5"
-                fill="currentColor"
-                fill-opacity="0.65"
-              />
-              <rect
-                x="1"
-                y="12"
-                width="7"
-                height="2"
-                rx="1"
-                fill="currentColor"
-                fill-opacity="0.4"
-              />
-            </svg>
-            Rhymes panel
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect
+                  x="1"
+                  y="2"
+                  width="14"
+                  height="3"
+                  rx="1.5"
+                  fill="currentColor"
+                  fill-opacity="0.9"
+                />
+                <rect
+                  x="1"
+                  y="7"
+                  width="10"
+                  height="3"
+                  rx="1.5"
+                  fill="currentColor"
+                  fill-opacity="0.65"
+                />
+                <rect
+                  x="1"
+                  y="12"
+                  width="7"
+                  height="2"
+                  rx="1"
+                  fill="currentColor"
+                  fill-opacity="0.4"
+                />
+              </svg>
+              Rhymes panel
             </button>
           </div>
           <div class="panel__action-group">
@@ -235,12 +241,30 @@
               class="panel__web-btn panel__web-btn--link"
               title="Умовні позначення (відкрити в новій вкладці)"
             >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/>
-              <text x="3" y="12" font-size="9" font-weight="700" fill="currentColor" font-family="serif">?</text>
-            </svg>
-            Legend
-          </a>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect
+                  x="1"
+                  y="1"
+                  width="14"
+                  height="14"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  fill="none"
+                />
+                <text
+                  x="3"
+                  y="12"
+                  font-size="9"
+                  font-weight="700"
+                  fill="currentColor"
+                  font-family="serif"
+                >
+                  ?
+                </text>
+              </svg>
+              Legend
+            </a>
             <!-- Legend-in-export toggle -->
             <button
               class="panel__web-btn"
@@ -248,16 +272,48 @@
               title="Include legend (умовні позначення) in exported SVG"
               @click="exportWithLegend = !exportWithLegend"
             >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" fill-opacity="0.7"/>
-              <rect x="9" y="3" width="5" height="1.5" rx="0.75" fill="currentColor"/>
-              <rect x="9" y="6" width="3" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.5"/>
-              <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" fill-opacity="0.4"/>
-              <rect x="9" y="10" width="5" height="1.5" rx="0.75" fill="currentColor"/>
-              <rect x="9" y="13" width="3" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.5"/>
-            </svg>
-            +Legend
-          </button>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect
+                  x="2"
+                  y="2"
+                  width="5"
+                  height="5"
+                  rx="1"
+                  fill="currentColor"
+                  fill-opacity="0.7"
+                />
+                <rect x="9" y="3" width="5" height="1.5" rx="0.75" fill="currentColor" />
+                <rect
+                  x="9"
+                  y="6"
+                  width="3"
+                  height="1.5"
+                  rx="0.75"
+                  fill="currentColor"
+                  fill-opacity="0.5"
+                />
+                <rect
+                  x="2"
+                  y="9"
+                  width="5"
+                  height="5"
+                  rx="1"
+                  fill="currentColor"
+                  fill-opacity="0.4"
+                />
+                <rect x="9" y="10" width="5" height="1.5" rx="0.75" fill="currentColor" />
+                <rect
+                  x="9"
+                  y="13"
+                  width="3"
+                  height="1.5"
+                  rx="0.75"
+                  fill="currentColor"
+                  fill-opacity="0.5"
+                />
+              </svg>
+              +Legend
+            </button>
           </div>
           <div class="panel__action-group">
             <!-- Export SVG button -->
@@ -267,11 +323,22 @@
               :title="exportWithLegend ? 'Export SVG with legend' : 'Export SVG (no legend)'"
               @click="phoneticPanelRef?.exportSvg(exportWithLegend)"
             >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            Export SVG
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 2v8M5 7l3 3 3-3"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Export SVG
             </button>
           </div>
         </div>
@@ -452,7 +519,7 @@ function clearText() {
     flex-shrink: 0;
   }
 
-    &__title {
+  &__title {
     margin: 0;
     font-size: 0.85rem;
     font-weight: 600;

@@ -113,9 +113,7 @@
     </div>
 
     <!-- Demo badge â always-visible notice in the bottom-right corner -->
-    <div class="pp-demo-badge" title="Demo Version — може містити неточності та похибки">
-      Demo
-    </div>
+    <div class="pp-demo-badge" title="Demo Version — може містити неточності та похибки">Demo</div>
   </div>
 </template>
 

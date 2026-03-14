@@ -74,10 +74,7 @@
       </p>
       <div class="lp-opacity-ex">
         <div v-for="step in OPACITY_STEPS" :key="step.label" class="lp-opacity-item">
-          <div
-            class="lp-op-swatch"
-            :style="{ background: `rgba(105,175,52,${step.alpha})` }"
-          />
+          <div class="lp-op-swatch" :style="{ background: `rgba(105,175,52,${step.alpha})` }" />
           <span class="lp-opacity-item__label">{{ step.label }}</span>
         </div>
         <span class="lp-opacity-arrow">→ частіший</span>
@@ -97,8 +94,8 @@
     <div class="lp-demo-notice">
       <span class="lp-demo-notice__badge">Demo</span>
       <span class="lp-demo-notice__text">
-        Ця версія є демонстраційною та може містити неточності у транскрипції, розбитті на
-        склади та аналізі патернів. Результати не слід використовувати як наукові джерела.
+        Ця версія є демонстраційною та може містити неточності у транскрипції, розбитті на склади та
+        аналізі патернів. Результати не слід використовувати як наукові джерела.
       </span>
     </div>
   </div>
@@ -108,25 +105,25 @@
 import { PSYCHO_GROUP_INFO, VOWEL_GROUP_INFO } from 'src/services/phonetic/ipaColorMap';
 
 const SHAPE_EXAMPLES = [
-  { label: 'Зупинні (п, б, т, д, к)', radius: '2px',   height: '76%' },
-  { label: 'Африкати (ц, ч, дж)',      radius: '4px',   height: '70%' },
-  { label: 'Фрикативні (с, ш, ф, х)',  radius: '8px',   height: '64%' },
+  { label: 'Зупинні (п, б, т, д, к)', radius: '2px', height: '76%' },
+  { label: 'Африкати (ц, ч, дж)', radius: '4px', height: '70%' },
+  { label: 'Фрикативні (с, ш, ф, х)', radius: '8px', height: '64%' },
   { label: 'Сонорні / носові (л, р, м, н)', radius: '999px', height: '80%' },
 ] as const;
 
 const CELL_EXAMPLES = [
-  { label: 'Склад без наголосу',          stressed: false, tab: false, wordLast: false },
-  { label: 'Наголошений склад',           stressed: true,  tab: false, wordLast: false },
-  { label: 'Останній склад слова',        stressed: false, tab: false, wordLast: true  },
-  { label: 'Відступ (tab)',               stressed: false, tab: true,  wordLast: false },
+  { label: 'Склад без наголосу', stressed: false, tab: false, wordLast: false },
+  { label: 'Наголошений склад', stressed: true, tab: false, wordLast: false },
+  { label: 'Останній склад слова', stressed: false, tab: false, wordLast: true },
+  { label: 'Відступ (tab)', stressed: false, tab: true, wordLast: false },
 ] as const;
 
 const OPACITY_STEPS = [
-  { label: 'рідкий',  alpha: 0.12 },
-  { label: '',        alpha: 0.28 },
-  { label: '',        alpha: 0.50 },
-  { label: '',        alpha: 0.72 },
-  { label: 'густий',  alpha: 1.00 },
+  { label: 'рідкий', alpha: 0.12 },
+  { label: '', alpha: 0.28 },
+  { label: '', alpha: 0.5 },
+  { label: '', alpha: 0.72 },
+  { label: 'густий', alpha: 1.0 },
 ] as const;
 </script>
 

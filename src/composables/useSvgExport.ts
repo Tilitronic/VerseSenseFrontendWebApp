@@ -20,19 +20,19 @@ import type { TokenVisual } from 'src/services/phonetic/ipaColorMap';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
-const CW = 52;       // cell width (px)
-const CH = 38;       // cell height (px)
-const NW = 26;       // row-number column width (px)
-const RG = 5;        // vertical gap between rows (px)
-const BLANK_H = 12;  // blank-row height (px)
-const PAD = 22;      // outer SVG padding (px)
+const CW = 52; // cell width (px)
+const CH = 38; // cell height (px)
+const NW = 26; // row-number column width (px)
+const RG = 5; // vertical gap between rows (px)
+const BLANK_H = 12; // blank-row height (px)
+const PAD = 22; // outer SVG padding (px)
 // When legend is included the cell-type row needs 4×150 = 600px available
 const LEGEND_MIN_SVG_W = 644;
 
-const HEADER_H = 58;       // height of title/subtitle area
-const LEGEND_GAP = 28;     // gap between grid and legend
+const HEADER_H = 58; // height of title/subtitle area
+const LEGEND_GAP = 28; // gap between grid and legend
 
-const FONT_UI  = "system-ui, 'Helvetica Neue', Arial, sans-serif";
+const FONT_UI = "system-ui, 'Helvetica Neue', Arial, sans-serif";
 const FONT_IPA = "'Georgia', 'Noto Serif', serif";
 
 // ── Text hash (FNV-1a 32-bit, base-36, 7 chars) ─────────────────────────────
@@ -76,7 +76,9 @@ interface SylCell {
   /** render-key for each IPA token: "{wordId}:{sylIdx}:{tokIdx}" */
   tokenKeys: string[];
 }
-interface TabCell { type: 'tab' }
+interface TabCell {
+  type: 'tab';
+}
 type Cell = SylCell | TabCell;
 
 interface GridRow {
@@ -87,10 +89,7 @@ interface GridRow {
 
 // ── Build rows ────────────────────────────────────────────────────────────────
 
-function buildRows(
-  lines: ILine[],
-  isLineConfirmed: (id: string) => boolean,
-): GridRow[] {
+function buildRows(lines: ILine[], isLineConfirmed: (id: string) => boolean): GridRow[] {
   const rows: GridRow[] = [];
 
   for (let li = 0; li < lines.length; li++) {
@@ -150,7 +149,11 @@ function maxCells(rows: GridRow[]): number {
 // ── Token ribbon layout ───────────────────────────────────────────────────────
 
 interface TokRender {
-  x: number; y: number; w: number; h: number; rx: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rx: number;
   color: string;
   symbol: string;
 }
@@ -176,7 +179,7 @@ function layoutTokens(
 
   for (let i = 0; i < n; i++) {
     const symbol = ipaTokens[i]!;
-    const key    = tokenKeys[i]!;
+    const key = tokenKeys[i]!;
     const visual = styleMap.get(key) ?? ipaTokenStyle(symbol, 0.22);
 
     const rw = tokW[i]! * scale;
@@ -187,8 +190,8 @@ function layoutTokens(
     const rxStr = visual?.borderRadius.split(' ')[0] ?? '4px';
     const corner = Math.min(parseFloat(rxStr), rh / 2, rw / 2);
 
-    const color = visual?.background ??
-      (isVowelTok(symbol) ? 'hsla(28,64%,58%,0.25)' : 'rgba(0,0,0,0.1)');
+    const color =
+      visual?.background ?? (isVowelTok(symbol) ? 'hsla(28,64%,58%,0.25)' : 'rgba(0,0,0,0.1)');
 
     out.push({ x, y: ry, w: rw, h: rh, rx: corner, color, symbol });
     x += rw;
@@ -218,14 +221,14 @@ function renderSvgCell(
   // Cell body
   parts.push(
     `<rect x="${x}" y="${y}" width="${CW}" height="${CH}" ` +
-    `fill="${bg}" stroke="#000" stroke-width="1"/>`,
+      `fill="${bg}" stroke="#000" stroke-width="1"/>`,
   );
 
   // Word-last thick right border overlay
   if (cell.wordLast) {
     parts.push(
       `<line x1="${x + CW}" y1="${y}" x2="${x + CW}" y2="${y + CH}" ` +
-      `stroke="#000" stroke-width="3"/>`,
+        `stroke="#000" stroke-width="3"/>`,
     );
   }
 
@@ -234,13 +237,13 @@ function renderSvgCell(
   for (const t of toks) {
     parts.push(
       `<rect x="${t.x.toFixed(1)}" y="${t.y.toFixed(1)}" ` +
-      `width="${t.w.toFixed(1)}" height="${t.h.toFixed(1)}" ` +
-      `rx="${t.rx.toFixed(1)}" fill="${esc(t.color)}"/>`,
+        `width="${t.w.toFixed(1)}" height="${t.h.toFixed(1)}" ` +
+        `rx="${t.rx.toFixed(1)}" fill="${esc(t.color)}"/>`,
     );
     parts.push(
       `<text x="${(t.x + t.w / 2).toFixed(1)}" y="${(t.y + t.h / 2).toFixed(1)}" ` +
-      `font-family="${FONT_IPA}" font-size="9" fill="rgba(0,0,0,0.82)" ` +
-      `text-anchor="middle" dominant-baseline="central">${esc(t.symbol)}</text>`,
+        `font-family="${FONT_IPA}" font-size="9" fill="rgba(0,0,0,0.82)" ` +
+        `text-anchor="middle" dominant-baseline="central">${esc(t.symbol)}</text>`,
     );
   }
 
@@ -249,11 +252,7 @@ function renderSvgCell(
 
 // ── SVG row rendering ─────────────────────────────────────────────────────────
 
-function renderSvgRow(
-  row: GridRow,
-  y: number,
-  styleMap: Map<string, TokenVisual>,
-): string {
+function renderSvgRow(row: GridRow, y: number, styleMap: Map<string, TokenVisual>): string {
   if (row.kind === 'blank') return '';
 
   const midY = (y + rowH(row) / 2).toFixed(1);
@@ -262,15 +261,15 @@ function renderSvgRow(
   // Row number
   parts.push(
     `<text x="${NW - 4}" y="${midY}" ` +
-    `font-family="${FONT_UI}" font-size="9" fill="rgba(0,0,0,0.28)" ` +
-    `text-anchor="end" dominant-baseline="central">${row.lineIdx + 1}</text>`,
+      `font-family="${FONT_UI}" font-size="9" fill="rgba(0,0,0,0.28)" ` +
+      `text-anchor="end" dominant-baseline="central">${row.lineIdx + 1}</text>`,
   );
 
   if (row.kind === 'pending') {
     parts.push(
       `<text x="${NW + 6}" y="${midY}" ` +
-      `font-family="${FONT_UI}" font-size="11" fill="rgba(0,0,0,0.12)" ` +
-      `dominant-baseline="central">· · ·</text>`,
+        `font-family="${FONT_UI}" font-size="11" fill="rgba(0,0,0,0.12)" ` +
+        `dominant-baseline="central">· · ·</text>`,
     );
     return parts.join('');
   }
@@ -287,7 +286,10 @@ function renderSvgRow(
 
 // ── Legend ────────────────────────────────────────────────────────────────────
 
-interface RenderResult { svg: string; height: number }
+interface RenderResult {
+  svg: string;
+  height: number;
+}
 
 function renderLegend(startX: number, startY: number, availW: number): RenderResult {
   const parts: string[] = [];
@@ -296,23 +298,23 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
   // Separator
   parts.push(
     `<line x1="${startX}" y1="${y}" x2="${startX + availW}" y2="${y}" ` +
-    `stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`,
+      `stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`,
   );
   y += 16;
 
   // Title
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="11" font-weight="700" fill="#333" letter-spacing="0.8">` +
-    `УМОВНІ ПОЗНАЧЕННЯ</text>`,
+      `font-size="11" font-weight="700" fill="#333" letter-spacing="0.8">` +
+      `УМОВНІ ПОЗНАЧЕННЯ</text>`,
   );
   y += 22;
 
   // ── Consonant colour groups ───────────────────────────────────────────────
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
-    `ЗВУКОВІ ГРУПИ (приголосні)</text>`,
+      `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
+      `ЗВУКОВІ ГРУПИ (приголосні)</text>`,
   );
   y += 16;
 
@@ -321,25 +323,24 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
   const SW = 14; // swatch size
 
   for (let i = 0; i < PSYCHO_GROUP_INFO.length; i++) {
-    const g   = PSYCHO_GROUP_INFO[i]!;
+    const g = PSYCHO_GROUP_INFO[i]!;
     const col = i % LEG_COLS;
     const row = Math.floor(i / LEG_COLS);
-    const ix  = startX + col * colW;
-    const iy  = y + row * 32;
+    const ix = startX + col * colW;
+    const iy = y + row * 32;
 
     parts.push(
-      `<rect x="${ix}" y="${iy}" width="${SW}" height="${SW}" ` +
-      `fill="${g.cssColor}" rx="3"/>`,
+      `<rect x="${ix}" y="${iy}" width="${SW}" height="${SW}" ` + `fill="${g.cssColor}" rx="3"/>`,
     );
     parts.push(
       `<text x="${ix + SW + 5}" y="${iy + 7}" ` +
-      `font-family="${FONT_UI}" font-size="9" font-weight="600" fill="#222" ` +
-      `dominant-baseline="central">${esc(g.labelUa)}</text>`,
+        `font-family="${FONT_UI}" font-size="9" font-weight="600" fill="#222" ` +
+        `dominant-baseline="central">${esc(g.labelUa)}</text>`,
     );
     parts.push(
       `<text x="${ix + SW + 5}" y="${iy + 7 + 12}" ` +
-      `font-family="${FONT_IPA}" font-size="8" fill="#666" ` +
-      `dominant-baseline="central">${esc(g.examplesIpa.join(' '))}</text>`,
+        `font-family="${FONT_IPA}" font-size="8" fill="#666" ` +
+        `dominant-baseline="central">${esc(g.examplesIpa.join(' '))}</text>`,
     );
   }
 
@@ -348,28 +349,27 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
   // ── Vowel groups ──────────────────────────────────────────────────────────
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
-    `ГОЛОСНІ</text>`,
+      `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
+      `ГОЛОСНІ</text>`,
   );
   y += 16;
 
   for (let i = 0; i < VOWEL_GROUP_INFO.length; i++) {
-    const g  = VOWEL_GROUP_INFO[i]!;
+    const g = VOWEL_GROUP_INFO[i]!;
     const ix = startX + i * colW;
 
     parts.push(
-      `<rect x="${ix}" y="${y}" width="${SW}" height="${SW}" ` +
-      `fill="${g.cssColor}" rx="7"/>`,
+      `<rect x="${ix}" y="${y}" width="${SW}" height="${SW}" ` + `fill="${g.cssColor}" rx="7"/>`,
     );
     parts.push(
       `<text x="${ix + SW + 5}" y="${y + 7}" ` +
-      `font-family="${FONT_UI}" font-size="9" font-weight="600" fill="#222" ` +
-      `dominant-baseline="central">${esc(g.labelUa)}</text>`,
+        `font-family="${FONT_UI}" font-size="9" font-weight="600" fill="#222" ` +
+        `dominant-baseline="central">${esc(g.labelUa)}</text>`,
     );
     parts.push(
       `<text x="${ix + SW + 5}" y="${y + 7 + 12}" ` +
-      `font-family="${FONT_IPA}" font-size="8" fill="#666" ` +
-      `dominant-baseline="central">${esc(g.examplesIpa.join(' '))}</text>`,
+        `font-family="${FONT_IPA}" font-size="8" fill="#666" ` +
+        `dominant-baseline="central">${esc(g.examplesIpa.join(' '))}</text>`,
     );
   }
   y += 32 + 12;
@@ -377,38 +377,38 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
   // ── Ribbon shape / voicing key ────────────────────────────────────────────
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
-    `ФОРМА СМУЖКИ</text>`,
+      `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
+      `ФОРМА СМУЖКИ</text>`,
   );
   y += 16;
 
   const shapeItems = [
-    { rx: 1,  label: 'Зупинні (п,б,т,д,к)',   h: 0.76 },
-    { rx: 4,  label: 'Африкати (ц,ч,дж)',      h: 0.70 },
-    { rx: 8,  label: 'Фрикативні (с,ш,ф,х)',   h: 0.64 },
-    { rx: 12, label: 'Сонорні / носові (л,р,м,н)', h: 0.80 },
+    { rx: 1, label: 'Зупинні (п,б,т,д,к)', h: 0.76 },
+    { rx: 4, label: 'Африкати (ц,ч,дж)', h: 0.7 },
+    { rx: 8, label: 'Фрикативні (с,ш,ф,х)', h: 0.64 },
+    { rx: 12, label: 'Сонорні / носові (л,р,м,н)', h: 0.8 },
   ];
   const SBW = 36; // shape block width
   const SBH = CH;
 
   for (let i = 0; i < shapeItems.length; i++) {
     const si = shapeItems[i]!;
-    const ix = startX + i * (colW * LEG_COLS / shapeItems.length);
+    const ix = startX + i * ((colW * LEG_COLS) / shapeItems.length);
     const rh = SBH * si.h;
     const ry = y + (SBH - rh) / 2;
 
     parts.push(
       `<rect x="${ix}" y="${y}" width="${SBW}" height="${SBH}" ` +
-      `fill="none" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`,
+        `fill="none" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`,
     );
     parts.push(
       `<rect x="${ix + 2}" y="${ry.toFixed(1)}" ` +
-      `width="${SBW - 4}" height="${rh.toFixed(1)}" ` +
-      `rx="${si.rx}" fill="rgba(0,0,0,0.18)"/>`,
+        `width="${SBW - 4}" height="${rh.toFixed(1)}" ` +
+        `rx="${si.rx}" fill="rgba(0,0,0,0.18)"/>`,
     );
     parts.push(
       `<text x="${ix}" y="${y + SBH + 13}" ` +
-      `font-family="${FONT_UI}" font-size="8" fill="#555">${esc(si.label)}</text>`,
+        `font-family="${FONT_UI}" font-size="8" fill="#555">${esc(si.label)}</text>`,
     );
   }
   y += SBH + 26;
@@ -416,19 +416,19 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
   // ── Cell type key ─────────────────────────────────────────────────────────
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
-    `ТИПИ КОМІРОК</text>`,
+      `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
+      `ТИПИ КОМІРОК</text>`,
   );
   y += 16;
 
-  const CEW = 34;  // cell example width
-  const CEH = 26;  // cell example height
+  const CEW = 34; // cell example width
+  const CEH = 26; // cell example height
   const STEP = 150;
 
   const cellItems = [
-    { bg: '#fff',             dash: '',     thick: false, label: 'Без наголосу' },
-    { bg: '#c8c8c8',          dash: '',     thick: false, label: 'Наголошений склад' },
-    { bg: '#fff',             dash: '',     thick: true,  label: 'Останній склад слова' },
+    { bg: '#fff', dash: '', thick: false, label: 'Без наголосу' },
+    { bg: '#c8c8c8', dash: '', thick: false, label: 'Наголошений склад' },
+    { bg: '#fff', dash: '', thick: true, label: 'Останній склад слова' },
     { bg: 'rgba(0,0,0,0.02)', dash: '4 2', thick: false, label: 'Відступ (tab)' },
   ];
 
@@ -438,18 +438,18 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
 
     parts.push(
       `<rect x="${ix}" y="${y}" width="${CEW}" height="${CEH}" ` +
-      `fill="${ci.bg}" stroke="rgba(0,0,0,0.6)" stroke-width="1" ` +
-      `${ci.dash ? `stroke-dasharray="${ci.dash}"` : ''}/>`,
+        `fill="${ci.bg}" stroke="rgba(0,0,0,0.6)" stroke-width="1" ` +
+        `${ci.dash ? `stroke-dasharray="${ci.dash}"` : ''}/>`,
     );
     if (ci.thick) {
       parts.push(
         `<line x1="${ix + CEW}" y1="${y}" x2="${ix + CEW}" y2="${y + CEH}" ` +
-        `stroke="#000" stroke-width="3"/>`,
+          `stroke="#000" stroke-width="3"/>`,
       );
     }
     parts.push(
       `<text x="${ix}" y="${y + CEH + 12}" ` +
-      `font-family="${FONT_UI}" font-size="8" fill="#555">${esc(ci.label)}</text>`,
+        `font-family="${FONT_UI}" font-size="8" fill="#555">${esc(ci.label)}</text>`,
     );
   }
   y += CEH + 24;
@@ -457,20 +457,20 @@ function renderLegend(startX: number, startY: number, availW: number): RenderRes
   // ── Pattern opacity note ──────────────────────────────────────────────────
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
-    `ВИДІЛЕННЯ ЗВУКОВИХ ПАТЕРНІВ</text>`,
+      `font-size="8.5" font-weight="600" fill="#555" letter-spacing="0.3">` +
+      `ВИДІЛЕННЯ ЗВУКОВИХ ПАТЕРНІВ</text>`,
   );
   y += 14;
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8" fill="#666">` +
-    `Насиченість кольору — щільність повторень звуку (яскравіше = частіше поруч).</text>`,
+      `font-size="8" fill="#666">` +
+      `Насиченість кольору — щільність повторень звуку (яскравіше = частіше поруч).</text>`,
   );
   y += 14;
   parts.push(
     `<text x="${startX}" y="${y}" font-family="${FONT_UI}" ` +
-    `font-size="8" fill="#666">` +
-    `Враховуються лише звуки, що зустрічаються ≥3 разів у тексті.</text>`,
+      `font-size="8" fill="#666">` +
+      `Враховуються лише звуки, що зустрічаються ≥3 разів у тексті.</text>`,
   );
   y += 18;
 
@@ -495,15 +495,13 @@ export function generateVisualizationSvg(
   title = '',
   includeLegend = false,
 ): string {
-  const rows    = buildRows(lines, isLineConfirmed);
-  const gh      = gridHeight(rows);
-  const mc      = maxCells(rows);
+  const rows = buildRows(lines, isLineConfirmed);
+  const gh = gridHeight(rows);
+  const mc = maxCells(rows);
   const contentW = NW + mc * CW;
   // Width is exactly the widest row + padding; expand only when legend needs it
-  const svgW    = includeLegend
-    ? Math.max(contentW + PAD * 2, LEGEND_MIN_SVG_W)
-    : contentW + PAD * 2;
-  const availW  = svgW - PAD * 2;
+  const svgW = includeLegend ? Math.max(contentW + PAD * 2, LEGEND_MIN_SVG_W) : contentW + PAD * 2;
+  const availW = svgW - PAD * 2;
 
   const gridStartY = PAD + HEADER_H;
   const legendStartY = gridStartY + gh + (includeLegend ? LEGEND_GAP : 0);
@@ -513,13 +511,13 @@ export function generateVisualizationSvg(
     : { svg: '', height: 0 };
 
   const footerY = legendStartY + (legendH > 0 ? legendH + 10 : 8);
-  const svgH    = footerY + 28 + PAD;
+  const svgH = footerY + 28 + PAD;
 
   const out: string[] = [];
 
   out.push(
     `<svg xmlns="http://www.w3.org/2000/svg" ` +
-    `width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`,
+      `width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`,
   );
 
   // Background
@@ -528,27 +526,25 @@ export function generateVisualizationSvg(
   // Grid area white card
   out.push(
     `<rect x="${PAD - 6}" y="${gridStartY - 6}" ` +
-    `width="${contentW + 12}" height="${gh + 12}" fill="#fff" rx="4"/>`,
+      `width="${contentW + 12}" height="${gh + 12}" fill="#fff" rx="4"/>`,
   );
 
   // ── Header ─────────────────────────────────────────────────────────────────
-  const titleText = title
-    ? `VerseSense · ${esc(title)}`
-    : 'VerseSense · Phonetic Visualization';
+  const titleText = title ? `VerseSense · ${esc(title)}` : 'VerseSense · Phonetic Visualization';
 
   out.push(
     `<text x="${PAD}" y="${PAD + 18}" ` +
-    `font-family="${FONT_UI}" font-size="15" font-weight="700" fill="#1a1a2e">` +
-    `${titleText}</text>`,
+      `font-family="${FONT_UI}" font-size="15" font-weight="700" fill="#1a1a2e">` +
+      `${titleText}</text>`,
   );
   out.push(
     `<text x="${PAD}" y="${PAD + 34}" ` +
-    `font-family="${FONT_UI}" font-size="8.5" fill="rgba(180,30,30,0.7)">` +
-    `⚠ Demo Version — може містити неточності та похибки</text>`,
+      `font-family="${FONT_UI}" font-size="8.5" fill="rgba(180,30,30,0.7)">` +
+      `⚠ Demo Version — може містити неточності та похибки</text>`,
   );
   out.push(
     `<line x1="${PAD}" y1="${PAD + 46}" x2="${PAD + contentW}" y2="${PAD + 46}" ` +
-    `stroke="rgba(0,0,0,0.1)" stroke-width="1"/>`,
+      `stroke="rgba(0,0,0,0.1)" stroke-width="1"/>`,
   );
 
   // ── Grid rows ───────────────────────────────────────────────────────────────
@@ -571,8 +567,8 @@ export function generateVisualizationSvg(
   const year = new Date().getFullYear();
   out.push(
     `<text x="${svgW - PAD}" y="${footerY + 14}" ` +
-    `font-family="${FONT_UI}" font-size="8" fill="rgba(0,0,0,0.25)" text-anchor="end">` +
-    `VerseSense Demo · versesense.app · ${year}</text>`,
+      `font-family="${FONT_UI}" font-size="8" fill="rgba(0,0,0,0.25)" text-anchor="end">` +
+      `VerseSense Demo · versesense.app · ${year}</text>`,
   );
 
   out.push('</svg>');
@@ -583,9 +579,9 @@ export function generateVisualizationSvg(
 
 export function downloadSvg(svgString: string, filename = 'phonetic.svg'): void {
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
