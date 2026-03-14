@@ -5,6 +5,7 @@
       <div class="panel__header">
         <h2 class="panel__title">Poetry Editor</h2>
         <div class="panel__actions">
+          <div class="panel__action-group">
           <!-- Row settings toggle -->
           <button
             v-if="appStore.toolbarMode === 'all'"
@@ -24,44 +25,45 @@
             Rows
           </button>
 
-          <!-- Toolbar mode toggle -->
-          <q-btn-toggle
-            v-model="toolbarModeModel"
-            flat
-            dense
-            no-caps
-            toggle-color="primary"
-            class="q-ml-xs"
-            :options="[
-              { value: 'active', slot: 'active' },
-              { value: 'all', slot: 'all' },
-            ]"
-          >
-            <template #active>
-              <q-icon name="highlight" size="16px" />
-              <q-tooltip>Active line only</q-tooltip>
-            </template>
-            <template #all>
-              <q-icon name="format_list_bulleted" size="16px" />
-              <q-tooltip>Every line</q-tooltip>
-            </template>
-          </q-btn-toggle>
+            <!-- Toolbar mode toggle -->
+            <q-btn-toggle
+              v-model="toolbarModeModel"
+              flat
+              dense
+              no-caps
+              toggle-color="primary"
+              class="q-ml-xs"
+              :options="[
+                { value: 'active', slot: 'active' },
+                { value: 'all', slot: 'all' },
+              ]"
+            >
+              <template #active>
+                <q-icon name="highlight" size="16px" />
+                <q-tooltip>Active line only</q-tooltip>
+              </template>
+              <template #all>
+                <q-icon name="format_list_bulleted" size="16px" />
+                <q-tooltip>Every line</q-tooltip>
+              </template>
+            </q-btn-toggle>
 
-          <!-- Word count -->
-          <span class="panel__word-count q-ml-xs">
-            {{ wordCount }} word{{ wordCount !== 1 ? 's' : '' }}
-          </span>
+            <!-- Word count -->
+            <span class="panel__word-count q-ml-xs">
+              {{ wordCount }} word{{ wordCount !== 1 ? 's' : '' }}
+            </span>
 
-          <!-- Clear -->
-          <q-btn
-            flat
-            dense
-            icon="delete_outline"
-            color="negative"
-            title="Clear"
-            class="q-ml-xs"
-            @click="clearText"
-          />
+            <!-- Clear -->
+            <q-btn
+              flat
+              dense
+              icon="delete_outline"
+              color="negative"
+              title="Clear"
+              class="q-ml-xs"
+              @click="clearText"
+            />
+          </div>
         </div>
       </div>
 
@@ -76,6 +78,7 @@
       <div class="panel__header">
         <h2 class="panel__title">Patterns Visualization</h2>
         <div class="panel__actions">
+          <div class="panel__action-group">
           <!-- Sound web toggle -->
           <button
             class="panel__web-btn"
@@ -112,13 +115,13 @@
             </svg>
             Right
           </button>
-          <!-- Rhyme motif detection toggle -->
-          <button
-            class="panel__web-btn"
-            :class="{ 'panel__web-btn--active': showRhymes }"
-            title="Highlight recurring phoneme patterns (rhymes)"
-            @click="showRhymes = !showRhymes"
-          >
+            <!-- Rhyme motif detection toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showRhymes }"
+              title="Highlight recurring phoneme patterns (rhymes)"
+              @click="showRhymes = !showRhymes"
+            >
             <svg width="28" height="14" viewBox="0 0 28 14" fill="none" style="font-family: serif">
               <text
                 x="0"
@@ -166,27 +169,31 @@
               </text>
             </svg>
             Rhymes highlight
-          </button>
-          <!-- Sound pattern colours toggle -->
-          <button
-            class="panel__web-btn"
-            :class="{ 'panel__web-btn--active': showSounds }"
-            title="Show / hide sound-pattern colour highlights"
-            @click="showSounds = !showSounds"
-          >
+            </button>
+          </div>
+          <div class="panel__action-group">
+            <!-- Sound pattern colours toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showSounds }"
+              title="Show / hide sound-pattern colour highlights"
+              @click="showSounds = !showSounds"
+            >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <circle cx="5" cy="8" r="3" fill="currentColor" fill-opacity="0.6" />
               <circle cx="11" cy="8" r="3" fill="currentColor" fill-opacity="0.85" />
             </svg>
             Sounds highlight
           </button>
-          <!-- Rhymes panel toggle -->
-          <button
-            class="panel__web-btn"
-            :class="{ 'panel__web-btn--active': showRhymesPanel }"
-            title="Open rhyme groups panel"
-            @click="showRhymesPanel = !showRhymesPanel"
-          >
+          </div>
+          <div class="panel__action-group">
+            <!-- Rhymes panel toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showRhymesPanel }"
+              title="Open rhyme groups panel"
+              @click="showRhymesPanel = !showRhymesPanel"
+            >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <rect
                 x="1"
@@ -217,11 +224,61 @@
               />
             </svg>
             Rhymes panel
+            </button>
+          </div>
+          <div class="panel__action-group">
+            <!-- Legend link -->
+            <a
+              href="/legend"
+              target="_blank"
+              rel="noopener"
+              class="panel__web-btn panel__web-btn--link"
+              title="Умовні позначення (відкрити в новій вкладці)"
+            >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/>
+              <text x="3" y="12" font-size="9" font-weight="700" fill="currentColor" font-family="serif">?</text>
+            </svg>
+            Legend
+          </a>
+            <!-- Legend-in-export toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': exportWithLegend }"
+              title="Include legend (умовні позначення) in exported SVG"
+              @click="exportWithLegend = !exportWithLegend"
+            >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" fill-opacity="0.7"/>
+              <rect x="9" y="3" width="5" height="1.5" rx="0.75" fill="currentColor"/>
+              <rect x="9" y="6" width="3" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.5"/>
+              <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" fill-opacity="0.4"/>
+              <rect x="9" y="10" width="5" height="1.5" rx="0.75" fill="currentColor"/>
+              <rect x="9" y="13" width="3" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.5"/>
+            </svg>
+            +Legend
           </button>
+          </div>
+          <div class="panel__action-group">
+            <!-- Export SVG button -->
+            <button
+              class="panel__web-btn panel__web-btn--export"
+              :disabled="!hasConfirmedLines"
+              :title="exportWithLegend ? 'Export SVG with legend' : 'Export SVG (no legend)'"
+              @click="phoneticPanelRef?.exportSvg(exportWithLegend)"
+            >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Export SVG
+            </button>
+          </div>
         </div>
       </div>
       <div class="panel__body panel__body--split" ref="splitBodyRef">
         <PhoneticPanel
+          ref="phoneticPanelRef"
           class="panel__split-main"
           v-model:showWeb="showSoundWeb"
           v-model:alignRight="showAlignRight"
@@ -251,13 +308,19 @@ import RhymesPanel from 'components/RhymesPanel.vue';
 const appStore = useAppStore();
 const poetryStore = usePoetryStore();
 
+const phoneticPanelRef = ref<InstanceType<typeof PhoneticPanel> | null>(null);
+
 const wordCount = computed(() => poetryStore.allWordTokens.length);
+const hasConfirmedLines = computed(() =>
+  poetryStore.document.lines.some((l) => poetryStore.isLineConfirmed(l.id)),
+);
 const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
 const showRhymes = ref(false);
 const showSounds = ref(true);
 const showRhymesPanel = ref(false);
 const showRowSettings = ref(true);
+const exportWithLegend = ref(false);
 
 // ── Resizable rhymes panel ───────────────────────────────────────────────────
 const splitBodyRef = ref<HTMLElement | null>(null);
@@ -336,6 +399,8 @@ function clearText() {
     .panel__header {
       background: #12121c;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-left: 20px;
+      padding-right: 20px;
     }
 
     .panel__title {
@@ -358,6 +423,8 @@ function clearText() {
       font-size: 0.68rem;
       cursor: pointer;
       user-select: none;
+      white-space: nowrap;
+      flex-shrink: 0;
       transition:
         background 0.12s,
         color 0.12s,
@@ -385,19 +452,36 @@ function clearText() {
     flex-shrink: 0;
   }
 
-  &__title {
+    &__title {
     margin: 0;
     font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.45);
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-left: 20px;
+    padding-right: 12px;
   }
 
   &__actions {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    min-width: 0;
+  }
+
+  .panel__action-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    margin-right: 8px;
+    margin-bottom: 6px;
   }
 
   &__word-count {
@@ -517,6 +601,33 @@ function clearText() {
     &--pending {
       background: #e8a030;
     } // orange — at least one unconfirmed
+  }
+}
+
+// ── Export SVG button ─────────────────────────────────────────────────────────
+.panel__web-btn--export {
+  border-color: rgba(100, 200, 120, 0.35) !important;
+  color: rgba(100, 220, 130, 0.7) !important;
+
+  &:not(:disabled):hover {
+    border-color: rgba(100, 220, 130, 0.7) !important;
+    color: rgba(100, 240, 140, 1) !important;
+    background: rgba(100, 220, 130, 0.08) !important;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+// ── Legend link button ────────────────────────────────────────────────────────
+.panel__web-btn--link {
+  text-decoration: none;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.7);
   }
 }
 

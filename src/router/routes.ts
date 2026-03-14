@@ -10,6 +10,13 @@ const routes: RouteRecordRaw[] = [
     ],
   },
 
+  // Standalone legend page — can be iframed from external sites.
+  // URL: /legend  (no layout chrome, suitable for embedding)
+  {
+    path: '/legend',
+    component: () => import('pages/LegendPage.vue'),
+  },
+
   // Always leave this as last one,
   // but you can also remove it
   {

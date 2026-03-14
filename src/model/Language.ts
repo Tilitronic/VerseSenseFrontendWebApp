@@ -13,8 +13,8 @@ export const DEFAULT_LANGUAGE: Language = 'ua';
 
 /** Human-readable label + flag emoji for UI display */
 export const LANGUAGE_META: Record<Language, { label: string; flag: string }> = {
-  'ua':    { label: 'Ukrainian', flag: '🇺🇦' },
-  'pl':    { label: 'Polish',    flag: '🇵🇱' },
+  ua: { label: 'Ukrainian', flag: '🇺🇦' },
+  pl: { label: 'Polish', flag: '🇵🇱' },
   'en-us': { label: 'English (US)', flag: '🇺🇸' },
   'en-gb': { label: 'English (GB)', flag: '🇬🇧' },
 };

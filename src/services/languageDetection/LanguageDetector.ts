@@ -64,13 +64,13 @@ const LATIN_ONLY = /[a-zA-Z\u00C0-\u024F]/;
  */
 const FRANC_TO_LANGUAGE: Record<string, Language> = {
   ukr: 'ua',
-  bul: 'ua',  // Cyrillic → assume UA if heuristic didn't catch it
-  rus: 'ua',  // same — we don't support Russian, map to closest
-  bel: 'ua',  // same
+  bul: 'ua', // Cyrillic → assume UA if heuristic didn't catch it
+  rus: 'ua', // same — we don't support Russian, map to closest
+  bel: 'ua', // same
   pol: 'pl',
   eng: 'en-us',
-  sco: 'en-us',  // Scots — very close to English, treat as en
-  afr: 'en-us',  // Afrikaans sometimes fires on short EN — treat as en
+  sco: 'en-us', // Scots — very close to English, treat as en
+  afr: 'en-us', // Afrikaans sometimes fires on short EN — treat as en
 };
 
 /** ISO 639-3 codes franc will consider; limits search space for performance */
@@ -107,7 +107,7 @@ export function detectLanguage(text: string): DetectionResult {
 
   // ── 0. Script guard ─────────────────────────────────────────────────────
   // Pure Latin text cannot be Ukrainian (Cyrillic). Skip all UA heuristics.
-  const isLatin    = LATIN_ONLY.test(trimmed) && !CYRILLIC.test(trimmed);
+  const isLatin = LATIN_ONLY.test(trimmed) && !CYRILLIC.test(trimmed);
   const isCyrillic = CYRILLIC.test(trimmed) && !LATIN_ONLY.test(trimmed);
 
   // ── 1. Heuristic layer ─────────────────────────────────────────────────────

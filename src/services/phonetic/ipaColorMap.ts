@@ -12,7 +12,9 @@
  * ── Consonant psychoacoustic families ────────────────────────────────────────
  *
  *  NASALS           m  n  ŋ  ɴ  ɱ       humming, warm resonance     → amber  42°
- *  LIQUIDS/GLIDES   l  r  ɾ  ɹ  j  w    flowing, melodic sonorants  → gold   60°
+ *  TRILLS / TAPS    r  ɾ  ʀ             vibrating, rolling          → copper 28°
+ *  LATERALS         l  ɬ  ɭ             lateral flow                → gold   55°
+ *  GLIDES           j  w  ɹ  ɰ          semi-vowels (vowel-bridge)  → cyan  195°
  *  LABIAL STOPS     p  b                 lip pops, sharp percussive  → red     0°
  *  CORONAL STOPS    t  d  (dental+alv)   tongue clicks               → orange 22°
  *  VELAR STOPS      k  g  ʔ (glottal)   deep / back-of-mouth thump  → indigo 252°
@@ -45,9 +47,11 @@ import {
 // ── Psychoacoustic groups ─────────────────────────────────────────────────────
 
 type PsychoGroup =
-  | 'nasal' // m n ŋ — humming resonance            → amber
-  | 'liquid-glide' // l r ɾ ɹ j w — flowing sonorants      → gold
-  | 'labial-stop' // p b — lip pop                        → red
+  | 'nasal'         // m n ŋ — humming resonance                → amber  42°
+  | 'trill'         // r ɾ ʀ — vibrating/rolling trill/tap      → copper 28°
+  | 'lateral'       // l ɬ ɭ — lateral sonorant                 → gold   55°
+  | 'glide'         // j w ɹ — semi-vowel / vowel-bridge        → cyan  195°
+  | 'labial-stop'   // p b — lip pop                            → red     0°
   | 'coronal-stop' // t d — tongue click                   → orange
   | 'velar-stop' // k g q ʔ — deep thump                 → indigo
   | 'labial-fric' // f v ɸ β — breath at lips             → coral
@@ -64,9 +68,11 @@ interface GroupColor {
   s: number;
 }
 const GROUP: Record<PsychoGroup, GroupColor> = {
-  nasal: { h: 42, s: 72 }, // amber
-  'liquid-glide': { h: 60, s: 58 }, // gold-green
-  'labial-stop': { h: 0, s: 88 }, // red
+  nasal:           { h: 42,  s: 72 }, // amber          — humming resonance
+  trill:           { h: 28,  s: 80 }, // copper-bronze  — vibrating roll
+  lateral:         { h: 55,  s: 62 }, // warm gold      — lateral flow
+  glide:           { h: 195, s: 45 }, // cool cyan      — semi-vowel bridge
+  'labial-stop':   { h: 0,   s: 88 }, // red
   'coronal-stop': { h: 22, s: 88 }, // orange
   'velar-stop': { h: 252, s: 80 }, // indigo
   'labial-fric': { h: 10, s: 70 }, // coral/salmon
@@ -82,15 +88,13 @@ function classify(place: PlaceOfArticulation, manner: MannerOfArticulation): Psy
   // ── Nasals ────────────────────────────────────────────────────────────────
   if (manner === 'NASAL') return 'nasal';
 
-  // ── Sonorants (liquids, glides, trills, taps, approximants) ───────────────
-  if (
-    manner === 'APPROXIMANT' ||
-    manner === 'LATERAL APPROXIMANT' ||
-    manner === 'TRILL' ||
-    manner === 'TAP/FLAP' ||
-    manner === 'LATERAL TAP/FLAP'
-  )
-    return 'liquid-glide';
+  // ── Sonorants: split by acoustic character ──────────────────────────────
+  // Trills and taps: r, ɾ — vibrating/rolling; phonetically energetic
+  if (manner === 'TRILL' || manner === 'TAP/FLAP') return 'trill';
+  // Lateral approximants and taps: l — smooth lateral flow
+  if (manner === 'LATERAL APPROXIMANT' || manner === 'LATERAL TAP/FLAP') return 'lateral';
+  // Central approximants: j, w, ɹ — semi-vowels / vowel-like glides
+  if (manner === 'APPROXIMANT') return 'glide';
 
   // ── Sibilant affricates: split by place into sibilant vs hushing ──────────
   if (manner === 'SIBILANT AFFRICATE') {
@@ -122,8 +126,8 @@ function classify(place: PlaceOfArticulation, manner: MannerOfArticulation): Psy
     }
   }
 
-  // ── Lateral affricates → liquid-glide family ──────────────────────────────
-  if (manner === 'LATERAL AFFRICATE') return 'liquid-glide';
+  // ── Lateral affricates → lateral family (same acoustic quality as l) ─────
+  if (manner === 'LATERAL AFFRICATE') return 'lateral';
 
   // ── Non-sibilant affricates: go with place ────────────────────────────────
   if (manner === 'NON-SIBILANT AFFRICATE') {
@@ -344,3 +348,134 @@ export function ipaTokenStyle(token: string, alpha = 1): TokenVisual | null {
     alignSelf: 'center',
   };
 }
+
+// ── Legend / annotation data exports ─────────────────────────────────────────
+
+export interface PsychoGroupInfo {
+  id: string;
+  /** Ukrainian name for the group */
+  labelUa: string;
+  /** Short description in Ukrainian */
+  descriptionUa: string;
+  /** Representative CSS hsl color (voiced variant) */
+  cssColor: string;
+  /** Example IPA symbols */
+  examplesIpa: string[];
+}
+
+/** All psychoacoustic consonant groups with colors, for building legends. */
+export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
+  {
+    id: 'nasal',
+    labelUa: 'Носові',
+    descriptionUa: 'м, н, нь — гудіння, резонанс',
+    cssColor: `hsl(42,72%,63%)`,
+    examplesIpa: ['m', 'n', 'ŋ'],
+  },
+  {
+    id: 'trill',
+    labelUa: 'Дрижачі (вібранти)',
+    descriptionUa: 'р, рь — вібруючий рокіт',
+    cssColor: `hsl(28,80%,56%)`,
+    examplesIpa: ['r', 'ɾ'],
+  },
+  {
+    id: 'lateral',
+    labelUa: 'Бокові (латеральні)',
+    descriptionUa: 'л, ль — плавний бічний сонорний',
+    cssColor: `hsl(55,62%,52%)`,
+    examplesIpa: ['l'],
+  },
+  {
+    id: 'glide',
+    labelUa: 'Ковзні (глайди)',
+    descriptionUa: 'й, в — напівголосні, перехідні',
+    cssColor: `hsl(195,45%,58%)`,
+    examplesIpa: ['j', 'w'],
+  },
+  {
+    id: 'labial-stop',
+    labelUa: 'Губні зупинні',
+    descriptionUa: 'п, б — губний вибух',
+    cssColor: `hsl(0,88%,63%)`,
+    examplesIpa: ['p', 'b'],
+  },
+  {
+    id: 'coronal-stop',
+    labelUa: 'Зубні зупинні',
+    descriptionUa: 'т, д — клацання язика',
+    cssColor: `hsl(22,88%,63%)`,
+    examplesIpa: ['t', 'd'],
+  },
+  {
+    id: 'velar-stop',
+    labelUa: 'Задньоротові зупинні',
+    descriptionUa: 'к, ґ — глибокий удар',
+    cssColor: `hsl(252,80%,68%)`,
+    examplesIpa: ['k', 'g'],
+  },
+  {
+    id: 'labial-fric',
+    labelUa: 'Губні фрикативні',
+    descriptionUa: 'ф, в — подих губами',
+    cssColor: `hsl(10,70%,63%)`,
+    examplesIpa: ['f', 'v'],
+  },
+  {
+    id: 'sibilant',
+    labelUa: 'Свистячі',
+    descriptionUa: 'с, з, ц, дз — свист',
+    cssColor: `hsl(105,78%,52%)`,
+    examplesIpa: ['s', 'z', 'ts'],
+  },
+  {
+    id: 'hushing',
+    labelUa: 'Шиплячі',
+    descriptionUa: 'ш, ж, ч, дж — шипіння',
+    cssColor: `hsl(172,72%,52%)`,
+    examplesIpa: ['ʃ', 'ʒ', 'tʃ'],
+  },
+  {
+    id: 'guttural-fric',
+    labelUa: 'Гортанні / задні',
+    descriptionUa: 'х, г — горловий фрикатив',
+    cssColor: `hsl(272,70%,63%)`,
+    examplesIpa: ['x', 'ɣ', 'χ'],
+  },
+  {
+    id: 'glottal-breath',
+    labelUa: 'Гортанний видих',
+    descriptionUa: 'h — аспірований подих',
+    cssColor: `hsl(330,55%,63%)`,
+    examplesIpa: ['h'],
+  },
+] as const;
+
+export interface VowelGroupInfo {
+  labelUa: string;
+  descriptionUa: string;
+  cssColor: string;
+  examplesIpa: string[];
+}
+
+/** Vowel groups by backness, for legends. */
+export const VOWEL_GROUP_INFO: readonly VowelGroupInfo[] = [
+  {
+    labelUa: 'Голосні передні',
+    descriptionUa: 'і, е, и — передній ряд',
+    cssColor: `hsl(210,88%,60%)`,
+    examplesIpa: ['i', 'e', 'ɪ'],
+  },
+  {
+    labelUa: 'Голосні центральні',
+    descriptionUa: 'ə, ɛ — нейтральні',
+    cssColor: `hsl(150,64%,52%)`,
+    examplesIpa: ['ə', 'ɛ'],
+  },
+  {
+    labelUa: 'Голосні задні',
+    descriptionUa: 'а, о, у — задній ряд',
+    cssColor: `hsl(28,64%,58%)`,
+    examplesIpa: ['a', 'o', 'u'],
+  },
+] as const;

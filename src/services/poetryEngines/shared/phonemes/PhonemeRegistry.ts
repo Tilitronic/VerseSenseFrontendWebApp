@@ -17,10 +17,7 @@
  */
 
 // The ipa-symbols library ships as CJS; Vite handles the interop.
-import {
-  CONSONANTS as IPA_CONSONANTS,
-  VOWELS as IPA_VOWELS,
-} from 'ipa-symbols/ipa_symbols.js';
+import { CONSONANTS as IPA_CONSONANTS, VOWELS as IPA_VOWELS } from 'ipa-symbols/ipa_symbols.js';
 
 import {
   Consonant,
@@ -123,10 +120,17 @@ function toRoundedness(raw: string | undefined): Roundedness {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SONORANT_SYMBOLS = new Set([
-  'm', 'n', 'ŋ', 'ɲ',          // nasals
-  'r', 'l', 'ʎ', 'ɾ',          // liquids
-  'j', 'w',                     // glides / approximants
-  'v',                          // Ukrainian treats в as sonorant in some contexts
+  'm',
+  'n',
+  'ŋ',
+  'ɲ', // nasals
+  'r',
+  'l',
+  'ʎ',
+  'ɾ', // liquids
+  'j',
+  'w', // glides / approximants
+  'v', // Ukrainian treats в as sonorant in some contexts
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,24 +149,24 @@ const SONORANT_SYMBOLS = new Set([
  */
 const PALATALIZED_PAIRS: Record<string, string> = {
   // Ukrainian soft consonants (м'які приголосні)
-  'nʲ': 'n',   // нь
-  'lʲ': 'l',   // ль
-  'tʲ': 't',   // ть
-  'dʲ': 'd',   // дь
-  'sʲ': 's',   // сь
-  'zʲ': 'z',   // зь
-  'tsʲ': 'ts', //ць
-  'dzʲ': 'dz', // дзь
-  'rʲ': 'r',   // рь (rare)
+  nʲ: 'n', // нь
+  lʲ: 'l', // ль
+  tʲ: 't', // ть
+  dʲ: 'd', // дь
+  sʲ: 's', // сь
+  zʲ: 'z', // зь
+  tsʲ: 'ts', //ць
+  dzʲ: 'dz', // дзь
+  rʲ: 'r', // рь (rare)
   // Polish additional soft consonants
-  'pʲ': 'p',   // pi
-  'bʲ': 'b',   // bi
-  'mʲ': 'm',   // mi
-  'fʲ': 'f',   // fi
-  'vʲ': 'v',   // wi
-  'kʲ': 'k',   // ki
-  'ɡʲ': 'ɡ',   // gi
-  'xʲ': 'x',   // chi
+  pʲ: 'p', // pi
+  bʲ: 'b', // bi
+  mʲ: 'm', // mi
+  fʲ: 'f', // fi
+  vʲ: 'v', // wi
+  kʲ: 'k', // ki
+  ɡʲ: 'ɡ', // gi
+  xʲ: 'x', // chi
 };
 
 /**
@@ -172,8 +176,8 @@ const PALATALIZED_PAIRS: Record<string, string> = {
  * Value = the canonical library symbol
  */
 const ALIASES: Record<string, string> = {
-  'tʃ': 't̠ʃ',   // postalveolar voiceless affricate (Ukrainian ч, English ch)
-  'dʒ': 'd̠ʒ',   // postalveolar voiced affricate (Ukrainian дж, English j)
+  tʃ: 't̠ʃ', // postalveolar voiceless affricate (Ukrainian ч, English ch)
+  dʒ: 'd̠ʒ', // postalveolar voiced affricate (Ukrainian дж, English j)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -299,14 +303,12 @@ class PhonemeRegistryClass {
 
   /** All consonant entries (excluding aliases that point to the same object). */
   get consonants(): Consonant[] {
-    return [...new Set(this.registry.values())]
-      .filter((p): p is Consonant => p.isConsonant());
+    return [...new Set(this.registry.values())].filter((p): p is Consonant => p.isConsonant());
   }
 
   /** All vowel entries. */
   get vowels(): Vowel[] {
-    return [...new Set(this.registry.values())]
-      .filter((p): p is Vowel => p.isVowel());
+    return [...new Set(this.registry.values())].filter((p): p is Vowel => p.isVowel());
   }
 
   /** Debug: print registry size. */
@@ -321,11 +323,7 @@ class PhonemeRegistryClass {
    * PhonemeRegistry.getSimilarity('p', 'b'); // ≈ 0.80
    * PhonemeRegistry.getSimilarity('s', 'ʃ'); // ≈ 0.65
    */
-  getSimilarity(
-    symbolA: string,
-    symbolB: string,
-    options?: SimilarityOptions,
-  ): number {
+  getSimilarity(symbolA: string, symbolB: string, options?: SimilarityOptions): number {
     return getSimilarityBySymbol(symbolA, symbolB, (s) => this.registry.get(s), options);
   }
 }

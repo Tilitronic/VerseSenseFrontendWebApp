@@ -24,9 +24,9 @@
  *   ∞  → 0.05
  */
 
-const MIN_COUNT  = 3;     // sound must appear at least this many times overall
-const LAMBDA     = 8;     // exponential decay constant (tokens)
-const ALPHA_MIN  = 0.05;  // minimum opacity even for isolated occurrences
+const MIN_COUNT = 3; // sound must appear at least this many times overall
+const LAMBDA = 8; // exponential decay constant (tokens)
+const ALPHA_MIN = 0.05; // minimum opacity even for isolated occurrences
 
 export interface SoundOpacityMap {
   /**
@@ -54,7 +54,10 @@ export function analyzeSoundPatterns(tokens: string[]): SoundOpacityMap {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
     let list = occurrences.get(t);
-    if (!list) { list = []; occurrences.set(t, list); }
+    if (!list) {
+      list = [];
+      occurrences.set(t, list);
+    }
     list.push(i);
   }
 
@@ -66,18 +69,12 @@ export function analyzeSoundPatterns(tokens: string[]): SoundOpacityMap {
     for (let k = 0; k < positions.length; k++) {
       const pos = positions[k]!;
       // Gap to previous same-token (exclusive count of tokens between)
-      const gapLeft  = k > 0
-        ? (pos - positions[k - 1]!) - 1
-        : Infinity;
+      const gapLeft = k > 0 ? pos - positions[k - 1]! - 1 : Infinity;
       // Gap to next same-token
-      const gapRight = k < positions.length - 1
-        ? (positions[k + 1]! - pos) - 1
-        : Infinity;
+      const gapRight = k < positions.length - 1 ? positions[k + 1]! - pos - 1 : Infinity;
 
       const gap = Math.min(gapLeft, gapRight);
-      const opacity = gap === Infinity
-        ? ALPHA_MIN
-        : Math.max(ALPHA_MIN, Math.exp(-gap / LAMBDA));
+      const opacity = gap === Infinity ? ALPHA_MIN : Math.max(ALPHA_MIN, Math.exp(-gap / LAMBDA));
 
       opacityByIndex.set(pos, opacity);
     }

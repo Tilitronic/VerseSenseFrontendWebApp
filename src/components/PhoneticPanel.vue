@@ -111,6 +111,11 @@
         </template>
       </div>
     </div>
+
+    <!-- Demo badge â always-visible notice in the bottom-right corner -->
+    <div class="pp-demo-badge" title="Demo Version — може містити неточності та похибки">
+      Demo
+    </div>
   </div>
 </template>
 
@@ -123,6 +128,7 @@ import { analyzeSoundPatterns } from 'src/services/phonetic/soundPatternAnalyzer
 import { ipaTokenColor, ipaTokenStyle, type TokenVisual } from 'src/services/phonetic/ipaColorMap';
 import { analyzeRhymes } from 'src/services/phonetic/rhyme/rhymeAnalyzer';
 import type { PhonemeMotif, RhymeAnalysis } from 'src/services/phonetic/rhyme/types';
+import { generateVisualizationSvg, downloadSvg, textHash } from 'src/composables/useSvgExport';
 
 const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
@@ -379,6 +385,25 @@ onMounted(() => {
   if (gridContainer.value) ro.observe(gridContainer.value);
 });
 onBeforeUnmount(() => ro?.disconnect());
+
+// ── SVG Export ───────────────────────────────────────────────────────────────
+
+function exportSvg(includeLegend = false): void {
+  const rawText = store.document.lines
+    .flatMap((l) => l.tokens.flatMap((t) => ('text' in t ? [t.text] : [])))
+    .join('');
+  const hash = textHash(rawText);
+  const svg = generateVisualizationSvg(
+    store.document.lines,
+    store.isLineConfirmed,
+    tokenStyleMap.value,
+    '',
+    includeLegend,
+  );
+  downloadSvg(svg, `phonetic-${hash}.svg`);
+}
+
+defineExpose({ exportSvg });
 </script>
 
 <style scoped lang="scss">
@@ -407,6 +432,27 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   padding: 10px 14px 10px;
   box-sizing: border-box;
   overflow: hidden; // scrolling is handled by pp-grid-wrap
+  position: relative; // anchor for demo badge
+}
+
+// ── Demo badge ───────────────────────────────────────────────────────────────
+.pp-demo-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(180, 30, 30, 0.5);
+  padding: 2px 6px;
+  border: 1px solid rgba(180, 30, 30, 0.25);
+  border-radius: 3px;
+  pointer-events: none;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.85);
+  z-index: 20;
+  cursor: help;
 }
 
 // ── grid wrapper (scrollable) ────────────────────────────────────────────────

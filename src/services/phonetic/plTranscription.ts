@@ -17,27 +17,27 @@ export interface PlSyllable {
 // ── Digraph / trigraph rules (longest match first) ────────────────────────────
 const GRAPHEME_RULES: [RegExp, string][] = [
   // Trigraphs
-  [/dzi/g,  'dʑ'],
+  [/dzi/g, 'dʑ'],
   [/dzi/gi, 'dʑ'],
   [/dżi/gi, 'dʐ'],
   // Digraphs — affricates and special clusters
-  [/cz/gi,  'tʂ'],
-  [/sz/gi,  'ʂ'],
-  [/ch/gi,  'x'],
-  [/dz/gi,  'dz'],
-  [/dż/gi,  'dʐ'],
-  [/dź/gi,  'dʑ'],
-  [/rz/gi,  'ʐ'],
+  [/cz/gi, 'tʂ'],
+  [/sz/gi, 'ʂ'],
+  [/ch/gi, 'x'],
+  [/dz/gi, 'dz'],
+  [/dż/gi, 'dʐ'],
+  [/dź/gi, 'dʑ'],
+  [/rz/gi, 'ʐ'],
   // Single special Polish letters
-  [/ą/g,    'ɔ̃'],   // nasal o (before fricatives) or on+C
-  [/ę/g,    'ɛ̃'],   // nasal e
-  [/ó/g,    'u'],
-  [/ś/gi,   'ɕ'],
-  [/ź/gi,   'ʑ'],
-  [/ć/gi,   'tɕ'],
-  [/ń/gi,   'ɲ'],
-  [/ż/gi,   'ʐ'],
-  [/ł/gi,   'w'],
+  [/ą/g, 'ɔ̃'], // nasal o (before fricatives) or on+C
+  [/ę/g, 'ɛ̃'], // nasal e
+  [/ó/g, 'u'],
+  [/ś/gi, 'ɕ'],
+  [/ź/gi, 'ʑ'],
+  [/ć/gi, 'tɕ'],
+  [/ń/gi, 'ɲ'],
+  [/ż/gi, 'ʐ'],
+  [/ł/gi, 'w'],
   // Softening: consonant + i + vowel → palatal consonant
   [/si(?=[aeouąę])/gi, 'ɕ'],
   [/zi(?=[aeouąę])/gi, 'ʑ'],
@@ -46,10 +46,29 @@ const GRAPHEME_RULES: [RegExp, string][] = [
 ];
 
 const LETTER_IPA: Record<string, string> = {
-  a: 'a', e: 'ɛ', i: 'i', o: 'ɔ', u: 'u', y: 'ɨ',
-  b: 'b', c: 'ts', d: 'd', f: 'f', g: 'g', h: 'x',
-  j: 'j', k: 'k', l: 'l', m: 'm', n: 'n', p: 'p',
-  r: 'r', s: 's', t: 't', w: 'v', z: 'z',
+  a: 'a',
+  e: 'ɛ',
+  i: 'i',
+  o: 'ɔ',
+  u: 'u',
+  y: 'ɨ',
+  b: 'b',
+  c: 'ts',
+  d: 'd',
+  f: 'f',
+  g: 'g',
+  h: 'x',
+  j: 'j',
+  k: 'k',
+  l: 'l',
+  m: 'm',
+  n: 'n',
+  p: 'p',
+  r: 'r',
+  s: 's',
+  t: 't',
+  w: 'v',
+  z: 'z',
 };
 
 // IPA vowel characters used in the output
@@ -60,7 +79,10 @@ function graphemesToIPA(word: string): string {
   for (const [re, rep] of GRAPHEME_RULES) {
     s = s.replace(re, rep);
   }
-  s = s.split('').map((ch) => LETTER_IPA[ch] ?? ch).join('');
+  s = s
+    .split('')
+    .map((ch) => LETTER_IPA[ch] ?? ch)
+    .join('');
   return s;
 }
 
@@ -83,10 +105,10 @@ function splitIpaToSyllables(ipa: string): string[] {
   let prev = 0;
 
   for (let ni = 0; ni < nuclei.length; ni++) {
-    const nucStart  = nuclei[ni]!;
-    const nucEnd    = nucStart + 1;
-    const nextNuc   = nuclei[ni + 1] ?? ipa.length;
-    const between   = ipa.slice(nucEnd, nextNuc);
+    const nucStart = nuclei[ni]!;
+    const nucEnd = nucStart + 1;
+    const nextNuc = nuclei[ni + 1] ?? ipa.length;
+    const between = ipa.slice(nucEnd, nextNuc);
 
     let codaEnd: number;
     if (ni < nuclei.length - 1) {
@@ -110,7 +132,7 @@ function splitIpaToSyllables(ipa: string): string[] {
  * @param stressIndex - 0-based index; pass -1 to use penultimate rule
  */
 export function transcribePolish(word: string, stressIndex: number): PlSyllable[] {
-  const ipa   = graphemesToIPA(word);
+  const ipa = graphemesToIPA(word);
   const parts = splitIpaToSyllables(ipa);
 
   if (parts.length === 0) {
@@ -119,13 +141,11 @@ export function transcribePolish(word: string, stressIndex: number): PlSyllable[
 
   // Default: penultimate stress
   const effectiveStress =
-    stressIndex >= 0 && stressIndex < parts.length
-      ? stressIndex
-      : Math.max(0, parts.length - 2);
+    stressIndex >= 0 && stressIndex < parts.length ? stressIndex : Math.max(0, parts.length - 2);
 
   return parts.map((part, idx) => ({
-    ipa:      part,
+    ipa: part,
     stressed: idx === effectiveStress,
-    isOpen:   isIPAVowelStart(part[part.length - 1] ?? ''),
+    isOpen: isIPAVowelStart(part[part.length - 1] ?? ''),
   }));
 }

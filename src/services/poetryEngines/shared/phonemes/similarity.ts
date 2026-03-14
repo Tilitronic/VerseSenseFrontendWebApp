@@ -35,15 +35,15 @@ export interface VowelWeights {
 }
 
 export const DEFAULT_CONSONANT_WEIGHTS: ConsonantWeights = {
-  place:       0.35,
-  manner:      0.35,
-  voicing:     0.20,
-  palatalized: 0.10,
+  place: 0.35,
+  manner: 0.35,
+  voicing: 0.2,
+  palatalized: 0.1,
 };
 
 export const DEFAULT_VOWEL_WEIGHTS: VowelWeights = {
-  height:      0.50,
-  backness:    0.35,
+  height: 0.5,
+  backness: 0.35,
   roundedness: 0.15,
 };
 
@@ -98,13 +98,7 @@ const HEIGHT_ORDER = [
 ] as const;
 
 /** VowelBackness ordered front → back */
-const BACKNESS_ORDER = [
-  'front',
-  'near-front',
-  'central',
-  'near-back',
-  'back',
-] as const;
+const BACKNESS_ORDER = ['front', 'near-front', 'central', 'near-back', 'back'] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ordinal scoring helpers
@@ -142,37 +136,29 @@ function mannerScore(a: string, b: string): number {
 // Core similarity functions
 // ─────────────────────────────────────────────────────────────────────────────
 
-function consonantSimilarity(
-  a: Consonant,
-  b: Consonant,
-  weights: ConsonantWeights,
-): number {
-  const placeScore      = ordinalScore(a.place, b.place, PLACE_ORDER);
-  const mannerScoreVal  = mannerScore(a.manner, b.manner);
-  const voicingScore    = a.voicing === b.voicing ? 1.0 : 0.0;
-  const palScore        = a.palatalized === b.palatalized ? 1.0 : 0.0;
+function consonantSimilarity(a: Consonant, b: Consonant, weights: ConsonantWeights): number {
+  const placeScore = ordinalScore(a.place, b.place, PLACE_ORDER);
+  const mannerScoreVal = mannerScore(a.manner, b.manner);
+  const voicingScore = a.voicing === b.voicing ? 1.0 : 0.0;
+  const palScore = a.palatalized === b.palatalized ? 1.0 : 0.0;
 
   return (
-    placeScore     * weights.place +
+    placeScore * weights.place +
     mannerScoreVal * weights.manner +
-    voicingScore   * weights.voicing +
-    palScore       * weights.palatalized
+    voicingScore * weights.voicing +
+    palScore * weights.palatalized
   );
 }
 
-function vowelSimilarity(
-  a: Vowel,
-  b: Vowel,
-  weights: VowelWeights,
-): number {
-  const heightScore     = ordinalScore(a.height, b.height, HEIGHT_ORDER);
-  const backnessScore   = ordinalScore(a.backness, b.backness, BACKNESS_ORDER);
-  const roundedScore    = a.roundedness === b.roundedness ? 1.0 : 0.0;
+function vowelSimilarity(a: Vowel, b: Vowel, weights: VowelWeights): number {
+  const heightScore = ordinalScore(a.height, b.height, HEIGHT_ORDER);
+  const backnessScore = ordinalScore(a.backness, b.backness, BACKNESS_ORDER);
+  const roundedScore = a.roundedness === b.roundedness ? 1.0 : 0.0;
 
   return (
-    heightScore   * weights.height +
+    heightScore * weights.height +
     backnessScore * weights.backness +
-    roundedScore  * weights.roundedness
+    roundedScore * weights.roundedness
   );
 }
 
@@ -199,11 +185,7 @@ export interface SimilarityOptions {
  * const e = PhonemeRegistry.getOrThrow('e');
  * getSimilarity(a, e); // ≈ 0.50 — adjacent height, same backness, same roundedness
  */
-export function getSimilarity(
-  a: IpaSymbol,
-  b: IpaSymbol,
-  options: SimilarityOptions = {},
-): number {
+export function getSimilarity(a: IpaSymbol, b: IpaSymbol, options: SimilarityOptions = {}): number {
   // Identical
   if (a === b || a.symbol === b.symbol) return 1.0;
 
@@ -218,11 +200,7 @@ export function getSimilarity(
     );
   }
 
-  return vowelSimilarity(
-    a as Vowel,
-    b as Vowel,
-    options.vowelWeights ?? DEFAULT_VOWEL_WEIGHTS,
-  );
+  return vowelSimilarity(a as Vowel, b as Vowel, options.vowelWeights ?? DEFAULT_VOWEL_WEIGHTS);
 }
 
 /**

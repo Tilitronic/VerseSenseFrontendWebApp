@@ -11,22 +11,35 @@ import { UA_VOWELS } from 'src/services/poetryEngines/ua/consts/ua-alphabet.cons
 
 /** Polish vowels (a e i o u ó y + ą ę) */
 const PL_VOWELS = new Set<string>([
-  'a','e','i','o','u','y','ó','ą','ę',
-  'A','E','I','O','U','Y','Ó','Ą','Ę',
+  'a',
+  'e',
+  'i',
+  'o',
+  'u',
+  'y',
+  'ó',
+  'ą',
+  'ę',
+  'A',
+  'E',
+  'I',
+  'O',
+  'U',
+  'Y',
+  'Ó',
+  'Ą',
+  'Ę',
 ]);
 
 /**
  * English vowels — includes 'y'/'Y' because it functions as a vowel
  * in words like "my", "by", "sky", "gym", "type" (the only vowel sound).
  */
-const EN_VOWELS = new Set<string>([
-  'a','e','i','o','u','y',
-  'A','E','I','O','U','Y',
-]);
+const EN_VOWELS = new Set<string>(['a', 'e', 'i', 'o', 'u', 'y', 'A', 'E', 'I', 'O', 'U', 'Y']);
 
 function vowelSetFor(lang: Language): Set<string> {
-  if (lang === 'ua')                   return UA_VOWELS;
-  if (lang === 'pl')                   return PL_VOWELS;
+  if (lang === 'ua') return UA_VOWELS;
+  if (lang === 'pl') return PL_VOWELS;
   if (lang === 'en-us' || lang === 'en-gb') return EN_VOWELS;
   return EN_VOWELS;
 }

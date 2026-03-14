@@ -12,11 +12,11 @@
 
 import type { Language } from 'src/model/Language';
 
-const CYRILLIC         = /[\u0400-\u04FF]/;
-const LATIN            = /[a-zA-Z\u00C0-\u024F]/;          // basic + extended
-const UA_EXCLUSIVE     = /[єїґ]/i;                          // never in RU/BG
-const UA_I             = /і/g;                               // U+0456
-const PL_EXCLUSIVE     = /[ąćęłńóśźż]/i;
+const CYRILLIC = /[\u0400-\u04FF]/;
+const LATIN = /[a-zA-Z\u00C0-\u024F]/; // basic + extended
+const UA_EXCLUSIVE = /[єїґ]/i; // never in RU/BG
+const UA_I = /і/g; // U+0456
+const PL_EXCLUSIVE = /[ąćęłńóśźż]/i;
 
 export type WordScript = 'cyrillic' | 'latin' | 'mixed' | 'other';
 
@@ -33,11 +33,15 @@ export interface WordScriptInfo {
 
 export function getWordScriptInfo(word: string): WordScriptInfo {
   const hasCyrillic = CYRILLIC.test(word);
-  const hasLatin    = LATIN.test(word);
+  const hasLatin = LATIN.test(word);
 
   // Mixed script — unusual; allow everything
   if (hasCyrillic && hasLatin) {
-    return { script: 'mixed', lockedLanguage: null, allowedLanguages: ['ua', 'pl', 'en-us', 'en-gb'] };
+    return {
+      script: 'mixed',
+      lockedLanguage: null,
+      allowedLanguages: ['ua', 'pl', 'en-us', 'en-gb'],
+    };
   }
 
   // ── Cyrillic ──────────────────────────────────────────────────────────────

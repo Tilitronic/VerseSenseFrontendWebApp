@@ -130,7 +130,9 @@ function onPickStress(idx: number | null) {
     font-size: 1rem;
     line-height: 1;
 
-    &:hover { color: #fff; }
+    &:hover {
+      color: #fff;
+    }
   }
 
   &__lang-grid {
@@ -151,12 +153,21 @@ function onPickStress(idx: number | null) {
     font-size: 0.88rem;
     transition: background 0.1s;
 
-    &:hover { background: rgba(255, 255, 255, 0.06); }
-    &--active { background: rgba(100, 180, 255, 0.15); color: #fff; }
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    &--active {
+      background: rgba(100, 180, 255, 0.15);
+      color: #fff;
+    }
   }
 
-  &__lang-flag { font-size: 1.1rem; }
-  &__lang-label { font-size: 0.82rem; }
+  &__lang-flag {
+    font-size: 1.1rem;
+  }
+  &__lang-label {
+    font-size: 0.82rem;
+  }
 
   &__divider {
     height: 1px;
@@ -176,8 +187,12 @@ function onPickStress(idx: number | null) {
     font-size: 0.82rem;
     transition: background 0.1s;
 
-    &:hover { background: rgba(255, 255, 255, 0.06); }
-    &--reset { color: rgba(255, 120, 120, 0.8); }
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    &--reset {
+      color: rgba(255, 120, 120, 0.8);
+    }
   }
 
   &__syllable-row {
@@ -196,9 +211,13 @@ function onPickStress(idx: number | null) {
     cursor: pointer;
     font-size: 0.9rem;
     font-family: 'Noto Serif', serif;
-    transition: background 0.1s, border-color 0.1s;
+    transition:
+      background 0.1s,
+      border-color 0.1s;
 
-    &:hover { background: rgba(255, 255, 255, 0.1); }
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
     &--active {
       background: rgba(100, 180, 255, 0.25);
       border-color: rgba(100, 180, 255, 0.5);
@@ -207,7 +226,9 @@ function onPickStress(idx: number | null) {
     &--clear {
       border-color: rgba(255, 100, 100, 0.25);
       color: rgba(255, 100, 100, 0.6);
-      &:hover { background: rgba(255, 100, 100, 0.1); }
+      &:hover {
+        background: rgba(255, 100, 100, 0.1);
+      }
     }
   }
 

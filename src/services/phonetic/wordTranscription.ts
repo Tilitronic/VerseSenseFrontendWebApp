@@ -46,31 +46,31 @@ export interface TranscribedWord {
 function uaTranscribe(text: string, stressIndex: number): TranscribedSyllable[] {
   const syllables = transcribeUkrainian(text, stressIndex);
   return syllables.map((s) => ({
-    ipa:       s.ipa,
+    ipa: s.ipa,
     ipaTokens: tokenizeIPA(s.ipa),
-    text:      s.ipa,
-    stressed:  s.stressed,
-    isOpen:    s.isOpen,
+    text: s.ipa,
+    stressed: s.stressed,
+    isOpen: s.isOpen,
   }));
 }
 
 function enTranscribe(text: string, stressIndex: number): TranscribedSyllable[] {
   return transcribeEnglish(text, stressIndex).map((s) => ({
-    ipa:       s.ipa,
+    ipa: s.ipa,
     ipaTokens: tokenizeIPA(s.ipa),
-    text:      s.ipa,
-    stressed:  s.stressed,
-    isOpen:    s.isOpen,
+    text: s.ipa,
+    stressed: s.stressed,
+    isOpen: s.isOpen,
   }));
 }
 
 function plTranscribe(text: string, stressIndex: number): TranscribedSyllable[] {
   return transcribePolish(text, stressIndex).map((s) => ({
-    ipa:       s.ipa,
+    ipa: s.ipa,
     ipaTokens: tokenizeIPA(s.ipa),
-    text:      s.ipa,
-    stressed:  s.stressed,
-    isOpen:    s.isOpen,
+    text: s.ipa,
+    stressed: s.stressed,
+    isOpen: s.isOpen,
   }));
 }
 
@@ -107,7 +107,9 @@ export function transcribeWord(token: IWordToken): TranscribedWord {
       syllables = plTranscribe(text, idx);
       break;
     default:
-      syllables = [{ ipa: text, ipaTokens: tokenizeIPA(text), text, stressed: true, isOpen: false }];
+      syllables = [
+        { ipa: text, ipaTokens: tokenizeIPA(text), text, stressed: true, isOpen: false },
+      ];
   }
 
   // Safety: if engine returned nothing, fall back to surface

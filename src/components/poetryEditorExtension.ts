@@ -46,8 +46,12 @@ class NewlineWidget extends WidgetType {
     span.setAttribute('contenteditable', 'false');
     return span;
   }
-  override ignoreEvent() { return true; }
-  override get estimatedHeight() { return -1; }
+  override ignoreEvent() {
+    return true;
+  }
+  override get estimatedHeight() {
+    return -1;
+  }
 }
 
 class TabWidget extends WidgetType {
@@ -59,9 +63,13 @@ class TabWidget extends WidgetType {
     span.setAttribute('contenteditable', 'false');
     return span;
   }
-  override ignoreEvent() { return true; }
+  override ignoreEvent() {
+    return true;
+  }
   // Tell CM this widget is inline
-  override get estimatedHeight() { return -1; }
+  override get estimatedHeight() {
+    return -1;
+  }
 }
 
 class SpaceWidget extends WidgetType {
@@ -73,8 +81,12 @@ class SpaceWidget extends WidgetType {
     span.setAttribute('contenteditable', 'false');
     return span;
   }
-  override ignoreEvent() { return true; }
-  override get estimatedHeight() { return -1; }
+  override ignoreEvent() {
+    return true;
+  }
+  override get estimatedHeight() {
+    return -1;
+  }
 }
 
 // Singleton widgets (no state → reusable)
@@ -105,11 +117,7 @@ function buildDecorations(view: EditorView): DecorationSet {
       leadingTabEnd++;
     }
     for (let t = 0; t < leadingTabEnd; t++) {
-      builder.add(
-        lineFrom + t,
-        lineFrom + t + 1,
-        Decoration.replace({ widget: tabWidget }),
-      );
+      builder.add(lineFrom + t, lineFrom + t + 1, Decoration.replace({ widget: tabWidget }));
     }
 
     // 2. Inter-word / trailing whitespace → distinct glyph per character type
@@ -209,7 +217,10 @@ export const poetryClipboardHandlers = EditorView.domEventHandlers({
     const changes = state.changeByRange((range) =>
       range.empty
         ? { range }
-        : { changes: { from: range.from, to: range.to, insert: '' }, range: EditorSelection.cursor(range.from) },
+        : {
+            changes: { from: range.from, to: range.to, insert: '' },
+            range: EditorSelection.cursor(range.from),
+          },
     );
     view.dispatch(state.update(changes, { scrollIntoView: true, userEvent: 'delete.cut' }));
     return true;
@@ -232,7 +243,7 @@ export const poetryTransactionFilter = EditorState.transactionFilter.of((tr) => 
   tr.changes.iterChanges((_fromA, _toA, fromB, toB) => {
     const doc = tr.newDoc;
     const first = doc.lineAt(fromB).number;
-    const last  = doc.lineAt(toB).number;
+    const last = doc.lineAt(toB).number;
     for (let n = Math.max(1, first - 1); n <= Math.min(doc.lines, last + 1); n++) {
       affectedLines.add(n);
     }
@@ -287,7 +298,9 @@ export const stressStatusField = StateField.define<StressLineStatus[]>({
 });
 
 class StressGutterMarker extends GutterMarker {
-  constructor(private status: StressLineStatus) { super(); }
+  constructor(private status: StressLineStatus) {
+    super();
+  }
   override toDOM() {
     const span = document.createElement('span');
     span.className = `cm-stress-dot cm-stress-dot--${this.status}`;
@@ -297,10 +310,10 @@ class StressGutterMarker extends GutterMarker {
 }
 
 const markerCache: Record<StressLineStatus, StressGutterMarker> = {
-  all:          new StressGutterMarker('all'),
-  unconfirmed:  new StressGutterMarker('unconfirmed'),
-  partial:      new StressGutterMarker('partial'),
-  none:         new StressGutterMarker('none'),
+  all: new StressGutterMarker('all'),
+  unconfirmed: new StressGutterMarker('unconfirmed'),
+  partial: new StressGutterMarker('partial'),
+  none: new StressGutterMarker('none'),
 };
 
 export const stressGutter = gutter({
@@ -330,21 +343,21 @@ export const poetryThemeBase = EditorView.baseTheme({
     cursor: 'default',
   },
   '.cm-poetry-tab': {
-    color: 'rgba(120,180,255,0.45)',   /* blue-ish — indentation */
+    color: 'rgba(120,180,255,0.45)' /* blue-ish — indentation */,
     userSelect: 'none',
     '-webkit-user-select': 'none',
     pointerEvents: 'none',
     display: 'inline-block',
-    width: '1ch',                       /* exactly one monofont character cell */
+    width: '1ch' /* exactly one monofont character cell */,
     textAlign: 'center',
   },
   '.cm-poetry-space': {
-    color: 'rgba(255,255,255,0.22)',   /* grey — word separator */
+    color: 'rgba(255,255,255,0.22)' /* grey — word separator */,
     userSelect: 'none',
     '-webkit-user-select': 'none',
     pointerEvents: 'none',
     display: 'inline-block',
-    width: '1ch',                       /* exactly one monofont character cell */
+    width: '1ch' /* exactly one monofont character cell */,
     textAlign: 'center',
   },
   '.cm-stress-gutter': {
@@ -356,7 +369,7 @@ export const poetryThemeBase = EditorView.baseTheme({
     alignItems: 'center',
     justifyContent: 'center',
     padding: '0 !important',
-    lineHeight: '1.9',          /* must match .cm-content lineHeight */
+    lineHeight: '1.9' /* must match .cm-content lineHeight */,
   },
   /* Kill the active-line highlight that bleeds from highlightActiveLineGutter() */
   '.cm-stress-gutter .cm-activeLineGutter': {
@@ -370,10 +383,10 @@ export const poetryThemeBase = EditorView.baseTheme({
     flexShrink: '0',
     transition: 'background 0.2s',
   },
-  '.cm-stress-dot--all':          { background: 'rgba( 80,220,100,0.75)' },
-  '.cm-stress-dot--unconfirmed':  { background: 'rgba(255,140, 30,0.80)' },
-  '.cm-stress-dot--partial':      { background: 'rgba(230,170, 40,0.75)' },
-  '.cm-stress-dot--none':         { background: 'rgba(255,255,255,0.12)' },
+  '.cm-stress-dot--all': { background: 'rgba( 80,220,100,0.75)' },
+  '.cm-stress-dot--unconfirmed': { background: 'rgba(255,140, 30,0.80)' },
+  '.cm-stress-dot--partial': { background: 'rgba(230,170, 40,0.75)' },
+  '.cm-stress-dot--none': { background: 'rgba(255,255,255,0.12)' },
 });
 
 // ─── Combined export ──────────────────────────────────────────────────────────

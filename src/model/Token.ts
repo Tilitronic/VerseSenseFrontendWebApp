@@ -1,6 +1,6 @@
 /**
  * Token.ts — Document model types
- * 
+ *
  * A poem is represented as a list of Lines, each containing an ordered
  * sequence of Tokens. Tokens are either Words or typographic separators.
  */

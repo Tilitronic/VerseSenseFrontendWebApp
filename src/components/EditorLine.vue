@@ -14,10 +14,7 @@
         <span v-else-if="token.kind === 'GAP'" class="editor-line__gap"> </span>
 
         <!-- WORD -->
-        <WordChip
-          v-else-if="token.kind === 'WORD'"
-          :token="token"
-        />
+        <WordChip v-else-if="token.kind === 'WORD'" :token="token" />
       </template>
     </template>
   </div>

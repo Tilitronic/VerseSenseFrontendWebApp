@@ -113,9 +113,7 @@ export class Sylabizer {
    * e.g. ["пи", "са", "ти"] with stress=1 → "пи-ˈса-ти"
    */
   static formatWithStress(syllables: Syllable[]): string {
-    return syllables
-      .map((s) => (s.stress ? `ˈ${s.phonetic}` : s.phonetic))
-      .join('-');
+    return syllables.map((s) => (s.stress ? `ˈ${s.phonetic}` : s.phonetic)).join('-');
   }
 
   /**
