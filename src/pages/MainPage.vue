@@ -235,7 +235,7 @@
           <div class="panel__action-group">
             <!-- Legend link -->
             <a
-              href="/legend"
+              href="/#/legend"
               target="_blank"
               rel="noopener"
               class="panel__web-btn panel__web-btn--link"
@@ -265,9 +265,35 @@
               </svg>
               Legend
             </a>
-            <!-- Legend-in-export toggle -->
+          </div>
+          <div class="panel__action-group">
+            <!-- Export SVG button -->
             <button
-              class="panel__web-btn"
+              class="panel__web-btn panel__web-btn--export"
+              :disabled="!hasConfirmedLines"
+              :title="exportWithLegend ? 'Export SVG with legend' : 'Export SVG (no legend)'"
+              @click="phoneticPanelRef?.exportSvg(exportWithLegend)"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 2v8M5 7l3 3 3-3"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Export SVG
+            </button>
+            <!-- Sub-setting: include legend in exported SVG -->
+            <button
+              class="panel__web-btn panel__web-btn--sub"
               :class="{ 'panel__web-btn--active': exportWithLegend }"
               title="Include legend (умовні позначення) in exported SVG"
               @click="exportWithLegend = !exportWithLegend"
@@ -313,32 +339,6 @@
                 />
               </svg>
               +Legend
-            </button>
-          </div>
-          <div class="panel__action-group">
-            <!-- Export SVG button -->
-            <button
-              class="panel__web-btn panel__web-btn--export"
-              :disabled="!hasConfirmedLines"
-              :title="exportWithLegend ? 'Export SVG with legend' : 'Export SVG (no legend)'"
-              @click="phoneticPanelRef?.exportSvg(exportWithLegend)"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M8 2v8M5 7l3 3 3-3"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                />
-              </svg>
-              Export SVG
             </button>
           </div>
         </div>
@@ -695,6 +695,23 @@ function clearText() {
   &:hover {
     border-color: rgba(255, 255, 255, 0.4);
     color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+// ── Export sub-setting button (+Legend) ───────────────────────────────────────
+.panel__web-btn--sub {
+  font-size: 0.62rem !important;
+  padding: 2px 6px !important;
+  opacity: 0.65;
+  border-style: dashed !important;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &.panel__web-btn--active {
+    opacity: 1;
+    border-style: solid !important;
   }
 }
 
