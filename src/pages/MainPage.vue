@@ -178,6 +178,42 @@
             </button>
           </div>
           <div class="panel__action-group">
+            <!-- Row badge column toggles -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showNumBadge }"
+              title="Show / hide row number column"
+              @click="showNumBadge = !showNumBadge"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="12" height="12" rx="2" fill="currentColor" />
+              </svg>
+              Row №
+            </button>
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showSylBadge }"
+              title="Show / hide syllable count column"
+              @click="showSylBadge = !showSylBadge"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="6" fill="currentColor" />
+              </svg>
+              Syllables
+            </button>
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showCvBadge }"
+              title="Show / hide C:V ratio column"
+              @click="showCvBadge = !showCvBadge"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <polygon points="7,1 13,7 7,13 1,7" fill="currentColor" />
+              </svg>
+              C:V ratio
+            </button>
+          </div>
+          <div class="panel__action-group">
             <!-- Sound pattern colours toggle -->
             <button
               class="panel__web-btn"
@@ -351,6 +387,9 @@
           v-model:alignRight="showAlignRight"
           v-model:showRhymes="showRhymes"
           v-model:showSounds="showSounds"
+          v-model:showNumBadge="showNumBadge"
+          v-model:showSylBadge="showSylBadge"
+          v-model:showCvBadge="showCvBadge"
         />
         <Transition name="rp-slide">
           <div v-if="showRhymesPanel" class="panel__rp-wrap">
@@ -388,6 +427,9 @@ const showSounds = ref(true);
 const showRhymesPanel = ref(false);
 const showRowSettings = ref(true);
 const exportWithLegend = ref(false);
+const showNumBadge = ref(true);
+const showSylBadge = ref(true);
+const showCvBadge = ref(true);
 
 // ── Resizable rhymes panel ───────────────────────────────────────────────────
 const splitBodyRef = ref<HTMLElement | null>(null);

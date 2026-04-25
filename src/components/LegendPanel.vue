@@ -1,17 +1,17 @@
 <template>
   <div class="lp-root">
-    <h2 class="lp-title">Умовні позначення</h2>
-    <p class="lp-subtitle">Legend drawn directly from the phonetic engine — always in sync.</p>
+    <h2 class="lp-title">Legend</h2>
+    <p class="lp-subtitle">Drawn directly from the phonetic engine — always in sync.</p>
 
     <!-- ── Consonant palette ──────────────────────────────────────────────── -->
     <section class="lp-section">
-      <h3 class="lp-section__title">Звукові групи (приголосні)</h3>
+      <h3 class="lp-section__title">Sound groups (consonants)</h3>
       <div class="lp-grid">
         <div v-for="g in PSYCHO_GROUP_INFO" :key="g.id" class="lp-item">
           <span class="lp-swatch lp-swatch--consonant" :style="{ background: g.cssColor }" />
           <span class="lp-item__body">
-            <span class="lp-item__label">{{ g.labelUa }}</span>
-            <span class="lp-item__desc">{{ g.descriptionUa }}</span>
+            <span class="lp-item__label">{{ g.labelEn }}</span>
+            <span class="lp-item__desc">{{ g.descriptionEn }}</span>
             <span class="lp-item__ex">{{ g.examplesIpa.join(' ') }}</span>
           </span>
         </div>
@@ -20,13 +20,13 @@
 
     <!-- ── Vowel palette ──────────────────────────────────────────────────── -->
     <section class="lp-section">
-      <h3 class="lp-section__title">Голосні</h3>
+      <h3 class="lp-section__title">Vowels</h3>
       <div class="lp-grid">
-        <div v-for="g in VOWEL_GROUP_INFO" :key="g.labelUa" class="lp-item">
+        <div v-for="g in VOWEL_GROUP_INFO" :key="g.labelEn" class="lp-item">
           <span class="lp-swatch lp-swatch--vowel" :style="{ background: g.cssColor }" />
           <span class="lp-item__body">
-            <span class="lp-item__label">{{ g.labelUa }}</span>
-            <span class="lp-item__desc">{{ g.descriptionUa }}</span>
+            <span class="lp-item__label">{{ g.labelEn }}</span>
+            <span class="lp-item__desc">{{ g.descriptionEn }}</span>
             <span class="lp-item__ex">{{ g.examplesIpa.join(' ') }}</span>
           </span>
         </div>
@@ -35,7 +35,7 @@
 
     <!-- ── Ribbon shape key ───────────────────────────────────────────────── -->
     <section class="lp-section">
-      <h3 class="lp-section__title">Форма смужки (спосіб творення)</h3>
+      <h3 class="lp-section__title">Ribbon shape (manner of articulation)</h3>
       <div class="lp-shapes">
         <div v-for="s in SHAPE_EXAMPLES" :key="s.label" class="lp-shape-item">
           <div class="lp-cell-ex">
@@ -48,7 +48,7 @@
 
     <!-- ── Cell type key ─────────────────────────────────────────────────── -->
     <section class="lp-section">
-      <h3 class="lp-section__title">Типи комірок</h3>
+      <h3 class="lp-section__title">Cell types</h3>
       <div class="lp-cells-row">
         <div v-for="c in CELL_EXAMPLES" :key="c.label" class="lp-celltype">
           <div
@@ -64,38 +64,52 @@
       </div>
     </section>
 
+    <!-- ── Row badges ────────────────────────────────────────────────────── -->
+    <section class="lp-section">
+      <h3 class="lp-section__title">Row badges</h3>
+      <div class="lp-badges-row">
+        <div class="lp-badge-item">
+          <span class="lp-badge lp-badge--sq">3</span>
+          <span class="lp-badge-item__label">Row number</span>
+        </div>
+        <div class="lp-badge-item">
+          <span class="lp-badge lp-badge--ci">7</span>
+          <span class="lp-badge-item__label">Syllable count</span>
+        </div>
+        <div class="lp-badge-item">
+          <span class="lp-badge lp-badge--tr">2</span>
+          <span class="lp-badge-item__label">C:V ratio</span>
+        </div>
+      </div>
+      <p class="lp-note" style="margin-top: 8px">
+        C:V ratio = consonants ÷ vowels in the line. A value of 2 means two consonants per vowel.
+        ∞ indicates a line with no vowels.
+      </p>
+    </section>
+
     <!-- ── Pattern opacity ───────────────────────────────────────────────── -->
     <section class="lp-section">
-      <h3 class="lp-section__title">Виділення звукових патернів</h3>
+      <h3 class="lp-section__title">Sound pattern highlighting</h3>
       <p class="lp-note">
-        Насиченість кольору смужки відображає щільність повторень звуку в тексті: чим яскравіший
-        колір — тим ближче інші входження того самого звуку. Враховуються лише звуки, що
-        зустрічаються ≥&thinsp;3 рази.
+        Ribbon colour saturation reflects how densely a sound repeats in the text: the brighter the
+        colour, the closer together its other occurrences. Only sounds appearing ≥&thinsp;3 times
+        are highlighted.
       </p>
       <div class="lp-opacity-ex">
         <div v-for="step in OPACITY_STEPS" :key="step.label" class="lp-opacity-item">
           <div class="lp-op-swatch" :style="{ background: `rgba(105,175,52,${step.alpha})` }" />
           <span class="lp-opacity-item__label">{{ step.label }}</span>
         </div>
-        <span class="lp-opacity-arrow">→ частіший</span>
+        <span class="lp-opacity-arrow">→ more frequent</span>
       </div>
-    </section>
-
-    <!-- ── Row numbers ───────────────────────────────────────────────────── -->
-    <section class="lp-section">
-      <h3 class="lp-section__title">Нумерація рядків</h3>
-      <p class="lp-note">
-        Кожен рядок позначено порядковим номером зліва. Ненумеровані рядки — порожні або ще не
-        підтверджені.
-      </p>
     </section>
 
     <!-- ── Demo notice ───────────────────────────────────────────────────── -->
     <div class="lp-demo-notice">
       <span class="lp-demo-notice__badge">Demo</span>
       <span class="lp-demo-notice__text">
-        Ця версія є демонстраційною та може містити неточності у транскрипції, розбитті на склади та
-        аналізі патернів. Результати не слід використовувати як наукові джерела.
+        This is a demo version and may contain inaccuracies in transcription, syllabification, and
+        pattern analysis. Results should not be used as academic sources.
       </span>
     </div>
   </div>
@@ -105,25 +119,25 @@
 import { PSYCHO_GROUP_INFO, VOWEL_GROUP_INFO } from 'src/services/phonetic/ipaColorMap';
 
 const SHAPE_EXAMPLES = [
-  { label: 'Зупинні (п, б, т, д, к)', radius: '2px', height: '76%' },
-  { label: 'Африкати (ц, ч, дж)', radius: '4px', height: '70%' },
-  { label: 'Фрикативні (с, ш, ф, х)', radius: '8px', height: '64%' },
-  { label: 'Сонорні / носові (л, р, м, н)', radius: '999px', height: '80%' },
+  { label: 'Stops (p, b, t, d, k)', radius: '2px', height: '76%' },
+  { label: 'Affricates (ts, tʃ, dʒ)', radius: '4px', height: '70%' },
+  { label: 'Fricatives (s, ʃ, f, x)', radius: '8px', height: '64%' },
+  { label: 'Sonorants / nasals (l, r, m, n)', radius: '999px', height: '80%' },
 ] as const;
 
 const CELL_EXAMPLES = [
-  { label: 'Склад без наголосу', stressed: false, tab: false, wordLast: false },
-  { label: 'Наголошений склад', stressed: true, tab: false, wordLast: false },
-  { label: 'Останній склад слова', stressed: false, tab: false, wordLast: true },
-  { label: 'Відступ (tab)', stressed: false, tab: true, wordLast: false },
+  { label: 'Unstressed syllable', stressed: false, tab: false, wordLast: false },
+  { label: 'Stressed syllable', stressed: true, tab: false, wordLast: false },
+  { label: 'Last syllable of word', stressed: false, tab: false, wordLast: true },
+  { label: 'Indent (tab)', stressed: false, tab: true, wordLast: false },
 ] as const;
 
 const OPACITY_STEPS = [
-  { label: 'рідкий', alpha: 0.12 },
+  { label: 'rare', alpha: 0.12 },
   { label: '', alpha: 0.28 },
   { label: '', alpha: 0.5 },
   { label: '', alpha: 0.72 },
-  { label: 'густий', alpha: 1.0 },
+  { label: 'dense', alpha: 1.0 },
 ] as const;
 </script>
 
@@ -341,6 +355,52 @@ $border-col: #000;
   font-size: 0.72rem;
   color: $sub;
   margin-left: 4px;
+}
+
+// ── Row badges ────────────────────────────────────────────────────────────────
+
+.lp-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin-bottom: 6px;
+}
+
+.lp-badge-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  &__label {
+    font-size: 0.7rem;
+    color: $sub;
+    text-align: center;
+  }
+}
+
+.lp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: $border-col;
+
+  &--sq {
+    border-radius: 4px;
+  }
+
+  &--ci {
+    border-radius: 50%;
+  }
+
+  &--tr {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
 }
 
 // ── Note ──────────────────────────────────────────────────────────────────────

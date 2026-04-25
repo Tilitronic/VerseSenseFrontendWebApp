@@ -227,13 +227,15 @@ export const poetryClipboardHandlers = EditorView.domEventHandlers({
   },
 });
 
-// ─── Transaction filter — trailing whitespace cleanup ─────────────────────────
+// ─── Transaction filter — double-space prevention ─────────────────────────────
 
 /**
- * After any document change, trims trailing whitespace from every affected line.
- * This handles: typing a space then Enter, Enter after a word, etc.
- * Paste is already pre-normalized by poetryClipboardHandlers, but the filter
- * acts as a safety net for any other code path.
+ * After any document change, collapses any run of two or more consecutive
+ * spaces on affected lines into a single space.
+ * A single trailing space is intentionally allowed so the user can type
+ * "word " before the next word without the cursor jumping.
+ * Paste is separately normalized by poetryClipboardHandlers (which also
+ * trims trailing whitespace from pasted content).
  */
 export const poetryTransactionFilter = EditorState.transactionFilter.of((tr) => {
   if (!tr.docChanged) return tr;
@@ -249,20 +251,24 @@ export const poetryTransactionFilter = EditorState.transactionFilter.of((tr) => 
     }
   });
 
-  const trims: { from: number; to: number }[] = [];
+  const fixes: { from: number; to: number }[] = [];
   for (const n of affectedLines) {
     const line = tr.newDoc.line(n);
-    const m = line.text.match(/[ \t]+$/);
-    if (m) trims.push({ from: line.to - m[0].length, to: line.to });
+    const re = / {2,}/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(line.text)) !== null) {
+      // Collapse N spaces → 1 space: delete all but the first character of the run
+      fixes.push({ from: line.from + m.index + 1, to: line.from + m.index + m[0].length });
+    }
   }
 
-  if (trims.length === 0) return tr;
+  if (fixes.length === 0) return tr;
 
-  trims.sort((a, b) => a.from - b.from);
+  fixes.sort((a, b) => a.from - b.from);
   return [
     tr,
     {
-      changes: trims.map(({ from, to }) => ({ from, to, insert: '' })),
+      changes: fixes.map(({ from, to }) => ({ from, to, insert: '' })),
       sequential: true,
     },
   ];

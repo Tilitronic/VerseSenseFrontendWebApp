@@ -357,6 +357,10 @@ export interface PsychoGroupInfo {
   labelUa: string;
   /** Short description in Ukrainian */
   descriptionUa: string;
+  /** English name for the group */
+  labelEn: string;
+  /** Short description in English */
+  descriptionEn: string;
   /** Representative CSS hsl color (voiced variant) */
   cssColor: string;
   /** Example IPA symbols */
@@ -369,6 +373,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'nasal',
     labelUa: 'Носові',
     descriptionUa: 'м, н, нь — гудіння, резонанс',
+    labelEn: 'Nasals',
+    descriptionEn: 'm, n — humming, resonance',
     cssColor: `hsl(42,72%,63%)`,
     examplesIpa: ['m', 'n', 'ŋ'],
   },
@@ -376,6 +382,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'trill',
     labelUa: 'Дрижачі (вібранти)',
     descriptionUa: 'р, рь — вібруючий рокіт',
+    labelEn: 'Trills',
+    descriptionEn: 'r — vibrating rumble',
     cssColor: `hsl(28,80%,56%)`,
     examplesIpa: ['r', 'ɾ'],
   },
@@ -383,6 +391,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'lateral',
     labelUa: 'Бокові (латеральні)',
     descriptionUa: 'л, ль — плавний бічний сонорний',
+    labelEn: 'Laterals',
+    descriptionEn: 'l — smooth lateral sonorant',
     cssColor: `hsl(55,62%,52%)`,
     examplesIpa: ['l'],
   },
@@ -390,6 +400,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'glide',
     labelUa: 'Ковзні (глайди)',
     descriptionUa: 'й, в — напівголосні, перехідні',
+    labelEn: 'Glides',
+    descriptionEn: 'j, w — semivowels, transitions',
     cssColor: `hsl(195,45%,58%)`,
     examplesIpa: ['j', 'w'],
   },
@@ -397,6 +409,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'labial-stop',
     labelUa: 'Губні зупинні',
     descriptionUa: 'п, б — губний вибух',
+    labelEn: 'Labial stops',
+    descriptionEn: 'p, b — labial burst',
     cssColor: `hsl(0,88%,63%)`,
     examplesIpa: ['p', 'b'],
   },
@@ -404,6 +418,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'coronal-stop',
     labelUa: 'Зубні зупинні',
     descriptionUa: 'т, д — клацання язика',
+    labelEn: 'Coronal stops',
+    descriptionEn: 't, d — tongue tap',
     cssColor: `hsl(22,88%,63%)`,
     examplesIpa: ['t', 'd'],
   },
@@ -411,6 +427,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'velar-stop',
     labelUa: 'Задньоротові зупинні',
     descriptionUa: 'к, ґ — глибокий удар',
+    labelEn: 'Velar stops',
+    descriptionEn: 'k, g — deep back burst',
     cssColor: `hsl(252,80%,68%)`,
     examplesIpa: ['k', 'g'],
   },
@@ -418,6 +436,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'labial-fric',
     labelUa: 'Губні фрикативні',
     descriptionUa: 'ф, в — подих губами',
+    labelEn: 'Labial fricatives',
+    descriptionEn: 'f, v — lip friction',
     cssColor: `hsl(10,70%,63%)`,
     examplesIpa: ['f', 'v'],
   },
@@ -425,6 +445,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'sibilant',
     labelUa: 'Свистячі',
     descriptionUa: 'с, з, ц, дз — свист',
+    labelEn: 'Sibilants',
+    descriptionEn: 's, z, ts — hissing whistle',
     cssColor: `hsl(105,78%,52%)`,
     examplesIpa: ['s', 'z', 'ts'],
   },
@@ -432,6 +454,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'hushing',
     labelUa: 'Шиплячі',
     descriptionUa: 'ш, ж, ч, дж — шипіння',
+    labelEn: 'Hushing sibilants',
+    descriptionEn: 'ʃ, ʒ, tʃ — slushing hiss',
     cssColor: `hsl(172,72%,52%)`,
     examplesIpa: ['ʃ', 'ʒ', 'tʃ'],
   },
@@ -439,6 +463,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'guttural-fric',
     labelUa: 'Гортанні / задні',
     descriptionUa: 'х, г — горловий фрикатив',
+    labelEn: 'Velars / gutturals',
+    descriptionEn: 'x, ɣ — guttural fricative',
     cssColor: `hsl(272,70%,63%)`,
     examplesIpa: ['x', 'ɣ', 'χ'],
   },
@@ -446,6 +472,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
     id: 'glottal-breath',
     labelUa: 'Гортанний видих',
     descriptionUa: 'h — аспірований подих',
+    labelEn: 'Glottal / aspiration',
+    descriptionEn: 'h — aspirated breath',
     cssColor: `hsl(330,55%,63%)`,
     examplesIpa: ['h'],
   },
@@ -454,6 +482,8 @@ export const PSYCHO_GROUP_INFO: readonly PsychoGroupInfo[] = [
 export interface VowelGroupInfo {
   labelUa: string;
   descriptionUa: string;
+  labelEn: string;
+  descriptionEn: string;
   cssColor: string;
   examplesIpa: string[];
 }
@@ -463,18 +493,24 @@ export const VOWEL_GROUP_INFO: readonly VowelGroupInfo[] = [
   {
     labelUa: 'Голосні передні',
     descriptionUa: 'і, е, и — передній ряд',
+    labelEn: 'Front vowels',
+    descriptionEn: 'i, e — front row',
     cssColor: `hsl(210,88%,60%)`,
     examplesIpa: ['i', 'e', 'ɪ'],
   },
   {
     labelUa: 'Голосні центральні',
     descriptionUa: 'ə, ɛ — нейтральні',
+    labelEn: 'Central vowels',
+    descriptionEn: 'ə, ɛ — neutral',
     cssColor: `hsl(150,64%,52%)`,
     examplesIpa: ['ə', 'ɛ'],
   },
   {
     labelUa: 'Голосні задні',
     descriptionUa: 'а, о, у — задній ряд',
+    labelEn: 'Back vowels',
+    descriptionEn: 'a, o, u — back row',
     cssColor: `hsl(28,64%,58%)`,
     examplesIpa: ['a', 'o', 'u'],
   },

@@ -6,8 +6,9 @@
       <p>Confirm each line to see its phonetic grid.</p>
     </div>
 
-    <!-- Line-by-line grid + optional SVG overlay -->
-    <div v-else ref="gridContainer" class="pp-grid-wrap">
+    <template v-else>
+      <!-- Line-by-line grid + optional SVG overlay -->
+      <div ref="gridContainer" class="pp-grid-wrap">
       <!-- SVG clustering web (sits on top, pointer-events:none) -->
       <svg
         v-if="showWeb"
@@ -48,7 +49,9 @@
             class="pp-row pp-row--pending"
             :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
           >
-            <span class="pp-row__num">{{ lineIdx + 1 }}</span>
+            <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
+            <span v-if="showSylBadge" class="pp-row__syl" />
+            <span v-if="showCvBadge" class="pp-row__cv" />
             <span class="pp-row__hint">· · ·</span>
           </div>
 
@@ -59,7 +62,9 @@
             class="pp-row"
             :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
           >
-            <span class="pp-row__num">{{ lineIdx + 1 }}</span>
+            <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
+            <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
+            <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
             <div class="pp-cells">
               <template v-for="tok in line.tokens" :key="tok.id">
                 <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
@@ -110,7 +115,8 @@
           </div>
         </template>
       </div>
-    </div>
+      </div>
+    </template>
 
     <!-- Demo badge â always-visible notice in the bottom-right corner -->
     <div class="pp-demo-badge" title="Demo Version — може містити неточності та похибки">Demo</div>
@@ -132,6 +138,9 @@ const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
 const showRhymes = defineModel<boolean>('showRhymes', { default: false });
 const showSounds = defineModel<boolean>('showSounds', { default: true });
+const showNumBadge = defineModel<boolean>('showNumBadge', { default: true });
+const showSylBadge = defineModel<boolean>('showSylBadge', { default: true });
+const showCvBadge = defineModel<boolean>('showCvBadge', { default: true });
 
 const store = usePoetryStore();
 
@@ -159,6 +168,29 @@ function isPunctuation(text: string): boolean {
 
 function wordTokensInLine(line: ILine): IWordToken[] {
   return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD' && !isPunctuation(t.text));
+}
+
+function lineSyllableCount(line: ILine): number {
+  return wordTokensInLine(line).reduce(
+    (sum, tok) => sum + transcribedWord(tok).syllables.length,
+    0,
+  );
+}
+
+function lineCvRatio(line: ILine): string {
+  let vowels = 0;
+  let consonants = 0;
+  for (const tok of wordTokensInLine(line)) {
+    for (const syl of transcribedWord(tok).syllables) {
+      for (const t of syl.ipaTokens) {
+        if (isVowelToken(t)) vowels++;
+        else consonants++;
+      }
+    }
+  }
+  if (vowels === 0) return consonants > 0 ? '∞' : '–';
+  const r = consonants / vowels;
+  return r % 1 === 0 ? String(r) : r.toFixed(1);
 }
 
 function transcribedWord(tok: IToken): TranscribedWord {
@@ -519,14 +551,34 @@ $consonant-col: rgba(0, 0, 0, 0.75);
     border-radius: 3px;
   }
 
-  &__num {
+  &__num,
+  &__syl,
+  &__cv {
     flex-shrink: 0;
-    width: 18px;
-    text-align: right;
-    font-size: 0.58rem;
-    color: rgba(0, 0, 0, 0.35);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: inherit;
     font-variant-numeric: tabular-nums;
+    color: #fff;
     user-select: none;
+    background: $border-col;
+  }
+
+  &__num {
+    border-radius: 4px;
+  }
+
+  &__syl {
+    border-radius: 50%;
+  }
+
+  &__cv {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   }
 
   &__hint {
