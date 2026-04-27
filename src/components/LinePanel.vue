@@ -194,9 +194,7 @@ function stressTitle(tok: IWordToken, slot: CharSlot): string {
   const alts = store.pendingStressAlts.get(tok.id);
   if (alts && alts.length >= 2) {
     const variants = alts.map((idx) => markedVariant(tok.text, idx)).join(' / ');
-    const kind = pending === 'variative'
-      ? 'Free variants'
-      : 'Context-dependent stress';
+    const kind = pending === 'variative' ? 'Free variants' : 'Context-dependent stress';
     return `${kind}: ${variants} \u00b7 click a vowel to choose`;
   }
   return 'Multiple stress variants \u00b7 click a vowel to choose';

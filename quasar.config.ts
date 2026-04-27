@@ -44,7 +44,9 @@ function lusciniaModelPlugin(): Plugin {
           source: readFileSync(LUSCINIA_MODEL_PATH),
         });
       } catch (err) {
-        this.warn(`[luscinia-model] model file not found — ML prediction disabled in build: ${String(err)}`);
+        this.warn(
+          `[luscinia-model] model file not found — ML prediction disabled in build: ${String(err)}`,
+        );
       }
     },
   };
@@ -109,7 +111,9 @@ export default defineConfig((ctx) => {
       extendViteConf(viteConf) {
         // Allow Vite to import .ctrie.gz/.onnx.gz as static asset URLs.
         const existing = viteConf.assetsInclude
-          ? (Array.isArray(viteConf.assetsInclude) ? viteConf.assetsInclude : [viteConf.assetsInclude])
+          ? Array.isArray(viteConf.assetsInclude)
+            ? viteConf.assetsInclude
+            : [viteConf.assetsInclude]
           : [];
         viteConf.assetsInclude = [...existing, '**/*.ctrie.gz', '**/*.onnx.gz', '**/*.onnx'];
 
@@ -118,7 +122,7 @@ export default defineConfig((ctx) => {
         // This prevents stale pre-bundle cache from serving an old version.
         viteConf.optimizeDeps ??= {};
         viteConf.optimizeDeps.exclude ??= [];
-        (viteConf.optimizeDeps.exclude as string[]).push('ua-stress-ml');
+        viteConf.optimizeDeps.exclude.push('ua-stress-ml');
       },
       // viteVuePluginOptions: {},
 

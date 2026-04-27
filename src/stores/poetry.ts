@@ -198,7 +198,12 @@ export const usePoetryStore = defineStore('poetry', () => {
         const pendingSrc = pendingStressIds.value.get(tok.id);
         if (pendingSrc) ann.stressPendingSource = pendingSrc;
         // Only persist if there is something non-trivial to store
-        if (ann.stress !== null || ann.lang !== undefined || ann.confirmed || ann.stressPendingSource !== undefined) {
+        if (
+          ann.stress !== null ||
+          ann.lang !== undefined ||
+          ann.confirmed ||
+          ann.stressPendingSource !== undefined
+        ) {
           words[key] = ann;
         }
         wordIdx++;
@@ -718,7 +723,12 @@ export const usePoetryStore = defineStore('poetry', () => {
 
     // Build sets of what needs to change before mutating, so we can
     // produce new object references for changed tokens/lines (Vue reactivity).
-    interface StressChange { syllableIndex: number; confirmed: boolean; source: 'monosyllable' | 'db' | 'heteronym' | 'variative' | 'ml'; stresses: number[]; }
+    interface StressChange {
+      syllableIndex: number;
+      confirmed: boolean;
+      source: 'monosyllable' | 'db' | 'heteronym' | 'variative' | 'ml';
+      stresses: number[];
+    }
     const langChanges = new Map<string, Language>(); // tokenId → new language
     const stressChanges = new Map<string, StressChange>(); // tokenId → resolved stress
 
@@ -761,13 +771,25 @@ export const usePoetryStore = defineStore('poetry', () => {
         if (tok.stressIndex === null) {
           const effectiveLang = langChanges.get(tok.id) ?? tok.language;
           const vowelCount = countVowels(tok.text, effectiveLang);
-          console.debug(`[stress:sync] word="${tok.text}" lang=${effectiveLang} vowels=${vowelCount} resolverReady=${!!stressResolver.value}`);
+          console.debug(
+            `[stress:sync] word="${tok.text}" lang=${effectiveLang} vowels=${vowelCount} resolverReady=${!!stressResolver.value}`,
+          );
 
           if (vowelCount === 1) {
             // Monosyllable — always confirmed.
-            stressChanges.set(tok.id, { syllableIndex: 0, confirmed: true, source: 'monosyllable', stresses: [] });
+            stressChanges.set(tok.id, {
+              syllableIndex: 0,
+              confirmed: true,
+              source: 'monosyllable',
+              stresses: [],
+            });
             console.debug(`[stress:sync]   -> monosyllable`);
-          } else if (vowelCount > 1 && effectiveLang === 'ua' && stressResolver.value && appStore.useDbStress) {
+          } else if (
+            vowelCount > 1 &&
+            effectiveLang === 'ua' &&
+            stressResolver.value &&
+            appStore.useDbStress
+          ) {
             // Multi-syllable Ukrainian word — synchronous trie lookup.
             const resolution = stressResolver.value.resolveSync(tok.text);
             console.debug(`[stress:sync]   -> resolveSync result:`, resolution);
@@ -785,7 +807,9 @@ export const usePoetryStore = defineStore('poetry', () => {
             console.debug(`[stress:sync]   -> skipped (resolver not ready yet)`);
           }
         } else {
-          console.debug(`[stress:sync] word="${tok.text}" already has stressIndex=${tok.stressIndex} — skipped`);
+          console.debug(
+            `[stress:sync] word="${tok.text}" already has stressIndex=${tok.stressIndex} — skipped`,
+          );
         }
       } // end for tok
     }); // end lines.forEach
@@ -818,9 +842,11 @@ export const usePoetryStore = defineStore('poetry', () => {
             newPendingAfterStress.delete(tok.id);
             newPendingAltsAfterStress.delete(tok.id);
           } else {
-            const pSrc = sc.source === 'ml' ? 'ml' : sc.source === 'variative' ? 'variative' : 'heteronym';
+            const pSrc =
+              sc.source === 'ml' ? 'ml' : sc.source === 'variative' ? 'variative' : 'heteronym';
             newPendingAfterStress.set(tok.id, pSrc);
-            if (sc.stresses && sc.stresses.length > 1) newPendingAltsAfterStress.set(tok.id, sc.stresses);
+            if (sc.stresses && sc.stresses.length > 1)
+              newPendingAltsAfterStress.set(tok.id, sc.stresses);
           }
         }
         lineChanged = true;
@@ -944,10 +970,20 @@ export const usePoetryStore = defineStore('poetry', () => {
       return;
     }
     const resolver = stressResolver.value;
-    const unresolvedTokens = allWordTokens.value.filter(t => t.stressIndex === null && t.language === 'ua');
+    const unresolvedTokens = allWordTokens.value.filter(
+      (t) => t.stressIndex === null && t.language === 'ua',
+    );
     console.debug(`[stress:async] starting — ${unresolvedTokens.length} unresolved UA words`);
 
-    const patches = new Map<string, { syllableIndex: number; confirmed: boolean; source: 'ml' | 'heteronym' | 'variative' | 'db'; stresses?: number[] }>();
+    const patches = new Map<
+      string,
+      {
+        syllableIndex: number;
+        confirmed: boolean;
+        source: 'ml' | 'heteronym' | 'variative' | 'db';
+        stresses?: number[];
+      }
+    >();
 
     for (const tok of allWordTokens.value) {
       if (tok.stressIndex !== null) {
@@ -971,7 +1007,10 @@ export const usePoetryStore = defineStore('poetry', () => {
       }
     }
 
-    console.debug(`[stress:async] patches collected: ${patches.size}`, [...patches.entries()].map(([id, p]) => `${id}→syllable${p.syllableIndex}(${p.source})`));
+    console.debug(
+      `[stress:async] patches collected: ${patches.size}`,
+      [...patches.entries()].map(([id, p]) => `${id}→syllable${p.syllableIndex}(${p.source})`),
+    );
     if (patches.size === 0) return;
 
     const newTokenIndex = new Map(document.value.tokenIndex);
@@ -992,7 +1031,8 @@ export const usePoetryStore = defineStore('poetry', () => {
           newPending.delete(tok.id);
           newAlts.delete(tok.id);
         } else {
-          const pSrc = patch.source === 'ml' ? 'ml' : patch.source === 'variative' ? 'variative' : 'heteronym';
+          const pSrc =
+            patch.source === 'ml' ? 'ml' : patch.source === 'variative' ? 'variative' : 'heteronym';
           newPending.set(tok.id, pSrc);
           if (patch.stresses && patch.stresses.length > 1) newAlts.set(tok.id, patch.stresses);
         }

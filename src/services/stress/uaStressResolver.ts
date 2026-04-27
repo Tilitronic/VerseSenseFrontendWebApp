@@ -60,7 +60,12 @@ export class UaStressResolver {
     if (result !== null) {
       if (!result.uncertain) {
         // Unique, unambiguous entry — auto-confirmed.
-        return { syllableIndex: result.stress, confirmed: true, source: 'db', stressType: 'unique' };
+        return {
+          syllableIndex: result.stress,
+          confirmed: true,
+          source: 'db',
+          stressType: 'unique',
+        };
       }
 
       // Heteronym or variative — pick the trie's first (default) stress, require confirmation.
@@ -103,7 +108,12 @@ export class UaStressResolver {
 
     if (result !== null) {
       if (!result.uncertain) {
-        return { syllableIndex: result.stress, confirmed: true, source: 'db', stressType: 'unique' };
+        return {
+          syllableIndex: result.stress,
+          confirmed: true,
+          source: 'db',
+          stressType: 'unique',
+        };
       }
       const src = result.type === 'variative' ? 'variative' : 'heteronym';
       return {

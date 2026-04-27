@@ -35,7 +35,9 @@ export class LusciniaPredictor implements IMlStressPredictor {
       console.debug('[LusciniaPredictor] worker spawned:', this.worker);
       this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const { id, result, error } = e.data;
-        console.debug(`[LusciniaPredictor] response id=${id} result=${result} error=${error ?? 'none'}`);
+        console.debug(
+          `[LusciniaPredictor] response id=${id} result=${result} error=${error ?? 'none'}`,
+        );
         const entry = this.pending.get(id);
         if (!entry) return;
         this.pending.delete(id);
@@ -64,4 +66,3 @@ export class LusciniaPredictor implements IMlStressPredictor {
     });
   }
 }
-

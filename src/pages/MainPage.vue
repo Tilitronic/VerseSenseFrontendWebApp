@@ -67,10 +67,10 @@
             <!-- ── Stress source toggles ─────────────────────────── -->
             <span class="stress-sep" />
             <q-btn-group unelevated class="stress-source-group">
-
               <!-- DB toggle -->
               <q-btn
-                no-caps dense
+                no-caps
+                dense
                 size="sm"
                 padding="2px 10px"
                 :color="appStore.useDbStress ? 'positive' : 'blue-grey-9'"
@@ -82,7 +82,8 @@
 
               <!-- ML toggle -->
               <q-btn
-                no-caps dense
+                no-caps
+                dense
                 size="sm"
                 padding="2px 10px"
                 :color="appStore.useMlStress ? 'primary' : 'blue-grey-9'"
@@ -110,17 +111,23 @@
                         Stress Dictionary (DB)
                       </div>
                       <div class="text-body2 q-mt-xs">
-                        Lookup via <strong>ua-word-stress</strong> — 2.9 M word forms.
-                        Heteronyms and free stress variants are highlighted in yellow.
+                        Lookup via <strong>ua-word-stress</strong> — 2.9 M word forms. Heteronyms
+                        and free stress variants are highlighted in yellow.
                       </div>
                     </q-card-section>
                     <q-card-section class="q-pt-xs">
                       <q-btn
-                        flat no-caps dense size="sm"
-                        icon="open_in_new" label="ua-stress-engine on GitHub"
+                        flat
+                        no-caps
+                        dense
+                        size="sm"
+                        icon="open_in_new"
+                        label="ua-stress-engine on GitHub"
                         href="https://github.com/Tilitronic/ua-stress-engine"
-                        target="_blank" rel="noopener noreferrer"
-                        type="a" color="primary"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="a"
+                        color="primary"
                       />
                     </q-card-section>
 
@@ -132,24 +139,31 @@
                         ML Predictor — Luscinia
                       </div>
                       <div class="text-body2 q-mt-xs">
-                        Predicts stress for words not found in the dictionary.
-                        Results are highlighted in blue and require confirmation.
-                        <div class="text-warning q-mt-xs">⚠ First use downloads the model (~30 MB).</div>
+                        Predicts stress for words not found in the dictionary. Results are
+                        highlighted in blue and require confirmation.
+                        <div class="text-warning q-mt-xs">
+                          ⚠ First use downloads the model (~30 MB).
+                        </div>
                       </div>
                     </q-card-section>
                     <q-card-section class="q-pt-xs">
                       <q-btn
-                        flat no-caps dense size="sm"
-                        icon="open_in_new" label="ua-stress-engine on GitHub"
+                        flat
+                        no-caps
+                        dense
+                        size="sm"
+                        icon="open_in_new"
+                        label="ua-stress-engine on GitHub"
                         href="https://github.com/Tilitronic/ua-stress-engine"
-                        target="_blank" rel="noopener noreferrer"
-                        type="a" color="primary"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="a"
+                        color="primary"
                       />
                     </q-card-section>
                   </q-card>
                 </q-menu>
               </q-btn>
-
             </q-btn-group>
           </div>
         </div>

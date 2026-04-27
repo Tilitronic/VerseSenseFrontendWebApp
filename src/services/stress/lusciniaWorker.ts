@@ -35,8 +35,15 @@ function getPredictor(modelUrl: string): Promise<LusciniaPredictor> {
   console.debug('[LusciniaWorker] loading model from', modelUrl);
   currentModelUrl = modelUrl;
   predictorPromise = LusciniaPredictor.fromUrl(modelUrl, ort)
-    .then((p) => { console.debug('[LusciniaWorker] model loaded successfully'); return p; })
-    .catch((err) => { console.error('[LusciniaWorker] model load failed:', err); predictorPromise = null; throw err; });
+    .then((p) => {
+      console.debug('[LusciniaWorker] model loaded successfully');
+      return p;
+    })
+    .catch((err) => {
+      console.error('[LusciniaWorker] model load failed:', err);
+      predictorPromise = null;
+      throw err;
+    });
   return predictorPromise;
 }
 
