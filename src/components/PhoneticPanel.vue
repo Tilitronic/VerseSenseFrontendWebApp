@@ -9,112 +9,112 @@
     <template v-else>
       <!-- Line-by-line grid + optional SVG overlay -->
       <div ref="gridContainer" class="pp-grid-wrap">
-      <!-- SVG clustering web (sits on top, pointer-events:none) -->
-      <svg
-        v-if="showWeb"
-        class="pp-web-svg"
-        :width="svgSize.w"
-        :height="svgSize.h"
-        :viewBox="`0 0 ${svgSize.w} ${svgSize.h}`"
-      >
-        <line
-          v-for="(seg, i) in webSegments"
-          :key="i"
-          :x1="seg.x1"
-          :y1="seg.y1"
-          :x2="seg.x2"
-          :y2="seg.y2"
-          :stroke="seg.color"
-          :stroke-width="seg.width"
-          :stroke-opacity="seg.opacity"
-          stroke-linecap="round"
-        />
-      </svg>
-
-      <div class="pp-lines" :class="{ 'pp-lines--right': alignRight }">
-        <template v-for="(line, lineIdx) in store.document.lines" :key="line.id">
-          <!-- Empty line (no tokens at all) → blank row -->
-          <div v-if="line.tokens.length === 0" class="pp-blank-row" />
-
-          <!-- TAB-only line with no words → compact blank row (indented empty line) -->
-          <div
-            v-else-if="wordTokensInLine(line).length === 0 && !store.isLineConfirmed(line.id)"
-            class="pp-blank-row"
+        <!-- SVG clustering web (sits on top, pointer-events:none) -->
+        <svg
+          v-if="showWeb"
+          class="pp-web-svg"
+          :width="svgSize.w"
+          :height="svgSize.h"
+          :viewBox="`0 0 ${svgSize.w} ${svgSize.h}`"
+        >
+          <line
+            v-for="(seg, i) in webSegments"
+            :key="i"
+            :x1="seg.x1"
+            :y1="seg.y1"
+            :x2="seg.x2"
+            :y2="seg.y2"
+            :stroke="seg.color"
+            :stroke-width="seg.width"
+            :stroke-opacity="seg.opacity"
+            stroke-linecap="round"
           />
+        </svg>
 
-          <!-- Unconfirmed line that has words → dim placeholder -->
-          <div
-            v-else-if="!store.isLineConfirmed(line.id)"
-            :ref="(el) => setRowRef(lineIdx, el)"
-            class="pp-row pp-row--pending"
-            :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
-          >
-            <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
-            <span v-if="showSylBadge" class="pp-row__syl" />
-            <span v-if="showCvBadge" class="pp-row__cv" />
-            <span class="pp-row__hint">· · ·</span>
-          </div>
+        <div class="pp-lines" :class="{ 'pp-lines--right': alignRight }">
+          <template v-for="(line, lineIdx) in store.document.lines" :key="line.id">
+            <!-- Empty line (no tokens at all) → blank row -->
+            <div v-if="line.tokens.length === 0" class="pp-blank-row" />
 
-          <!-- Confirmed line → syllable cell row -->
-          <div
-            v-else
-            :ref="(el) => setRowRef(lineIdx, el)"
-            class="pp-row"
-            :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
-          >
-            <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
-            <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
-            <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
-            <div class="pp-cells">
-              <template v-for="tok in line.tokens" :key="tok.id">
-                <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
-                <template v-else-if="tok.kind === 'WORD' && !isPunctuation(tok.text)">
-                  <template v-for="(syl, si) in transcribedWord(tok).syllables" :key="si">
-                    <div
-                      class="pp-cell"
-                      :class="{
-                        'pp-cell--stressed': syl.stressed,
-                        'pp-cell--word-last': si === transcribedWord(tok).syllables.length - 1,
-                      }"
-                    >
-                      <div class="pp-cell__tokens">
-                        <span
-                          v-for="(token, ti) in syl.ipaTokens"
-                          :key="ti"
-                          :ref="(el) => setTokenRef(`${tok.id}:${si}:${ti}`, el)"
-                          class="pp-cell__token"
-                          :class="
-                            isVowelToken(token)
-                              ? 'pp-cell__token--vowel'
-                              : 'pp-cell__token--consonant'
-                          "
-                          :style="
-                            showSounds
-                              ? (tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined)
-                              : undefined
-                          "
-                          >{{ token }}</span
-                        >
+            <!-- TAB-only line with no words → compact blank row (indented empty line) -->
+            <div
+              v-else-if="wordTokensInLine(line).length === 0 && !store.isLineConfirmed(line.id)"
+              class="pp-blank-row"
+            />
+
+            <!-- Unconfirmed line that has words → dim placeholder -->
+            <div
+              v-else-if="!store.isLineConfirmed(line.id)"
+              :ref="(el) => setRowRef(lineIdx, el)"
+              class="pp-row pp-row--pending"
+              :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
+            >
+              <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
+              <span v-if="showSylBadge" class="pp-row__syl" />
+              <span v-if="showCvBadge" class="pp-row__cv" />
+              <span class="pp-row__hint">· · ·</span>
+            </div>
+
+            <!-- Confirmed line → syllable cell row -->
+            <div
+              v-else
+              :ref="(el) => setRowRef(lineIdx, el)"
+              class="pp-row"
+              :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
+            >
+              <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
+              <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
+              <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
+              <div class="pp-cells">
+                <template v-for="tok in line.tokens" :key="tok.id">
+                  <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
+                  <template v-else-if="tok.kind === 'WORD' && !isPunctuation(tok.text)">
+                    <template v-for="(syl, si) in transcribedWord(tok).syllables" :key="si">
+                      <div
+                        class="pp-cell"
+                        :class="{
+                          'pp-cell--stressed': syl.stressed,
+                          'pp-cell--word-last': si === transcribedWord(tok).syllables.length - 1,
+                        }"
+                      >
+                        <div class="pp-cell__tokens">
+                          <span
+                            v-for="(token, ti) in syl.ipaTokens"
+                            :key="ti"
+                            :ref="(el) => setTokenRef(`${tok.id}:${si}:${ti}`, el)"
+                            class="pp-cell__token"
+                            :class="
+                              isVowelToken(token)
+                                ? 'pp-cell__token--vowel'
+                                : 'pp-cell__token--consonant'
+                            "
+                            :style="
+                              showSounds
+                                ? (tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined)
+                                : undefined
+                            "
+                            >{{ token }}</span
+                          >
+                        </div>
+                        <!-- Rhyme bars: one per motif matching this syllable -->
+                        <template v-if="showRhymes">
+                          <div
+                            v-for="(motif, mi) in sylMotifs(tok.id, si, syl.ipaTokens.length)"
+                            :key="motif.id"
+                            class="pp-cell__rhyme-bar"
+                            :class="`pp-cell__rhyme-bar--${motif.tier}`"
+                            :style="rhymeBarStyle(motif, mi)"
+                            :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
+                          />
+                        </template>
                       </div>
-                      <!-- Rhyme bars: one per motif matching this syllable -->
-                      <template v-if="showRhymes">
-                        <div
-                          v-for="(motif, mi) in sylMotifs(tok.id, si, syl.ipaTokens.length)"
-                          :key="motif.id"
-                          class="pp-cell__rhyme-bar"
-                          :class="`pp-cell__rhyme-bar--${motif.tier}`"
-                          :style="rhymeBarStyle(motif, mi)"
-                          :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
-                        />
-                      </template>
-                    </div>
+                    </template>
                   </template>
                 </template>
-              </template>
+              </div>
             </div>
-          </div>
-        </template>
-      </div>
+          </template>
+        </div>
       </div>
     </template>
 

@@ -3,6 +3,52 @@
 
 import { defineConfig } from '#q-app/wrappers';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import type { Plugin } from 'vite';
+
+// Absolute path to the pre-compressed ONNX model — sourced from the linked ua-stress-ml package.
+const LUSCINIA_MODEL_PATH = resolve(
+  fileURLToPath(new URL('.', import.meta.url)),
+  'node_modules/ua-stress-ml/data/P3_0017_full.onnx.gz',
+);
+const LUSCINIA_ROUTE = '/models/luscinia.onnx.gz';
+
+/**
+ * Vite plugin: serve the Luscinia ONNX model during dev and emit it as a build asset.
+ * The model is gzip-compressed; the browser decompresses it via DecompressionStream
+ * in LusciniaPredictor before passing the raw ONNX bytes to onnxruntime-web.
+ */
+function lusciniaModelPlugin(): Plugin {
+  return {
+    name: 'luscinia-model',
+    // Dev server: serve the model from its original location without reading into memory up-front.
+    configureServer(server) {
+      server.middlewares.use(LUSCINIA_ROUTE, (_req, res) => {
+        try {
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.end(readFileSync(LUSCINIA_MODEL_PATH));
+        } catch (err) {
+          res.statusCode = 404;
+          res.end(`[luscinia-model] model not found: ${LUSCINIA_MODEL_PATH}`);
+          console.warn('[luscinia-model] model file not found — build it first:', err);
+        }
+      });
+    },
+    // Build: emit the model as a static asset under models/.
+    generateBundle() {
+      try {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'models/luscinia.onnx.gz',
+          source: readFileSync(LUSCINIA_MODEL_PATH),
+        });
+      } catch (err) {
+        this.warn(`[luscinia-model] model file not found — ML prediction disabled in build: ${String(err)}`);
+      }
+    },
+  };
+}
 
 export default defineConfig((ctx) => {
   return {
@@ -12,7 +58,7 @@ export default defineConfig((ctx) => {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ['i18n', 'axios', 'localStoreBoot', 'codemirror'],
+    boot: ['i18n', 'axios', 'localStoreBoot', 'codemirror', 'stressTrie'],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: ['app.scss'],
@@ -60,10 +106,24 @@ export default defineConfig((ctx) => {
       // polyfillModulePreload: true,
       // distDir
 
-      // extendViteConf (viteConf) {},
+      extendViteConf(viteConf) {
+        // Allow Vite to import .ctrie.gz/.onnx.gz as static asset URLs.
+        const existing = viteConf.assetsInclude
+          ? (Array.isArray(viteConf.assetsInclude) ? viteConf.assetsInclude : [viteConf.assetsInclude])
+          : [];
+        viteConf.assetsInclude = [...existing, '**/*.ctrie.gz', '**/*.onnx.gz', '**/*.onnx'];
+
+        // Exclude ua-stress-ml from Vite's dep pre-bundler so it is always
+        // served directly from node_modules/ua-stress-ml/dist/index.js.
+        // This prevents stale pre-bundle cache from serving an old version.
+        viteConf.optimizeDeps ??= {};
+        viteConf.optimizeDeps.exclude ??= [];
+        (viteConf.optimizeDeps.exclude as string[]).push('ua-stress-ml');
+      },
       // viteVuePluginOptions: {},
 
       vitePlugins: [
+        lusciniaModelPlugin(),
         [
           '@intlify/unplugin-vue-i18n/vite',
           {

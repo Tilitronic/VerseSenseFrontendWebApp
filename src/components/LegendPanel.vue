@@ -82,8 +82,8 @@
         </div>
       </div>
       <p class="lp-note" style="margin-top: 8px">
-        C:V ratio = consonants ÷ vowels in the line. A value of 2 means two consonants per vowel.
-        ∞ indicates a line with no vowels.
+        C:V ratio = consonants ÷ vowels in the line. A value of 2 means two consonants per vowel. ∞
+        indicates a line with no vowels.
       </p>
     </section>
 

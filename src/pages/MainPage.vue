@@ -63,6 +63,94 @@
               class="q-ml-xs"
               @click="clearText"
             />
+
+            <!-- ── Stress source toggles ─────────────────────────── -->
+            <span class="stress-sep" />
+            <q-btn-group unelevated class="stress-source-group">
+
+              <!-- DB toggle -->
+              <q-btn
+                no-caps dense
+                size="sm"
+                padding="2px 10px"
+                :color="appStore.useDbStress ? 'positive' : 'blue-grey-9'"
+                :text-color="appStore.useDbStress ? 'white' : 'grey-5'"
+                label="Stress DB"
+                :title="appStore.useDbStress ? 'Dictionary enabled' : 'Dictionary disabled'"
+                @click="appStore.setUseDbStress(!appStore.useDbStress)"
+              />
+
+              <!-- ML toggle -->
+              <q-btn
+                no-caps dense
+                size="sm"
+                padding="2px 10px"
+                :color="appStore.useMlStress ? 'primary' : 'blue-grey-9'"
+                :text-color="appStore.useMlStress ? 'white' : 'grey-5'"
+                label="Stress ML"
+                :title="appStore.useMlStress ? 'ML predictor enabled' : 'ML predictor disabled'"
+                @click="appStore.setUseMlStress(!appStore.useMlStress)"
+              />
+
+              <!-- Info / docs -->
+              <q-btn
+                dense
+                unelevated
+                size="sm"
+                padding="2px 6px"
+                color="blue-grey-9"
+                text-color="grey-5"
+                icon="help_outline"
+              >
+                <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
+                  <q-card class="stress-info-card">
+                    <q-card-section class="q-pb-xs">
+                      <div class="text-subtitle2">
+                        <q-icon name="menu_book" size="xs" color="positive" class="q-mr-xs" />
+                        Stress Dictionary (DB)
+                      </div>
+                      <div class="text-body2 q-mt-xs">
+                        Lookup via <strong>ua-word-stress</strong> — 2.9 M word forms.
+                        Heteronyms and free stress variants are highlighted in yellow.
+                      </div>
+                    </q-card-section>
+                    <q-card-section class="q-pt-xs">
+                      <q-btn
+                        flat no-caps dense size="sm"
+                        icon="open_in_new" label="ua-stress-engine on GitHub"
+                        href="https://github.com/Tilitronic/ua-stress-engine"
+                        target="_blank" rel="noopener noreferrer"
+                        type="a" color="primary"
+                      />
+                    </q-card-section>
+
+                    <q-separator />
+
+                    <q-card-section class="q-pb-xs">
+                      <div class="text-subtitle2">
+                        <q-icon name="psychology" size="xs" color="primary" class="q-mr-xs" />
+                        ML Predictor — Luscinia
+                      </div>
+                      <div class="text-body2 q-mt-xs">
+                        Predicts stress for words not found in the dictionary.
+                        Results are highlighted in blue and require confirmation.
+                        <div class="text-warning q-mt-xs">⚠ First use downloads the model (~30 MB).</div>
+                      </div>
+                    </q-card-section>
+                    <q-card-section class="q-pt-xs">
+                      <q-btn
+                        flat no-caps dense size="sm"
+                        icon="open_in_new" label="ua-stress-engine on GitHub"
+                        href="https://github.com/Tilitronic/ua-stress-engine"
+                        target="_blank" rel="noopener noreferrer"
+                        type="a" color="primary"
+                      />
+                    </q-card-section>
+                  </q-card>
+                </q-menu>
+              </q-btn>
+
+            </q-btn-group>
           </div>
         </div>
       </div>
@@ -768,5 +856,24 @@ function clearText() {
     width: 100%;
     min-height: 50vh;
   }
+}
+
+// ── Stress source toggles ────────────────────────────────────────────────────
+.stress-sep {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.stress-source-group {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stress-info-card {
+  width: 280px;
 }
 </style>

@@ -24,6 +24,8 @@ import { getPhoneme } from 'src/services/poetryEngines/ua/Phonetizer';
 import { Sylabizer, type Syllable } from 'src/services/poetryEngines/ua/Sylabizer';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
+import { useStressTrie } from 'src/composables/useStressTrie';
+import { useAppStore } from 'src/stores/app';
 
 const STORAGE_KEY_TEXT = 'verseSense_poemText';
 const STORAGE_KEY_DOC_LANG = 'verseSense_docLanguage';
@@ -44,6 +46,8 @@ interface WordAnnotation {
   lang?: Language;
   /** Whether the user confirmed the language for this word */
   confirmed: boolean;
+  /** Source of auto-resolved stress pending user confirmation (absent = not pending) */
+  stressPendingSource?: 'ml' | 'heteronym' | 'variative';
 }
 
 /** Root blob stored under STORAGE_KEY_ANNOTATIONS */
@@ -65,6 +69,10 @@ function normalizeLeadingSpaces(text: string): string {
 }
 
 export const usePoetryStore = defineStore('poetry', () => {
+  // ── Stress trie resolver ───────────────────────────────────────────────────
+  const { resolver: stressResolver } = useStressTrie();
+  const appStore = useAppStore();
+
   // ── State ──────────────────────────────────────────────────────────────────
 
   /** Raw text as typed by the user */
@@ -116,14 +124,26 @@ export const usePoetryStore = defineStore('poetry', () => {
   const confirmedWords = ref<Set<string>>(new Set());
 
   /**
+   * Map from word token ID to the source of auto-resolved stress.
+   *   'ml'        → ML prediction (displayed in blue)
+   *   'heteronym' → Trie heteronym — multiple valid forms (displayed in yellow)
+   * Absent from map → stress was confirmed (by user or from DB).
+   */
+  const pendingStressIds = ref<Map<string, 'ml' | 'heteronym' | 'variative'>>(new Map());
+  /** Alternative stress positions for heteronym/variative words, used by tooltips. Not persisted. */
+  const pendingStressAlts = ref<Map<string, number[]>>(new Map());
+
+  /**
    * Confidence of the last auto-detection (0.0–1.0).
    * Exposed so the UI can show a low-confidence warning badge.
    */
   const detectionConfidence = ref<number>(1.0);
 
-  // ── Internal debounce timer ────────────────────────────────────────────────
+  // ── Internal debounce timers ───────────────────────────────────────────────
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let stressDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const STRESS_DEBOUNCE_MS = 600;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -175,8 +195,10 @@ export const usePoetryStore = defineStore('poetry', () => {
           confirmed: lockedLanguage !== null || confirmedWords.value.has(tok.id),
         };
         if (langOverride !== undefined) ann.lang = langOverride;
+        const pendingSrc = pendingStressIds.value.get(tok.id);
+        if (pendingSrc) ann.stressPendingSource = pendingSrc;
         // Only persist if there is something non-trivial to store
-        if (ann.stress !== null || ann.lang !== undefined || ann.confirmed) {
+        if (ann.stress !== null || ann.lang !== undefined || ann.confirmed || ann.stressPendingSource !== undefined) {
           words[key] = ann;
         }
         wordIdx++;
@@ -215,6 +237,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     const newTokenIndex = new Map(document.value.tokenIndex);
     const newLangMap = new Map(wordLanguages.value);
     const newConfirmed = new Set(confirmedWords.value);
+    const newPending = new Map(pendingStressIds.value);
     let anyChange = false;
 
     const newLines = document.value.lines.map((line, lineIdx) => {
@@ -233,6 +256,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         };
         if (ann.lang) newLangMap.set(tok.id, ann.lang);
         if (ann.confirmed) newConfirmed.add(tok.id);
+        if (ann.stressPendingSource) newPending.set(tok.id, ann.stressPendingSource);
         newTokenIndex.set(tok.id, newTok);
         lineChanged = true;
         anyChange = true;
@@ -245,6 +269,7 @@ export const usePoetryStore = defineStore('poetry', () => {
       document.value = { lines: newLines, tokenIndex: newTokenIndex };
       wordLanguages.value = newLangMap;
       confirmedWords.value = newConfirmed;
+      pendingStressIds.value = newPending;
     }
   }
 
@@ -323,6 +348,12 @@ export const usePoetryStore = defineStore('poetry', () => {
     const sc = new Map(syllableCache.value);
     sc.delete(wordId);
     syllableCache.value = sc;
+    // Manual user pick clears the pending flag for this word
+    if (pendingStressIds.value.has(wordId)) {
+      const next = new Map(pendingStressIds.value);
+      next.delete(wordId);
+      pendingStressIds.value = next;
+    }
     // When user sets a stress, try to auto-confirm the line
     const line = document.value.lines.find((l) => l.tokens.some((t) => t.id === wordId));
     if (line) tryAutoConfirmLine(line.id);
@@ -370,12 +401,15 @@ export const usePoetryStore = defineStore('poetry', () => {
     const line = document.value.lines.find((l) => l.id === lineId);
     if (!line) return;
     const next = new Set(confirmedWords.value);
+    const nextPending = new Map(pendingStressIds.value);
     for (const tok of line.tokens) {
       if (tok.kind !== 'WORD') continue;
       const { lockedLanguage } = getWordScriptInfo(tok.text);
       if (lockedLanguage === null) next.add(tok.id);
+      nextPending.delete(tok.id);
     }
     confirmedWords.value = next;
+    pendingStressIds.value = nextPending;
   }
 
   /** Remove all non-locked words on a line from confirmedWords (toggle back). */
@@ -463,6 +497,7 @@ export const usePoetryStore = defineStore('poetry', () => {
       stressIndex: number | null;
       lang: Language | undefined;
       confirmed: boolean;
+      pendingSource?: 'ml' | 'heteronym' | 'variative';
     }
     const prevByPos = new Map<string, WordSnapshot>(); // "L{li}:W{wi}" → snap
     const prevByText = new Map<string, WordSnapshot>(); // word text → snap (first occurrence)
@@ -473,11 +508,13 @@ export const usePoetryStore = defineStore('poetry', () => {
         if (tok.kind !== 'WORD') continue;
         const key = `L${li}:W${wi}`;
         const { lockedLanguage } = getWordScriptInfo(tok.text);
+        const pendingSrc = pendingStressIds.value.get(tok.id);
         const snap: WordSnapshot = {
           text: tok.text,
           stressIndex: tok.stressIndex,
           lang: wordLanguages.value.get(tok.id),
           confirmed: lockedLanguage !== null || confirmedWords.value.has(tok.id),
+          ...(pendingSrc !== undefined ? { pendingSource: pendingSrc } : {}),
         };
         prevByPos.set(key, snap);
         // Register first-occurrence text→snap for position-shift fallback
@@ -495,6 +532,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     //            but only when the word text appears exactly once in old doc.
     const newConfirmed = new Set<string>();
     const newLangMap = new Map<string, Language>();
+    const newPendingIds = new Map<string, 'ml' | 'heteronym' | 'variative'>();
     const stressPatches = new Map<string, number | null>(); // newId → stressIndex
 
     // Track which text-based snaps were already consumed by a positional match
@@ -535,6 +573,7 @@ export const usePoetryStore = defineStore('poetry', () => {
           if (snap.stressIndex !== null) stressPatches.set(tok.id, snap.stressIndex);
           if (snap.lang !== undefined) newLangMap.set(tok.id, snap.lang);
           if (snap.confirmed) newConfirmed.add(tok.id);
+          if (snap.pendingSource) newPendingIds.set(tok.id, snap.pendingSource);
         }
         // No matching snap → annotations cleared (word is new or changed)
         wi++;
@@ -565,8 +604,17 @@ export const usePoetryStore = defineStore('poetry', () => {
     document.value = { lines: newLines, tokenIndex: newTokenIndex };
     wordLanguages.value = newLangMap;
     confirmedWords.value = newConfirmed;
+    pendingStressIds.value = newPendingIds;
+    // pendingStressAlts is derived from live resolution, not migrated — reset it
+    pendingStressAlts.value = new Map();
 
-    autoDetectAndStressWords();
+    // Debounce stress resolution — don't run while the user is still typing
+    if (stressDebounceTimer) clearTimeout(stressDebounceTimer);
+    stressDebounceTimer = setTimeout(() => {
+      console.debug('[stress] debounce fired — running sync + async resolve');
+      autoDetectAndStressWords();
+      void resolveAllStressAsync();
+    }, STRESS_DEBOUNCE_MS);
   }
 
   /**
@@ -670,8 +718,9 @@ export const usePoetryStore = defineStore('poetry', () => {
 
     // Build sets of what needs to change before mutating, so we can
     // produce new object references for changed tokens/lines (Vue reactivity).
+    interface StressChange { syllableIndex: number; confirmed: boolean; source: 'monosyllable' | 'db' | 'heteronym' | 'variative' | 'ml'; stresses: number[]; }
     const langChanges = new Map<string, Language>(); // tokenId → new language
-    const stressChanges = new Set<string>(); // tokenId → set stress 0
+    const stressChanges = new Map<string, StressChange>(); // tokenId → resolved stress
 
     lines.forEach((line, lineIdx) => {
       for (const tok of line.tokens) {
@@ -708,12 +757,35 @@ export const usePoetryStore = defineStore('poetry', () => {
           }
         }
 
-        // ── 2. Auto-stress monosyllabic words ─────────────────────────────────
+        // ── 2. Auto-stress via trie resolver ─────────────────────────────────────
         if (tok.stressIndex === null) {
           const effectiveLang = langChanges.get(tok.id) ?? tok.language;
-          if (countVowels(tok.text, effectiveLang) === 1) {
-            stressChanges.add(tok.id);
+          const vowelCount = countVowels(tok.text, effectiveLang);
+          console.debug(`[stress:sync] word="${tok.text}" lang=${effectiveLang} vowels=${vowelCount} resolverReady=${!!stressResolver.value}`);
+
+          if (vowelCount === 1) {
+            // Monosyllable — always confirmed.
+            stressChanges.set(tok.id, { syllableIndex: 0, confirmed: true, source: 'monosyllable', stresses: [] });
+            console.debug(`[stress:sync]   -> monosyllable`);
+          } else if (vowelCount > 1 && effectiveLang === 'ua' && stressResolver.value && appStore.useDbStress) {
+            // Multi-syllable Ukrainian word — synchronous trie lookup.
+            const resolution = stressResolver.value.resolveSync(tok.text);
+            console.debug(`[stress:sync]   -> resolveSync result:`, resolution);
+            if (resolution.syllableIndex !== null) {
+              stressChanges.set(tok.id, {
+                syllableIndex: resolution.syllableIndex,
+                confirmed: resolution.confirmed,
+                source: resolution.source === 'unresolved' ? 'ml' : resolution.source,
+                stresses: resolution.stresses ?? [],
+              });
+            }
+          } else if (vowelCount > 1 && effectiveLang !== 'ua') {
+            console.debug(`[stress:sync]   -> skipped (non-UA lang: ${effectiveLang})`);
+          } else if (vowelCount > 1 && !stressResolver.value) {
+            console.debug(`[stress:sync]   -> skipped (resolver not ready yet)`);
           }
+        } else {
+          console.debug(`[stress:sync] word="${tok.text}" already has stressIndex=${tok.stressIndex} — skipped`);
         }
       } // end for tok
     }); // end lines.forEach
@@ -723,20 +795,34 @@ export const usePoetryStore = defineStore('poetry', () => {
     // Apply changes: produce new ILine/IToken object references so Vue
     // detects prop changes and re-renders LinePanel components.
     const newTokenIndex = new Map(document.value.tokenIndex);
+    const newConfirmedAfterStress = new Set(confirmedWords.value);
+    const newPendingAfterStress = new Map(pendingStressIds.value);
+    const newPendingAltsAfterStress = new Map(pendingStressAlts.value);
     const newLines = document.value.lines.map((line) => {
       let lineChanged = false;
       const newTokens = line.tokens.map((tok) => {
         if (tok.kind !== 'WORD') return tok;
         const newLang = langChanges.get(tok.id);
-        const doStress = stressChanges.has(tok.id);
-        if (!newLang && !doStress) return tok;
+        const sc = stressChanges.get(tok.id);
+        if (!newLang && !sc) return tok;
         const newTok = {
           ...tok,
           language: newLang ?? tok.language,
-          stressIndex: doStress ? 0 : tok.stressIndex,
+          stressIndex: sc !== undefined ? sc.syllableIndex : tok.stressIndex,
         };
         newTokenIndex.set(tok.id, newTok);
-        if (doStress) syllableCache.value.delete(tok.id);
+        if (sc !== undefined) {
+          syllableCache.value.delete(tok.id);
+          if (sc.confirmed) {
+            newConfirmedAfterStress.add(tok.id);
+            newPendingAfterStress.delete(tok.id);
+            newPendingAltsAfterStress.delete(tok.id);
+          } else {
+            const pSrc = sc.source === 'ml' ? 'ml' : sc.source === 'variative' ? 'variative' : 'heteronym';
+            newPendingAfterStress.set(tok.id, pSrc);
+            if (sc.stresses && sc.stresses.length > 1) newPendingAltsAfterStress.set(tok.id, sc.stresses);
+          }
+        }
         lineChanged = true;
         return newTok;
       });
@@ -744,6 +830,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     });
 
     document.value = { lines: newLines, tokenIndex: newTokenIndex };
+    confirmedWords.value = newConfirmedAfterStress;
+    pendingStressIds.value = newPendingAfterStress;
+    pendingStressAlts.value = newPendingAltsAfterStress;
 
     // Auto-confirm lines where every word has unambiguous language
     for (const line of document.value.lines) {
@@ -760,10 +849,12 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
   }
 
-  // Save annotations whenever the document or confirmed set changes
-  watch([() => document.value, () => confirmedWords.value], () => scheduleSaveAnnotations(), {
-    deep: false,
-  });
+  // Save annotations whenever the document, confirmed set, or pending set changes
+  watch(
+    [() => document.value, () => confirmedWords.value, () => pendingStressIds.value],
+    () => scheduleSaveAnnotations(),
+    { deep: false },
+  );
 
   // Watch rawText — debounced auto-detection (skipped if user set language manually)
   watch(rawText, (newText) => {
@@ -777,6 +868,17 @@ export const usePoetryStore = defineStore('poetry', () => {
   watch(documentLanguage, () => {
     syllableCache.value = new Map();
     autoDetectAndStressWords();
+  });
+
+  // When the trie resolver becomes available, re-run stress detection so that
+  // any words that were 'unresolved' on the first sync pass get their stress
+  // filled in (from DB or ML).
+  watch(stressResolver, (newResolver) => {
+    if (newResolver) {
+      autoDetectAndStressWords();
+      // After the sync trie pass, run the async ML pass for any remaining OOV words.
+      void resolveAllStressAsync();
+    }
   });
 
   /**
@@ -826,6 +928,87 @@ export const usePoetryStore = defineStore('poetry', () => {
   // Trigger one immediate save so fresh annotations are in sync
   saveAnnotations();
 
+  /**
+   * Async pass: resolve stress for Ukrainian words that are still unresolved
+   * (stressIndex === null) using the full resolver (sync trie + optional ML).
+   * Only words that didn't get a sync result (OOV) are passed through the
+   * async ML path. Results still needing confirmation are NOT auto-confirmed.
+   */
+  async function resolveAllStressAsync(): Promise<void> {
+    if (!stressResolver.value) {
+      console.debug('[stress:async] resolver not ready — skipping');
+      return;
+    }
+    if (!appStore.useMlStress) {
+      console.debug('[stress:async] ML disabled — skipping');
+      return;
+    }
+    const resolver = stressResolver.value;
+    const unresolvedTokens = allWordTokens.value.filter(t => t.stressIndex === null && t.language === 'ua');
+    console.debug(`[stress:async] starting — ${unresolvedTokens.length} unresolved UA words`);
+
+    const patches = new Map<string, { syllableIndex: number; confirmed: boolean; source: 'ml' | 'heteronym' | 'variative' | 'db'; stresses?: number[] }>();
+
+    for (const tok of allWordTokens.value) {
+      if (tok.stressIndex !== null) {
+        console.debug(`[stress:async] "${tok.text}" already resolved (${tok.stressIndex}) — skip`);
+        continue;
+      }
+      if (tok.language !== 'ua') {
+        console.debug(`[stress:async] "${tok.text}" lang=${tok.language} — skip`);
+        continue;
+      }
+      console.debug(`[stress:async] resolving "${tok.text}"...`);
+      const resolution = await resolver.resolve(tok.text);
+      console.debug(`[stress:async]   -> result:`, resolution);
+      if (resolution.syllableIndex !== null) {
+        patches.set(tok.id, {
+          syllableIndex: resolution.syllableIndex,
+          confirmed: resolution.confirmed,
+          source: resolution.source as 'ml' | 'heteronym' | 'variative' | 'db',
+          stresses: resolution.stresses ?? [],
+        });
+      }
+    }
+
+    console.debug(`[stress:async] patches collected: ${patches.size}`, [...patches.entries()].map(([id, p]) => `${id}→syllable${p.syllableIndex}(${p.source})`));
+    if (patches.size === 0) return;
+
+    const newTokenIndex = new Map(document.value.tokenIndex);
+    const newConfirmed = new Set(confirmedWords.value);
+    const newPending = new Map(pendingStressIds.value);
+    const newAlts = new Map(pendingStressAlts.value);
+    const newLines = document.value.lines.map((line) => {
+      let lineChanged = false;
+      const newTokens = line.tokens.map((tok) => {
+        if (tok.kind !== 'WORD') return tok;
+        const patch = patches.get(tok.id);
+        if (!patch) return tok;
+        const newTok: IWordToken = { ...tok, stressIndex: patch.syllableIndex };
+        newTokenIndex.set(tok.id, newTok);
+        syllableCache.value.delete(tok.id);
+        if (patch.confirmed) {
+          newConfirmed.add(tok.id);
+          newPending.delete(tok.id);
+          newAlts.delete(tok.id);
+        } else {
+          const pSrc = patch.source === 'ml' ? 'ml' : patch.source === 'variative' ? 'variative' : 'heteronym';
+          newPending.set(tok.id, pSrc);
+          if (patch.stresses && patch.stresses.length > 1) newAlts.set(tok.id, patch.stresses);
+        }
+        lineChanged = true;
+        return newTok;
+      });
+      return lineChanged ? { ...line, tokens: newTokens } : line;
+    });
+
+    document.value = { lines: newLines, tokenIndex: newTokenIndex };
+    confirmedWords.value = newConfirmed;
+    pendingStressIds.value = newPending;
+    pendingStressAlts.value = newAlts;
+    for (const line of document.value.lines) tryAutoConfirmLine(line.id);
+  }
+
   return {
     // State
     rawText,
@@ -834,6 +1017,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     documentLanguageManual,
     wordLanguages,
     confirmedWords,
+    pendingStressIds,
+    pendingStressAlts,
     detectionConfidence,
     syllableCache,
     allWordTokens,
@@ -854,6 +1039,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     tryAutoConfirmLine,
     getSyllables,
     autoDetectAndStressWords,
+    resolveAllStressAsync,
     setActiveLineIndex: (idx: number | null) => {
       activeLineIndex.value = idx;
     },

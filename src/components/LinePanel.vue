@@ -17,8 +17,9 @@
               :class="[
                 'lp-char',
                 slot.isVowel ? 'lp-char--vowel' : 'lp-char--consonant',
-                isStressedVowel(tok, slot) ? 'lp-char--stressed' : '',
+                stressClass(tok, slot),
               ]"
+              :title="stressTitle(tok, slot)"
               @click="slot.isVowel ? setStress(tok, slot) : undefined"
               >{{ slot.char }}</span
             >
@@ -116,6 +117,8 @@ import {
   type CharSlot,
 } from 'src/services/poetryEngines/shared/wordVowels';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
+import { LUSCINIA_MODEL_DISPLAY } from 'src/services/stress/lusciniaPredictor';
+import { applyStressMark } from 'ua-word-stress';
 
 const props = defineProps<{ line: ILine }>();
 
@@ -158,6 +161,45 @@ function getCharSlots(tok: IWordToken): CharSlot[] {
 function isStressedVowel(tok: IWordToken, slot: CharSlot): boolean {
   if (!slot.isVowel || tok.stressIndex === null) return false;
   return vowelCharIndex(tok.text, tok.language, tok.stressIndex) === slot.index;
+}
+
+/** CSS class for a char slot: green = confirmed, yellow = heteronym/variative, blue = ML. */
+function stressClass(tok: IWordToken, slot: CharSlot): string {
+  if (!isStressedVowel(tok, slot)) return '';
+  const pending = store.pendingStressIds.get(tok.id);
+  if (!pending) return 'lp-char--stressed';
+  return pending === 'ml' ? 'lp-char--stressed-ml' : 'lp-char--stressed-pending';
+}
+
+/** Build the marked-word label for a single stress position. */
+function markedVariant(word: string, vowelIdx: number): string {
+  // Strip leading/trailing punctuation for display
+  const clean = word.replace(/[^\u0400-\u04FF'\u2019\u02BC]/g, '');
+  return applyStressMark(clean, vowelIdx) ?? clean;
+}
+
+/** Native tooltip text for a stressed vowel slot. */
+function stressTitle(tok: IWordToken, slot: CharSlot): string {
+  if (!slot.isVowel) return '';
+  const pending = store.pendingStressIds.get(tok.id);
+  if (!pending) return '';
+
+  if (pending === 'ml') {
+    return isStressedVowel(tok, slot)
+      ? `ML prediction \u00b7 ${LUSCINIA_MODEL_DISPLAY}`
+      : `Click to override ML prediction`;
+  }
+
+  // heteronym or variative — show both marked variants if available
+  const alts = store.pendingStressAlts.get(tok.id);
+  if (alts && alts.length >= 2) {
+    const variants = alts.map((idx) => markedVariant(tok.text, idx)).join(' / ');
+    const kind = pending === 'variative'
+      ? 'Free variants'
+      : 'Context-dependent stress';
+    return `${kind}: ${variants} \u00b7 click a vowel to choose`;
+  }
+  return 'Multiple stress variants \u00b7 click a vowel to choose';
 }
 
 function setStress(tok: IWordToken, slot: CharSlot) {
@@ -288,6 +330,22 @@ function langCode(lang: Language): string {
     color: #fff !important;
     background: rgba(100, 220, 130, 0.28) !important;
     border-bottom: 2px solid rgba(80, 220, 100, 0.85);
+    font-weight: 600;
+  }
+
+  // Yellow — heteronym: multiple valid stress forms, first one picked automatically
+  &--stressed-pending {
+    color: #fff !important;
+    background: rgba(255, 200, 60, 0.22) !important;
+    border-bottom: 2px solid rgba(240, 180, 30, 0.85);
+    font-weight: 600;
+  }
+
+  // Blue — ML prediction: out-of-vocabulary word, model chose the stress
+  &--stressed-ml {
+    color: #fff !important;
+    background: rgba(60, 150, 255, 0.22) !important;
+    border-bottom: 2px solid rgba(40, 130, 255, 0.85);
     font-weight: 600;
   }
 }
