@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  ua-word-stress: link:../../ua-stress-engine/packages/ua-stress-web
-
 importers:
 
   .:
@@ -54,8 +51,8 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0(onnxruntime-web@1.24.3)
       ua-word-stress:
-        specifier: link:../../ua-stress-engine/packages/ua-stress-web
-        version: link:../../ua-stress-engine/packages/ua-stress-web
+        specifier: ^1.0.0
+        version: 1.0.0
       vue:
         specifier: ^3.5.22
         version: 3.5.25(typescript@5.9.3)
@@ -2766,6 +2763,9 @@ packages:
     resolution: {integrity: sha512-a5fQ92SZjTP4rARVAsrbKzUDTHkzTnl7LC6ejzZanhtasbenuvA29g5s5pBZ83wlcLSEccCdfN5xlQyr5MzyPQ==}
     peerDependencies:
       onnxruntime-web: '>=1.18.0'
+
+  ua-word-stress@1.0.0:
+    resolution: {integrity: sha512-K3sND80HCXR/6W1UoS5YSU3CKjRNe9FKmg1Za0smVzPIOFF6pOGW3pDW2U5TV925iFj3fbKS7E19+PJmx2HzAw==}
 
   ufo@1.6.1:
     resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
@@ -5709,6 +5709,8 @@ snapshots:
   ua-stress-ml@1.0.0(onnxruntime-web@1.24.3):
     dependencies:
       onnxruntime-web: 1.24.3
+
+  ua-word-stress@1.0.0: {}
 
   ufo@1.6.1: {}
 

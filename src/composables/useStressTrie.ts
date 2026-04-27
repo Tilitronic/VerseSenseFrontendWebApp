@@ -41,6 +41,7 @@ export async function initStressTrie(ml: IMlStressPredictor | null = null): Prom
     .catch((err: unknown) => {
       _error.value = err instanceof Error ? err : new Error(String(err));
       _initPromise = null; // allow retry
+      return; // ensure catch handler returns void, not null
     })
     .finally(() => {
       _loading.value = false;
