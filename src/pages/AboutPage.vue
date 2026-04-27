@@ -1,32 +1,166 @@
 <template>
-  <q-page class="row items-center justify-center">
-    <div class="about-container">
-      <h1>About VerseSense</h1>
-      <p>
-        VerseSense is a sophisticated poetry analysis engine designed to help you understand and
-        explore the depths of poetic expression.
-      </p>
-      <h2>Features</h2>
-      <ul>
-        <li>Advanced verse analysis</li>
-        <li>Meter and rhyme detection</li>
-        <li>Semantic analysis</li>
-        <li>Historical context</li>
-      </ul>
-      <q-btn label="Back to Main" color="primary" @click="navigateTo('/')" />
+  <q-page class="about-page q-pa-lg">
+    <div class="about-wrap">
+
+      <!-- ── Hero ──────────────────────────────────────────────────── -->
+      <div class="about-hero q-mb-xl">
+        <div class="about-wordmark">VerseSense</div>
+        <p class="about-tagline">{{ $t('about.tagline') }}</p>
+        <p class="about-intro">{{ $t('about.intro') }}</p>
+      </div>
+
+      <!-- ── Features ──────────────────────────────────────────────── -->
+      <q-card class="about-card q-mb-lg" flat bordered>
+        <q-card-section>
+          <div class="text-h6 q-mb-md">{{ $t('about.featuresTitle') }}</div>
+          <q-list separator>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat1') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat2') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat3') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat4') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat5') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat6') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat7') }}</q-item-section>
+            </q-item>
+            <q-item class="q-py-sm">
+              <q-item-section side top><q-icon name="check_circle" color="positive" /></q-item-section>
+              <q-item-section>{{ $t('about.feat8') }}</q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+
+      <!-- ── Tech stack ─────────────────────────────────────────────── -->
+      <q-card class="about-card q-mb-lg" flat bordered>
+        <q-card-section>
+          <div class="text-h6 q-mb-md">{{ $t('about.techTitle') }}</div>
+          <div class="tech-row">
+            <q-chip color="teal-9" text-color="white" icon="widgets" label="Vue 3" />
+            <q-chip color="primary" text-color="white" icon="layers" label="Quasar Framework" />
+            <q-chip color="blue-8" text-color="white" icon="code" label="TypeScript" />
+            <q-chip color="deep-purple-9" text-color="white" icon="bolt" label="Vite" />
+            <q-chip color="amber-8" text-color="white" icon="store" label="Pinia" />
+            <q-chip color="blue-grey-7" text-color="white" icon="edit_note" label="CodeMirror 6" />
+            <q-chip color="orange-9" text-color="white" icon="memory" label="ONNX Runtime Web" />
+            <q-chip color="green-9" text-color="white" icon="book" label="ua-word-stress" />
+            <q-chip color="blue-9" text-color="white" icon="psychology" label="Luscinia ML" />
+            <q-chip color="indigo-8" text-color="white" icon="translate" label="vue-i18n" />
+            <q-chip color="teal-8" text-color="white" icon="cloud" label="Netlify" />
+          </div>
+        </q-card-section>
+      </q-card>
+
+      <!-- ── Open source ─────────────────────────────────────────────── -->
+      <q-card class="about-card q-mb-xl" flat bordered>
+        <q-card-section>
+          <div class="text-h6 q-mb-sm">{{ $t('about.sourceTitle') }}</div>
+          <p class="text-body2 about-source-text">{{ $t('about.sourceText') }}</p>
+          <q-btn
+            flat
+            no-caps
+            color="primary"
+            icon="open_in_new"
+            :label="$t('about.sourceLink')"
+            href="https://github.com/Tilitronic/VerseSenseFrontendWebApp"
+            target="_blank"
+            rel="noopener noreferrer"
+            type="a"
+          />
+        </q-card-section>
+      </q-card>
+
+      <!-- ── Back ─────────────────────────────────────────────────────── -->
+      <q-btn
+        color="primary"
+        icon="arrow_back"
+        :label="$t('about.backBtn')"
+        @click="$router.push('/')"
+      />
+
     </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
-
-function navigateTo(path: string) {
-  void router.push(path);
-}
+// $t is globally available via vue-i18n globalInjection: true
+// $router is globally available via vue-router
 </script>
+
+<style scoped lang="scss">
+.about-page {
+  min-height: 100%;
+  background: #12121c;
+  color: #e0e0e0;
+}
+
+.about-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+// ── Hero ─────────────────────────────────────────────────────────────────────
+.about-wordmark {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin-bottom: 0.3rem;
+}
+
+.about-tagline {
+  font-size: 1.05rem;
+  color: var(--q-primary);
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.about-intro {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.58);
+  line-height: 1.65;
+  margin: 0;
+}
+
+// ── Cards ─────────────────────────────────────────────────────────────────────
+.about-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.about-source-text {
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 12px;
+}
+
+// ── Tech chip row ─────────────────────────────────────────────────────────────
+.tech-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+</style>
+
 
 <style scoped>
 .about-container {

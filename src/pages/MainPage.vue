@@ -3,7 +3,7 @@
     <!-- ── LEFT: Editor panel ─────────────────────────────────────── -->
     <div class="panel panel--editor">
       <div class="panel__header">
-        <h2 class="panel__title">Poetry Editor</h2>
+        <h2 class="panel__title">{{ $t('editor.title') }}</h2>
         <div class="panel__actions">
           <div class="panel__action-group">
             <!-- Row settings toggle -->
@@ -11,7 +11,7 @@
               v-if="appStore.toolbarMode === 'all'"
               class="editor-settings-btn"
               :class="{ 'editor-settings-btn--active': showRowSettings }"
-              :title="showRowSettings ? 'Hide row settings' : 'Show row settings'"
+              :title="showRowSettings ? $t('editor.rowsHide') : $t('editor.rowsShow')"
               @click="showRowSettings = !showRowSettings"
             >
               <span
@@ -22,7 +22,7 @@
                     : 'editor-settings-btn__dot--pending'
                 "
               />
-              Rows
+              {{ $t('editor.rows') }}
             </button>
 
             <!-- Toolbar mode toggle -->
@@ -40,17 +40,17 @@
             >
               <template #active>
                 <q-icon name="highlight" size="16px" />
-                <q-tooltip>Active line only</q-tooltip>
+                <q-tooltip>{{ $t('editor.activeLineOnly') }}</q-tooltip>
               </template>
               <template #all>
                 <q-icon name="format_list_bulleted" size="16px" />
-                <q-tooltip>Every line</q-tooltip>
+                <q-tooltip>{{ $t('editor.everyLine') }}</q-tooltip>
               </template>
             </q-btn-toggle>
 
             <!-- Word count -->
             <span class="panel__word-count q-ml-xs">
-              {{ wordCount }} word{{ wordCount !== 1 ? 's' : '' }}
+              {{ wordCount }} {{ $t('editor.words') }}
             </span>
 
             <!-- Clear -->
@@ -59,7 +59,7 @@
               dense
               icon="delete_outline"
               color="negative"
-              title="Clear"
+              :title="$t('editor.clear')"
               class="q-ml-xs"
               @click="clearText"
             />
@@ -75,8 +75,8 @@
                 padding="2px 10px"
                 :color="appStore.useDbStress ? 'positive' : 'blue-grey-9'"
                 :text-color="appStore.useDbStress ? 'white' : 'grey-5'"
-                label="Stress DB"
-                :title="appStore.useDbStress ? 'Dictionary enabled' : 'Dictionary disabled'"
+                :label="$t('editor.stressDb')"
+                :title="$t(appStore.useDbStress ? 'editor.stressDbOn' : 'editor.stressDbOff')"
                 @click="appStore.setUseDbStress(!appStore.useDbStress)"
               />
 
@@ -88,8 +88,8 @@
                 padding="2px 10px"
                 :color="appStore.useMlStress ? 'primary' : 'blue-grey-9'"
                 :text-color="appStore.useMlStress ? 'white' : 'grey-5'"
-                label="Stress ML"
-                :title="appStore.useMlStress ? 'ML predictor enabled' : 'ML predictor disabled'"
+                :label="$t('editor.stressMl')"
+                :title="$t(appStore.useMlStress ? 'editor.stressMlOn' : 'editor.stressMlOff')"
                 @click="appStore.setUseMlStress(!appStore.useMlStress)"
               />
 
@@ -108,12 +108,9 @@
                     <q-card-section class="q-pb-xs">
                       <div class="text-subtitle2">
                         <q-icon name="menu_book" size="xs" color="positive" class="q-mr-xs" />
-                        Stress Dictionary (DB)
+                        {{ $t('stressInfo.dbTitle') }}
                       </div>
-                      <div class="text-body2 q-mt-xs">
-                        Lookup via <strong>ua-word-stress</strong> — 2.9 M word forms. Heteronyms
-                        and free stress variants are highlighted in yellow.
-                      </div>
+                      <div class="text-body2 q-mt-xs">{{ $t('stressInfo.dbDesc') }}</div>
                     </q-card-section>
                     <q-card-section class="q-pt-xs">
                       <q-btn
@@ -122,7 +119,7 @@
                         dense
                         size="sm"
                         icon="open_in_new"
-                        label="ua-stress-engine on GitHub"
+                        :label="$t('stressInfo.dbLink')"
                         href="https://github.com/Tilitronic/ua-stress-engine"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -136,14 +133,11 @@
                     <q-card-section class="q-pb-xs">
                       <div class="text-subtitle2">
                         <q-icon name="psychology" size="xs" color="primary" class="q-mr-xs" />
-                        ML Predictor — Luscinia
+                        {{ $t('stressInfo.mlTitle') }}
                       </div>
                       <div class="text-body2 q-mt-xs">
-                        Predicts stress for words not found in the dictionary. Results are
-                        highlighted in blue and require confirmation.
-                        <div class="text-warning q-mt-xs">
-                          ⚠ First use downloads the model (~30 MB).
-                        </div>
+                        {{ $t('stressInfo.mlDesc') }}
+                        <div class="text-warning q-mt-xs">{{ $t('stressInfo.mlWarning') }}</div>
                       </div>
                     </q-card-section>
                     <q-card-section class="q-pt-xs">
@@ -153,7 +147,7 @@
                         dense
                         size="sm"
                         icon="open_in_new"
-                        label="ua-stress-engine on GitHub"
+                        :label="$t('stressInfo.mlLink')"
                         href="https://github.com/Tilitronic/ua-stress-engine"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -178,14 +172,14 @@
     <!-- ── RIGHT: Phonetic panel ──────────────────────────────────── -->
     <div class="panel panel--phonetic">
       <div class="panel__header">
-        <h2 class="panel__title">Patterns Visualization</h2>
+        <h2 class="panel__title">{{ $t('phonetic.title') }}</h2>
         <div class="panel__actions">
           <div class="panel__action-group">
             <!-- Sound web toggle -->
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showSoundWeb }"
-              title="Sound clustering web"
+              :title="$t('phonetic.soundsWebTitle')"
               @click="showSoundWeb = !showSoundWeb"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -201,13 +195,13 @@
                 <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
                 <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
               </svg>
-              Sounds web
+              {{ $t('phonetic.soundsWeb') }}
             </button>
             <!-- Right-align toggle -->
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showAlignRight }"
-              title="Right-align rows (ignore leading tabs)"
+              :title="$t('phonetic.alignRightTitle')"
               @click="showAlignRight = !showAlignRight"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -215,13 +209,13 @@
                 <rect x="6" y="7" width="8" height="2" rx="1" fill="currentColor" />
                 <rect x="4" y="11" width="10" height="2" rx="1" fill="currentColor" />
               </svg>
-              Right
+              {{ $t('phonetic.alignRight') }}
             </button>
             <!-- Rhyme motif detection toggle -->
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showRhymes }"
-              title="Highlight recurring phoneme patterns (rhymes)"
+              :title="$t('phonetic.rhymesHighlightTitle')"
               @click="showRhymes = !showRhymes"
             >
               <svg
@@ -276,7 +270,7 @@
                   A
                 </text>
               </svg>
-              Rhymes highlight
+              {{ $t('phonetic.rhymesHighlight') }}
             </button>
           </div>
           <div class="panel__action-group">
@@ -284,35 +278,35 @@
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showNumBadge }"
-              title="Show / hide row number column"
+              :title="$t('phonetic.rowNumTitle')"
               @click="showNumBadge = !showNumBadge"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <rect x="1" y="1" width="12" height="12" rx="2" fill="currentColor" />
               </svg>
-              Row №
+              {{ $t('phonetic.rowNum') }}
             </button>
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showSylBadge }"
-              title="Show / hide syllable count column"
+              :title="$t('phonetic.syllablesTitle')"
               @click="showSylBadge = !showSylBadge"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <circle cx="7" cy="7" r="6" fill="currentColor" />
               </svg>
-              Syllables
+              {{ $t('phonetic.syllables') }}
             </button>
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showCvBadge }"
-              title="Show / hide C:V ratio column"
+              :title="$t('phonetic.cvRatioTitle')"
               @click="showCvBadge = !showCvBadge"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <polygon points="7,1 13,7 7,13 1,7" fill="currentColor" />
               </svg>
-              C:V ratio
+              {{ $t('phonetic.cvRatio') }}
             </button>
           </div>
           <div class="panel__action-group">
@@ -320,14 +314,14 @@
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showSounds }"
-              title="Show / hide sound-pattern colour highlights"
+              :title="$t('phonetic.soundsColorTitle')"
               @click="showSounds = !showSounds"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <circle cx="5" cy="8" r="3" fill="currentColor" fill-opacity="0.6" />
                 <circle cx="11" cy="8" r="3" fill="currentColor" fill-opacity="0.85" />
               </svg>
-              Sounds highlight
+              {{ $t('phonetic.soundsColor') }}
             </button>
           </div>
           <div class="panel__action-group">
@@ -335,7 +329,7 @@
             <button
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': showRhymesPanel }"
-              title="Open rhyme groups panel"
+              :title="$t('phonetic.rhymesPanelTitle')"
               @click="showRhymesPanel = !showRhymesPanel"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -367,7 +361,7 @@
                   fill-opacity="0.4"
                 />
               </svg>
-              Rhymes panel
+              {{ $t('phonetic.rhymesPanel') }}
             </button>
           </div>
           <div class="panel__action-group">
@@ -377,7 +371,7 @@
               target="_blank"
               rel="noopener"
               class="panel__web-btn panel__web-btn--link"
-              title="Умовні позначення (відкрити в новій вкладці)"
+              :title="$t('phonetic.legendTitle')"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <rect
@@ -401,7 +395,7 @@
                   ?
                 </text>
               </svg>
-              Legend
+              {{ $t('phonetic.legend') }}
             </a>
           </div>
           <div class="panel__action-group">
@@ -409,7 +403,7 @@
             <button
               class="panel__web-btn panel__web-btn--export"
               :disabled="!hasConfirmedLines"
-              :title="exportWithLegend ? 'Export SVG with legend' : 'Export SVG (no legend)'"
+              :title="exportWithLegend ? $t('phonetic.exportSvgLegend') : $t('phonetic.exportSvg')"
               @click="phoneticPanelRef?.exportSvg(exportWithLegend)"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -427,13 +421,13 @@
                   stroke-linecap="round"
                 />
               </svg>
-              Export SVG
+              {{ $t('phonetic.exportSvg') }}
             </button>
             <!-- Sub-setting: include legend in exported SVG -->
             <button
               class="panel__web-btn panel__web-btn--sub"
               :class="{ 'panel__web-btn--active': exportWithLegend }"
-              title="Include legend (умовні позначення) in exported SVG"
+              :title="$t('phonetic.exportLegendTitle')"
               @click="exportWithLegend = !exportWithLegend"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -476,7 +470,7 @@
                   fill-opacity="0.5"
                 />
               </svg>
-              +Legend
+              {{ $t('phonetic.exportLegend') }}
             </button>
           </div>
         </div>
