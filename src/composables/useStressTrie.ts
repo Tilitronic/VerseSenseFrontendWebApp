@@ -28,6 +28,36 @@ const _error = ref<Error | null>(null);
 let _initPromise: Promise<void> | null = null;
 
 /**
+ * Fetch and decompress the trie file, bypassing the deadlock in
+ * UaStressTrie.fromUrl() which writes all compressed bytes then tries to close
+ * the writer before reading — blocking forever when backpressure fills the
+ * DecompressionStream buffer on large files (~80 MB decompressed).
+ *
+ * Strategy:
+ * - If server sends Content-Encoding: gzip the browser has already decompressed;
+ *   pass the buffer straight to fromBuffer().
+ * - Otherwise pipe resp.body through DecompressionStream — this connects the
+ *   readable and writable streams concurrently so backpressure flows correctly.
+ */
+async function _fetchAndParseTrie(url: string): Promise<InstanceType<typeof UaStressTrie>> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`[useStressTrie] HTTP ${resp.status} fetching ${url}`);
+
+  const contentEncoding = resp.headers.get('content-encoding');
+  if (contentEncoding?.toLowerCase().includes('gzip')) {
+    // Browser transparently decompressed — buffer is already raw ctrie bytes.
+    const buf = await resp.arrayBuffer();
+    return UaStressTrie.fromBuffer(buf);
+  }
+
+  // Server sent raw gzip bytes. Use streaming decompression to avoid deadlock.
+  if (!resp.body) throw new Error('[useStressTrie] Response body is null');
+  const decompressed = resp.body.pipeThrough(new DecompressionStream('gzip'));
+  const buf = await new Response(decompressed).arrayBuffer();
+  return UaStressTrie.fromBuffer(buf);
+}
+
+/**
  * Kick off trie loading. Called by the boot file so it starts early.
  * Subsequent calls return the same promise.
  */
@@ -56,7 +86,7 @@ export async function initStressTrie(ml: IMlStressPredictor | null = null): Prom
 
   // Race trie load against a timeout so a silent hang is surfaced in the logs.
   const _trieLoad = Promise.race([
-    UaStressTrie.fromUrl(trieUrl),
+    _fetchAndParseTrie(trieUrl),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('[useStressTrie] trie load timed out after 30 s')), 30_000),
     ),
