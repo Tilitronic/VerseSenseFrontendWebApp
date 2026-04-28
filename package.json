@@ -17,6 +17,7 @@
   "dependencies": {
     "@codemirror/commands": "^6.10.2",
     "@codemirror/language": "^6.12.1",
+    "@codemirror/lint": "^6.9.5",
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.15",
     "@quasar/extras": "^1.16.4",

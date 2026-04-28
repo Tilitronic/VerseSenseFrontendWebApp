@@ -10,6 +10,8 @@ export const useAppStore = defineStore('app', () => {
   const toolbarMode = ref<ToolbarMode>(config.toolbarMode);
   const useDbStress = ref<boolean>(config.useDbStress);
   const useMlStress = ref<boolean>(config.useMlStress);
+  const spellcheckEnabled = ref<boolean>(config.spellcheckEnabled);
+  const ltEnabled = ref<boolean>(config.ltEnabled);
 
   // Update dark mode and sync to localStorage
   function setDarkMode(mode: DarkMode) {
@@ -33,14 +35,28 @@ export const useAppStore = defineStore('app', () => {
     updateLocalConfig({ useMlStress: val });
   }
 
+  function setSpellcheckEnabled(val: boolean) {
+    spellcheckEnabled.value = val;
+    updateLocalConfig({ spellcheckEnabled: val });
+  }
+
+  function setLtEnabled(val: boolean) {
+    ltEnabled.value = val;
+    updateLocalConfig({ ltEnabled: val });
+  }
+
   return {
     darkMode,
     toolbarMode,
     useDbStress,
     useMlStress,
+    spellcheckEnabled,
+    ltEnabled,
     setDarkMode,
     setToolbarMode,
     setUseDbStress,
     setUseMlStress,
+    setSpellcheckEnabled,
+    setLtEnabled,
   };
 });

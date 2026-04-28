@@ -2,7 +2,7 @@
   <div class="poetry-editor" :class="{ 'poetry-editor--all': appStore.toolbarMode === 'all' }">
     <!-- ── CM editor pane ─────────────────────────────────────── -->
     <div class="pe-pane pe-pane--editor" :style="editorPaneStyle">
-      <div class="poetry-editor__cm-wrap">
+      <div class="poetry-editor__cm-wrap" @contextmenu.prevent="onContextMenu">
         <codemirror
           v-model="text"
           :extensions="extensions"
@@ -32,6 +32,19 @@
     >
       <ActiveLineToolbar mode="all" :cm-scroll-top="cmScrollTop" />
     </div>
+
+    <!-- ── Editor context menu ────────────────────────────────── -->
+    <EditorContextMenu
+      :visible="contextMenuVisible"
+      :word="contextMenuWord"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      @close="contextMenuVisible = false"
+      @copy="handleCopy"
+      @cut="handleCut"
+      @paste="handlePaste"
+      @transform="handleTransform"
+    />
   </div>
 </template>
 
@@ -44,19 +57,22 @@ import {
   highlightActiveLine,
   highlightActiveLineGutter,
 } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { indentOnInput } from '@codemirror/language';
 import { keymap, lineNumbers } from '@codemirror/view';
+import { lintGutter } from '@codemirror/lint';
 import { usePoetryStore } from 'src/stores/poetry';
 import { useAppStore } from 'src/stores/app';
 import { EDITOR_FONT_FAMILY } from 'src/constants/fonts';
+import { ltLinter } from 'src/services/lt/ltLinter';
 import {
   poetryEditorExtension,
   setStressStatusEffect,
   type StressLineStatus,
 } from './poetryEditorExtension';
 import ActiveLineToolbar from './ActiveLineToolbar.vue';
+import EditorContextMenu from './EditorContextMenu.vue';
 import type { IWordToken } from 'src/model/Token';
 
 const poetryStore = usePoetryStore();
@@ -224,6 +240,79 @@ const fontTheme = EditorView.theme({
   // Selection
   '.cm-selectionBackground': { background: 'rgba(100,180,255,0.18) !important' },
   '&.cm-focused .cm-selectionBackground': { background: 'rgba(100,180,255,0.25) !important' },
+  // ── Lint / LanguageTool tooltip ───────────────────────────────────────────
+  // CM6 inserts these directly into the editor DOM; they need explicit theming
+  // because Quasar's dark-mode resets don't reach them.
+  '.cm-tooltip': {
+    zIndex: '9999',
+    borderRadius: '6px',
+    border: '1px solid rgba(255,255,255,0.10)',
+    boxShadow: '0 6px 24px rgba(0,0,0,0.65)',
+    background: '#1e2330',
+    color: '#c9d1d9',
+    fontFamily: 'inherit',
+    overflow: 'hidden',
+    maxWidth: '360px',
+  },
+  '.cm-tooltip.cm-tooltip-lint': {
+    padding: '0',
+  },
+  '.cm-diagnostic': {
+    padding: '7px 10px 5px',
+    fontSize: '0.8rem',
+    lineHeight: '1.45',
+    borderLeft: '3px solid transparent',
+  },
+  '.cm-diagnostic + .cm-diagnostic': {
+    borderTop: '1px solid rgba(255,255,255,0.06)',
+  },
+  '.cm-diagnostic-error': { borderLeftColor: '#e57373' },
+  '.cm-diagnostic-warning': { borderLeftColor: '#ffb74d' },
+  '.cm-diagnostic-info': { borderLeftColor: '#64b5f6' },
+  '.cm-diagnosticAction': {
+    display: 'inline-block',
+    margin: '3px 3px 1px 0',
+    padding: '1px 8px',
+    fontSize: '0.75rem',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.14)',
+    borderRadius: '4px',
+    color: '#c9d1d9',
+    cursor: 'pointer',
+    lineHeight: '1.6',
+    verticalAlign: 'middle',
+    fontFamily: 'inherit',
+  },
+  '.cm-diagnosticAction:hover': {
+    background: 'rgba(255,255,255,0.16)',
+  },
+  // Gutter marker
+  '.cm-lint-marker': { cursor: 'help' },
+  // Align the lint gutter column to match the stress-dot gutter geometry
+  '.cm-gutter-lint': { width: '16px' },
+  '.cm-gutter-lint .cm-gutterElement': {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 !important',
+    lineHeight: '1.9',
+  },
+  '.cm-gutter-lint .cm-activeLineGutter': { background: 'transparent !important' },
+  // Scale the marker icon down to match the 7 px stress dot
+  '.cm-lint-marker img, .cm-lint-marker svg': {
+    width: '7px',
+    height: '7px',
+    display: 'block',
+  },
+  // Underline colours
+  '.cm-lintRange-error': {
+    backgroundImage:
+      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 2.5 L2 0.5 L4 2.5 L6 0.5' stroke='%23e57373' fill='none' stroke-width='1.2'/%3E%3C/svg%3E\")",
+  },
+  '.cm-lintRange-warning': {
+    backgroundImage:
+      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 2.5 L2 0.5 L4 2.5 L6 0.5' stroke='%23ffb74d' fill='none' stroke-width='1.2'/%3E%3C/svg%3E\")",
+  },
 });
 
 /**
@@ -315,7 +404,150 @@ const baseExtensions = [
   fontTheme,
 ];
 
-const extensions = baseExtensions;
+// ── Compartments for hot-swappable settings ───────────────────────────────────
+const spellcheckCompartment = new Compartment();
+const ltCompartment = new Compartment();
+const lintGutterCompartment = new Compartment();
+
+function spellcheckExt(enabled: boolean) {
+  return EditorView.contentAttributes.of({ spellcheck: enabled ? 'true' : 'false' });
+}
+
+function ltExt(enabled: boolean) {
+  return enabled ? ltLinter(poetryStore.documentLanguage) : [];
+}
+
+function lintGutterExt(enabled: boolean) {
+  return enabled ? lintGutter() : [];
+}
+
+const extensions = [
+  ...baseExtensions,
+  spellcheckCompartment.of(spellcheckExt(appStore.spellcheckEnabled)),
+  ltCompartment.of(ltExt(appStore.ltEnabled)),
+  lintGutterCompartment.of(lintGutterExt(appStore.ltEnabled)),
+];
+
+// Reconfigure compartments reactively
+watch(
+  () => appStore.spellcheckEnabled,
+  (val) => {
+    cmView.value?.dispatch({
+      effects: spellcheckCompartment.reconfigure(spellcheckExt(val)),
+    });
+  },
+);
+
+watch(
+  () => appStore.ltEnabled,
+  (val) => {
+    cmView.value?.dispatch({
+      effects: [
+        ltCompartment.reconfigure(ltExt(val)),
+        lintGutterCompartment.reconfigure(lintGutterExt(val)),
+      ],
+    });
+  },
+);
+
+// If document language changes while LT is on, reconfigure with updated lang
+watch(
+  () => poetryStore.documentLanguage,
+  () => {
+    if (appStore.ltEnabled) {
+      cmView.value?.dispatch({
+        effects: ltCompartment.reconfigure(ltExt(true)),
+      });
+    }
+  },
+);
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+const contextMenuVisible = ref(false);
+const contextMenuWord = ref<string | null>(null);
+const contextMenuWordRange = ref<{ from: number; to: number } | null>(null);
+const contextMenuX = ref(0);
+const contextMenuY = ref(0);
+
+/** Extract the word (including apostrophes) at a CM document position. */
+function extractWordAtPos(
+  view: EditorView,
+  pos: number,
+): { text: string; from: number; to: number } | null {
+  const line = view.state.doc.lineAt(pos);
+  const offset = pos - line.from;
+  const txt = line.text;
+  const isWordChar = (ch: string) => /[\p{L}'ʼ\u2019]/u.test(ch);
+  let start = offset;
+  let end = offset;
+  while (start > 0 && isWordChar(txt[start - 1]!)) start--;
+  while (end < txt.length && isWordChar(txt[end]!)) end++;
+  if (start === end || !/\p{L}/u.test(txt.slice(start, end))) return null;
+  return { text: txt.slice(start, end), from: line.from + start, to: line.from + end };
+}
+
+function onContextMenu(e: MouseEvent) {
+  const view = cmView.value;
+  if (!view) return;
+  contextMenuX.value = e.clientX;
+  contextMenuY.value = e.clientY;
+  const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+  if (pos !== null) {
+    const result = extractWordAtPos(view, pos);
+    contextMenuWord.value = result?.text ?? null;
+    contextMenuWordRange.value = result ? { from: result.from, to: result.to } : null;
+  } else {
+    contextMenuWord.value = null;
+    contextMenuWordRange.value = null;
+  }
+  contextMenuVisible.value = true;
+}
+
+async function handleCopy() {
+  const view = cmView.value;
+  if (!view) return;
+  const sel = view.state.selection.main;
+  const text =
+    sel.from !== sel.to ? view.state.sliceDoc(sel.from, sel.to) : (contextMenuWord.value ?? '');
+  if (text) await navigator.clipboard.writeText(text);
+}
+
+function handleCut() {
+  const view = cmView.value;
+  const range = contextMenuWordRange.value;
+  const word = contextMenuWord.value;
+  if (!view || !range || !word) return;
+  void navigator.clipboard.writeText(word);
+  view.dispatch({ changes: { from: range.from, to: range.to, insert: '' } });
+}
+
+async function handlePaste() {
+  const view = cmView.value;
+  if (!view) return;
+  try {
+    const text = await navigator.clipboard.readText();
+    const { from, to } = view.state.selection.main;
+    view.dispatch({
+      changes: { from, to, insert: text },
+      selection: { anchor: from + text.length },
+    });
+    view.focus();
+  } catch {
+    // clipboard permission denied — ignore
+  }
+}
+
+function handleTransform(kind: 'capitalize' | 'lowercase' | 'uppercase') {
+  const view = cmView.value;
+  const range = contextMenuWordRange.value;
+  const word = contextMenuWord.value;
+  if (!view || !range || !word) return;
+  let result: string;
+  if (kind === 'capitalize') result = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  else if (kind === 'lowercase') result = word.toLowerCase();
+  else result = word.toUpperCase();
+  view.dispatch({ changes: { from: range.from, to: range.to, insert: result } });
+}
 </script>
 
 <style scoped lang="scss">

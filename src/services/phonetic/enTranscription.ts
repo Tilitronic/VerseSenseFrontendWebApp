@@ -12,8 +12,25 @@
  * (proper nouns, neologisms, unusual spellings).
  */
 
-import { dictionary as CMU } from 'cmu-pronouncing-dictionary';
 import { tokenizeIPA } from './ipaTokenizer';
+
+// ── CMU dictionary — fetched as a JSON asset, never in the module graph ───────
+// The package is a 4.7 MB ESM file; Firefox refuses to execute it when served
+// without a Content-Type header from Vite's pre-bundle cache.  We serve it as
+// /data/cmu-dict.json via the `cmuDictPlugin` Vite plugin instead.
+// Until the fetch resolves, transcribeFromCmu() returns null and calls fall
+// back to the rule-based path transparently.
+let _cmu: Record<string, string> | null = null;
+
+void fetch('/data/cmu-dict.json')
+  .then((r) => r.json())
+  .then((dict) => {
+    _cmu = dict as Record<string, string>;
+  })
+  .catch(() => {
+    // Failed to load CMU dict (e.g. offline, dev server not running plugin).
+    // Rule-based fallback will be used for all English words.
+  });
 
 export interface EnSyllable {
   /** IPA phonetic string for this syllable */
@@ -146,8 +163,9 @@ interface CmuResult {
 }
 
 function transcribeFromCmu(word: string): CmuResult | null {
+  if (!_cmu) return null; // not loaded yet — fall back to rule-based
   const key = word.toLowerCase().replace(/['']/g, "'");
-  const arpabet = (CMU as Record<string, string>)[key];
+  const arpabet = _cmu[key];
   if (!arpabet) return null;
 
   const ipaTokens: string[] = [];

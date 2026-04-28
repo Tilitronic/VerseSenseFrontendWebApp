@@ -4,7 +4,7 @@
 import { defineConfig } from '#q-app/wrappers';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import type { Plugin } from 'vite';
 
 // Absolute path to the pre-compressed ONNX model — sourced from the linked ua-stress-ml package.
@@ -22,6 +22,69 @@ const LUSCINIA_ROUTE = '/models/luscinia.onnx.gz';
  * The stress trie (ua-word-stress) is handled via a `?url` import in useStressTrie.ts;
  * Vite copies the file to the dist/assets folder automatically during build.
  */
+/**
+ * Vite plugin: serve the CMU Pronouncing Dictionary as a plain JSON asset.
+ *
+ * Problem: `cmu-pronouncing-dictionary` is a 4.7 MB ESM object literal.
+ * When Vite pre-bundles it, Firefox refuses to execute it due to a missing
+ * Content-Type header on the cached chunk file.  Keeping it in the module
+ * graph also causes Vue Router to receive a navigation error when the import
+ * fails, producing a black screen.
+ *
+ * Solution: read the dictionary in Node.js at startup, serialize it to JSON,
+ * and serve it as a static asset (`/data/cmu-dict.json`) with the correct
+ * MIME type.  The browser fetches it with a plain `fetch()` call — no Vite
+ * module bundling involved.
+ */
+function cmuDictPlugin(): Plugin {
+  const ROUTE = '/data/cmu-dict.json';
+  let cachedJson: string | null = null;
+
+  function readDict(): string {
+    if (cachedJson) return cachedJson;
+    // The package's index.js is plain ESM that exports a single object.
+    // We read the source and extract the dictionary by requiring the file
+    // as CommonJS via a simple text extraction (the file is a single
+    // `export const dictionary = { … }` with no side effects).
+    const pkgPath = join(
+      fileURLToPath(new URL('.', import.meta.url)),
+      'node_modules/cmu-pronouncing-dictionary/index.js',
+    );
+    const src = readFileSync(pkgPath, 'utf8');
+    // Strip the ESM export prefix to get the bare object literal
+    const objSrc = src.replace(/^export const dictionary\s*=\s*/, '').replace(/;\s*$/, '');
+    // Use Function() to evaluate the object literal in a controlled way
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const dict = new Function(`return (${objSrc})`)() as Record<string, string>;
+    cachedJson = JSON.stringify(dict);
+    return cachedJson;
+  }
+
+  return {
+    name: 'cmu-dict',
+    configureServer(server) {
+      server.middlewares.use(ROUTE, (_req, res) => {
+        try {
+          const json = readDict();
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(json);
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(`[cmu-dict] failed to read CMU dictionary: ${String(err)}`);
+        }
+      });
+    },
+    generateBundle() {
+      try {
+        const json = readDict();
+        this.emitFile({ type: 'asset', fileName: 'data/cmu-dict.json', source: json });
+      } catch (err) {
+        this.warn(`[cmu-dict] CMU dictionary not available: ${String(err)}`);
+      }
+    },
+  };
+}
+
 function lusciniaModelPlugin(): Plugin {
   return {
     name: 'luscinia-model',
@@ -138,11 +201,18 @@ export default defineConfig((ctx) => {
         //   and corrupts the Emscripten output (NS_ERROR_CORRUPTED_CONTENT).
         viteConf.optimizeDeps ??= {};
         viteConf.optimizeDeps.exclude ??= [];
-        viteConf.optimizeDeps.exclude.push('ua-stress-ml', 'ua-word-stress', 'onnxruntime-web');
+        viteConf.optimizeDeps.exclude.push(
+          'ua-stress-ml',
+          'ua-word-stress',
+          'onnxruntime-web',
+          // cmu-pronouncing-dictionary is served as JSON via cmuDictPlugin — not imported as a module.
+          'cmu-pronouncing-dictionary',
+        );
       },
       // viteVuePluginOptions: {},
 
       vitePlugins: [
+        cmuDictPlugin(),
         lusciniaModelPlugin(),
         [
           '@intlify/unplugin-vue-i18n/vite',

@@ -53,6 +53,16 @@
               {{ wordCount }} {{ $t('editor.words') }}
             </span>
 
+            <!-- Copy all -->
+            <q-btn
+              flat
+              dense
+              icon="content_copy"
+              :title="$t('editor.copyAll')"
+              class="q-ml-xs"
+              @click="copyAllText"
+            />
+
             <!-- Clear -->
             <q-btn
               flat
@@ -63,6 +73,82 @@
               class="q-ml-xs"
               @click="clearText"
             />
+
+            <!-- ── Spellcheck / LT toggles ────────────────────── -->
+            <span class="stress-sep" />
+            <q-btn-group unelevated class="stress-source-group">
+              <q-btn
+                no-caps
+                dense
+                size="sm"
+                padding="2px 10px"
+                :color="appStore.spellcheckEnabled ? 'teal-8' : 'blue-grey-9'"
+                :text-color="appStore.spellcheckEnabled ? 'white' : 'grey-5'"
+                :label="$t('editor.spellcheck')"
+                @click="appStore.setSpellcheckEnabled(!appStore.spellcheckEnabled)"
+              >
+                <q-tooltip
+                  anchor="bottom middle"
+                  self="top middle"
+                  :offset="[0, 6]"
+                  style="max-width: 300px"
+                >
+                  <div class="text-body2 q-mb-xs">
+                    {{
+                      $t(
+                        appStore.spellcheckEnabled ? 'editor.spellcheckOn' : 'editor.spellcheckOff',
+                      )
+                    }}
+                  </div>
+                  <div class="text-caption text-grey-4">{{ $t('editor.spellcheckHint') }}</div>
+                  <div class="text-caption q-mt-xs">
+                    <a
+                      href="https://languagetool.org/browserextension"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-teal-3"
+                      style="text-decoration: none"
+                      @click.stop
+                      >{{ $t('editor.ltExtension') }}</a
+                    >
+                  </div>
+                </q-tooltip>
+              </q-btn>
+              <q-btn
+                no-caps
+                dense
+                size="sm"
+                padding="2px 10px"
+                :color="appStore.ltEnabled ? 'deep-orange-8' : 'blue-grey-9'"
+                :text-color="appStore.ltEnabled ? 'white' : 'grey-5'"
+                :label="$t('editor.lt')"
+                @click="appStore.setLtEnabled(!appStore.ltEnabled)"
+              >
+                <q-tooltip
+                  anchor="bottom middle"
+                  self="top middle"
+                  :offset="[0, 6]"
+                  style="max-width: 300px"
+                >
+                  <div class="text-body2 q-mb-xs">
+                    {{ $t(appStore.ltEnabled ? 'editor.ltOn' : 'editor.ltOff') }}
+                  </div>
+                  <div class="text-caption text-grey-4">{{ $t('editor.ltDesc') }}</div>
+                  <div class="text-caption text-grey-5 q-mt-xs">{{ $t('editor.ltRateInfo') }}</div>
+                  <div class="text-caption q-mt-xs">
+                    <a
+                      href="https://languagetool.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-deep-orange-3"
+                      style="text-decoration: none"
+                      @click.stop
+                      >languagetool.org</a
+                    >
+                  </div>
+                </q-tooltip>
+              </q-btn>
+            </q-btn-group>
 
             <!-- ── Stress source toggles ─────────────────────────── -->
             <span class="stress-sep" />
@@ -573,6 +659,12 @@ const toolbarModeModel = computed<ToolbarMode>({
 
 function clearText() {
   poetryStore.setRawText('');
+}
+
+async function copyAllText() {
+  const text = poetryStore.rawText;
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
 }
 </script>
 

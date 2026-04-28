@@ -154,8 +154,13 @@ function toggleConfirmLine() {
   }
 }
 
+/** Strip trailing punctuation from word text for display (keep letters and apostrophes). */
+function wordDisplayText(tok: IWordToken): string {
+  return tok.text.replace(/[^\p{L}'\u02bc\u2019]+$/gu, '');
+}
+
 function getCharSlots(tok: IWordToken): CharSlot[] {
-  return getWordCharSlots(tok.text, tok.language);
+  return getWordCharSlots(wordDisplayText(tok), tok.language);
 }
 
 function isStressedVowel(tok: IWordToken, slot: CharSlot): boolean {

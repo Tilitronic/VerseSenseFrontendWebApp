@@ -9,6 +9,8 @@ export interface LocalConfig {
   useDbStress: boolean;
   useMlStress: boolean;
   locale: MessageLanguages;
+  spellcheckEnabled: boolean;
+  ltEnabled: boolean;
 }
 
 export const DEFAULT_LOCAL_CONFIG: LocalConfig = {
@@ -17,6 +19,8 @@ export const DEFAULT_LOCAL_CONFIG: LocalConfig = {
   useDbStress: true,
   useMlStress: true,
   locale: 'uk',
+  spellcheckEnabled: true,
+  ltEnabled: false,
 };
 
 const LOCAL_STORAGE_KEY = 'localConfig';
@@ -32,13 +36,24 @@ export function getLocalConfig(): LocalConfig {
         parsed['toolbarMode'] === 'active' ? 'active' : DEFAULT_LOCAL_CONFIG.toolbarMode;
       const useDbStress: boolean = parsed['useDbStress'] !== false;
       const useMlStress: boolean = parsed['useMlStress'] !== false;
+      const spellcheckEnabled: boolean = parsed['spellcheckEnabled'] !== false;
+      const ltEnabled: boolean = parsed['ltEnabled'] === true;
       // Accept locale from localConfig; fall back to legacy standalone 'locale' key
       const raw = parsed['locale'] ?? localStorage.getItem('locale');
       const locale: MessageLanguages =
         typeof raw === 'string' && VALID_LOCALES.has(raw)
           ? (raw as MessageLanguages)
           : DEFAULT_LOCAL_CONFIG.locale;
-      return { ...DEFAULT_LOCAL_CONFIG, ...parsed, toolbarMode, useDbStress, useMlStress, locale };
+      return {
+        ...DEFAULT_LOCAL_CONFIG,
+        ...parsed,
+        toolbarMode,
+        useDbStress,
+        useMlStress,
+        spellcheckEnabled,
+        ltEnabled,
+        locale,
+      };
     }
   } catch (error) {
     console.error('Failed to parse localStorage config:', error);
