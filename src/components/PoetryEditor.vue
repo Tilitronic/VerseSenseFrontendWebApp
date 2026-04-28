@@ -2,7 +2,7 @@
   <div class="poetry-editor" :class="{ 'poetry-editor--all': appStore.toolbarMode === 'all' }">
     <!-- ── CM editor pane ─────────────────────────────────────── -->
     <div class="pe-pane pe-pane--editor" :style="editorPaneStyle">
-      <div class="poetry-editor__cm-wrap" @contextmenu.prevent="onContextMenu">
+      <div class="poetry-editor__cm-wrap" :lang="docLang" @contextmenu="onContextMenu">
         <codemirror
           v-model="text"
           :extensions="extensions"
@@ -437,13 +437,20 @@ function spellcheckExt(enabled: boolean) {
   ];
 }
 
-/** Map app Language → BCP-47 tag for the `lang` attribute. */
+/** Map app Language → BCP-47 tag for the `lang` attribute.
+ * Also used on the outer wrapper div so browser extensions (LT, Grammarly)
+ * can detect the language without inspecting deep CM internals.
+ */
 const LANG_BCP47: Record<string, string> = {
   ua: 'uk',
   pl: 'pl',
   'en-us': 'en',
   'en-gb': 'en-GB',
 };
+
+const docLang = computed(() =>
+  appStore.spellcheckEnabled ? (LANG_BCP47[poetryStore.documentLanguage] ?? 'uk') : undefined,
+);
 
 function langExt(language: string) {
   const tag = LANG_BCP47[language] ?? 'uk';
@@ -523,6 +530,9 @@ function extractWordAtPos(
 }
 
 function onContextMenu(e: MouseEvent) {
+  // Ctrl+right-click → let the native browser context menu through
+  if (e.ctrlKey) return;
+  e.preventDefault();
   const view = cmView.value;
   if (!view) return;
   contextMenuX.value = e.clientX;
