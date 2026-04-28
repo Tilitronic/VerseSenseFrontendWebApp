@@ -8,8 +8,8 @@
 
         <!-- Language switcher -->
         <q-btn flat dense no-caps class="lang-btn q-mr-xs" size="sm">
-          <span class="lang-flag">{{ currentLang.flag }}</span>
-          <span class="lang-label q-ml-xs">{{ currentLang.label }}</span>
+          <LangFlag :lang="currentLang.value" class="q-mr-xs" />
+          <span class="lang-label">{{ currentLang.code }}</span>
           <q-icon name="arrow_drop_down" size="16px" />
           <q-menu auto-close anchor="bottom right" self="top right" :offset="[0, 4]">
             <q-list dense style="min-width: 160px">
@@ -22,7 +22,7 @@
                 @click="setLocale(lang.value)"
               >
                 <q-item-section side style="min-width: 28px; padding-right: 6px">
-                  {{ lang.flag }}
+                  <LangFlag :lang="lang.value" />
                 </q-item-section>
                 <q-item-section>{{ lang.label }}</q-item-section>
               </q-item>
@@ -77,6 +77,8 @@ import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import type { MessageLanguages } from 'src/boot/i18n';
+import LangFlag from 'src/components/LangFlag.vue';
+import { updateLocalConfig } from 'src/stores/localConfig';
 
 const router = useRouter();
 const route = useRoute();
@@ -84,22 +86,22 @@ const { locale } = useI18n();
 
 const leftDrawerOpen = ref(false);
 
-const langs: Array<{ value: MessageLanguages; label: string; flag: string }> = [
-  { value: 'uk', label: 'Українська', flag: '🇺🇦' },
-  { value: 'pl', label: 'Polski', flag: '🇵🇱' },
-  { value: 'be', label: 'Беларуская', flag: '🇧🇾' },
-  { value: 'en-US', label: 'English', flag: '🇬🇧' },
+const langs: Array<{ value: MessageLanguages; label: string; code: string }> = [
+  { value: 'uk', label: 'Українська', code: 'UA' },
+  { value: 'pl', label: 'Polski', code: 'PL' },
+  { value: 'be', label: 'Беларуская', code: 'BE' },
+  { value: 'en-US', label: 'English', code: 'EN' },
 ];
 
-const currentLang = computed(
-  () => langs.find((l) => l.value === locale.value) ?? langs[0]!,
-);
+const currentLang = computed(() => langs.find((l) => l.value === locale.value) ?? langs[0]!);
 
 function setLocale(code: MessageLanguages) {
   locale.value = code;
   try {
-    localStorage.setItem('locale', code);
-  } catch { /* SSR safety */ }
+    updateLocalConfig({ locale: code });
+  } catch {
+    /* SSR safety */
+  }
 }
 
 function toggleLeftDrawer() {
@@ -125,13 +127,7 @@ function isActive(path: string): boolean {
   padding: 2px 6px;
 }
 
-.lang-flag {
-  font-size: 1rem;
-  line-height: 1;
-}
-
 .lang-label {
   font-size: 0.72rem;
 }
 </style>
-

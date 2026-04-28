@@ -28,10 +28,12 @@ export default {
   },
   stressInfo: {
     dbTitle: 'Słownik akcentów (DB)',
-    dbDesc: 'Wyszukiwanie w ua-word-stress — 2.9 mln form wyrazowych. Homografy i warianty akcentowe zaznaczone na żółto.',
+    dbDesc:
+      'Wyszukiwanie w ua-word-stress — 2.9 mln form wyrazowych. Homografy i warianty akcentowe zaznaczone na żółto.',
     dbLink: 'ua-stress-engine na GitHub',
     mlTitle: 'Prediktor ML — Luscinia',
-    mlDesc: 'Przewiduje akcent dla słów spoza słownika. Wyniki zaznaczone na niebiesko wymagają potwierdzenia.',
+    mlDesc:
+      'Przewiduje akcent dla słów spoza słownika. Wyniki zaznaczone na niebiesko wymagają potwierdzenia.',
     mlWarning: '⚠ Pierwsze użycie pobiera model (~30 MB).',
     mlLink: 'ua-stress-engine na GitHub',
   },
@@ -62,21 +64,33 @@ export default {
   },
   about: {
     pageTitle: 'O VerseSense',
-    tagline: 'Inteligentna analiza fonetyczna ukraińskiej poezji',
+    tagline: 'Ilościowa i jakościowa analiza oraz wizualizacja wzorców dźwiękowych w poezji',
     backBtn: 'Powrót do edytora',
-    intro: 'VerseSense to otwarte, przeglądarkowe narzędzie do głębokiej analizy fonetycznej i prozodycznej ukraińskiego wiersza. Wklej wiersz, a silnik automatycznie rozpozna akcenty, wygeneruje transkrypcję IPA, wykryje schematy rymów i zwizualizuje strukturę dźwiękową każdej linii.',
+    intro:
+      'VerseSense to otwarte, przeglądarkowe narzędzie do głębokiej analizy ukraińskiego wiersza. Wklej utwór — silnik rozpozna akcenty, wygeneruje transkrypcję IPA, a następnie pójdzie dalej: wykryje i zwizualizuje powtarzające się wzorce dźwiękowe w całym tekście, zmierzy metrum sylabotonicze każdej linii, znajdzie grupy rymów i zbuduje mapę gęstości spółgłosek do samogłosek. Celem jest uwidocznienie dźwiękowej architektury wiersza.',
     featuresTitle: 'Funkcje',
-    feat1: 'Automatyczne rozpoznawanie akcentów — słownik 2.9 mln form wyrazowych (ua-word-stress) z predyktorem ML dla nieznanych słów',
+    feat1:
+      'Automatyczne rozpoznawanie akcentów — słownik 2.9 mln form wyrazowych (ua-word-stress) z predyktorem ML Luscinia dla nieznanych słów',
     feat2: 'Transkrypcja fonetyczna IPA dla każdego słowa',
     feat3: 'Wizualizacja metrum sylabotoniczne dla każdej linii',
-    feat4: 'Wykrywanie rymów i asonansów z podświetlaniem wzorców ABAB / ABBA',
-    feat5: 'Analiza wzorców dźwiękowych z kolorowym kodowaniem IPA',
-    feat6: 'Stosunek spółgłoska:samogłoska (S:G) dla każdej linii',
+    feat4:
+      'Wykrywanie i wizualizacja wzorców dźwiękowych — powtarzające się fonemy kodowane kolorem z wagą według gęstości w całym tekście',
+    feat5: 'Wykrywanie rymów i asonansów z podświetlaniem schematów ABAB / ABBA',
+    feat6:
+      'Stosunek spółgłoska:samogłoska (S:G) dla każdej linii — ilościowa miara gęstości dźwiękowej',
     feat7: 'Eksport SVG wizualizacji fonetycznych',
     feat8: 'W pełni offline — bez serwera, wszystkie obliczenia w przeglądarce',
     techTitle: 'Technologie',
+    stressTitle: 'ua-stress-engine — odrębny projekt open-source',
+    stressText:
+      'Rozpoznawanie akcentów jest wyodrębnione do osobnego projektu open-source. Składa się z dwóch pakietów: ua-word-stress — słownikowe wyszukiwanie po 2.9 mln formach wyrazowych (działa w przeglądarce i Node); ua-stress-ml — prediktor ML {mlModel} dla słów spoza słownika, w tym neologizmów (działa przez ONNX Runtime Web w Web Worker).',
+    stressLink: 'ua-stress-engine na GitHub',
+    demoTitle: 'To jest prototyp',
+    demoText:
+      'Analiza i wizualizacja wzorców dźwiękowych to demonstracyjny prototyp. Wyniki nie zostały zweryfikowane przez językoznawców ani filologów. Część aspektów jest celowo uproszczona lub jeszcze niezaimplementowana: algorytm podziału na sylaby, grupowanie i klasyfikacja dźwięków, wektoryzacja podobieństwa fonetycznego oraz kompatybilność fonetyczna między językami. Wszelkie zastosowania naukowe lub dydaktyczne wymagają niezależnej weryfikacji.',
     sourceTitle: 'Otwarte oprogramowanie',
-    sourceText: 'VerseSense jest wolnym i otwartym oprogramowaniem, opublikowanym na licencji AGPL-3.0.',
-    sourceLink: 'Zobacz na GitHub',
+    sourceText:
+      'VerseSense jest wolnym i otwartym oprogramowaniem, opublikowanym na licencji AGPL-3.0.',
+    sourceLink: 'VerseSense na GitHub',
   },
 };

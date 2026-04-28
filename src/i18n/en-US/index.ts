@@ -28,10 +28,12 @@ export default {
   },
   stressInfo: {
     dbTitle: 'Stress Dictionary (DB)',
-    dbDesc: 'Lookup via ua-word-stress — 2.9 M word forms. Heteronyms and free stress variants highlighted in yellow.',
+    dbDesc:
+      'Lookup via ua-word-stress — 2.9 M word forms. Heteronyms and free stress variants highlighted in yellow.',
     dbLink: 'ua-stress-engine on GitHub',
     mlTitle: 'ML Predictor — Luscinia',
-    mlDesc: 'Predicts stress for words not found in the dictionary. Results highlighted in blue and require confirmation.',
+    mlDesc:
+      'Predicts stress for words not found in the dictionary. Results highlighted in blue and require confirmation.',
     mlWarning: '⚠ First use downloads the model (~30 MB).',
     mlLink: 'ua-stress-engine on GitHub',
   },
@@ -62,21 +64,32 @@ export default {
   },
   about: {
     pageTitle: 'About VerseSense',
-    tagline: 'Intelligent phonetic analysis for Ukrainian poetry',
+    tagline: 'Quantitative and qualitative analysis and visualisation of sound patterns in poetry',
     backBtn: 'Back to Editor',
-    intro: 'VerseSense is a browser-based open-source tool for deep phonetic and prosodic analysis of Ukrainian verse. Paste a poem and the engine automatically resolves word stress, generates IPA transcription, detects rhyme patterns, and visualises the sound structure of every line.',
+    intro:
+      'VerseSense is a browser-based open-source tool for deep analysis of Ukrainian verse. Paste a poem — the engine resolves word stress, generates IPA transcription, and then goes further: it detects and visualises recurring sound patterns across the whole text, measures syllabic metre per line, finds rhyme groups, and gives you a C:V density map. The goal is to make the sonic architecture of a poem visible.',
     featuresTitle: 'Features',
-    feat1: 'Automatic word-stress resolution — 2.9 M word-form dictionary (ua-word-stress) with ML fallback for unknown words',
+    feat1:
+      'Automatic word-stress resolution — 2.9 M word-form dictionary (ua-word-stress) with Luscinia ML fallback for unknown words',
     feat2: 'IPA phonetic transcription for each word',
     feat3: 'Syllabic-accentual metre visualisation per line',
-    feat4: 'Rhyme and assonance detection with ABAB / ABBA pattern highlighting',
-    feat5: 'Sound-pattern analysis with colour-coded IPA notation',
-    feat6: 'C:V (consonant-to-vowel) ratio per line',
+    feat4:
+      'Sound-pattern detection and visualisation — recurring phonemes are colour-coded and weighted by density across the whole text',
+    feat5: 'Rhyme and assonance detection with ABAB / ABBA scheme highlighting',
+    feat6: 'C:V (consonant-to-vowel) ratio per line — quantitative sound-density metric',
     feat7: 'SVG export of phonetic visualisations',
     feat8: 'Fully offline — no server, all computation runs in the browser',
     techTitle: 'Built with',
+    stressTitle: 'ua-stress-engine — a standalone open-source project',
+    stressText:
+      'Word-stress resolution lives in a separate open-source project. It includes two packages: ua-word-stress — a dictionary lookup over 2.9 M word forms (browser and Node compatible); ua-stress-ml — the {mlModel} ML predictor for words outside the dictionary, including neologisms (runs via ONNX Runtime Web in a Web Worker).',
+    stressLink: 'ua-stress-engine on GitHub',
+    demoTitle: 'This is a prototype',
+    demoText:
+      'The sound-pattern analysis and visualisation features are a proof-of-concept demo. Results have not been reviewed or validated by linguists or philologists. Several aspects are intentionally simplified or not yet implemented: the syllabification algorithm, phoneme grouping and classification, phonetic similarity vectorisation, and cross-language phonetic compatibility. Any use in academic or educational contexts requires independent verification.',
     sourceTitle: 'Open source',
-    sourceText: 'VerseSense is free and open-source software, published under the AGPL-3.0 licence.',
-    sourceLink: 'View on GitHub',
+    sourceText:
+      'VerseSense is free and open-source software, published under the AGPL-3.0 licence.',
+    sourceLink: 'VerseSense on GitHub',
   },
 };

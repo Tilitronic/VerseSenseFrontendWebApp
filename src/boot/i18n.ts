@@ -2,6 +2,7 @@ import { defineBoot } from '#q-app/wrappers';
 import { createI18n } from 'vue-i18n';
 
 import messages from 'src/i18n';
+import { getLocalConfig } from 'src/stores/localConfig';
 
 export type MessageLanguages = keyof typeof messages;
 // Type-define 'en-US' as the master schema for the resource
@@ -21,12 +22,13 @@ declare module 'vue-i18n' {
 }
 /* eslint-enable @typescript-eslint/no-empty-object-type */
 
-/** Read persisted locale; fall back to Ukrainian. */
+/** Read persisted locale from unified localConfig; fall back to Ukrainian. */
 const savedLocale = ((): MessageLanguages => {
   try {
-    const v = localStorage.getItem('locale') as MessageLanguages | null;
-    if (v && v in messages) return v;
-  } catch { /* SSR / server-render safety */ }
+    return getLocalConfig().locale;
+  } catch {
+    /* SSR / server-render safety */
+  }
   return 'uk';
 })();
 
