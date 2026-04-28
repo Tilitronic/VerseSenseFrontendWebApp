@@ -6,7 +6,7 @@
         <h2 class="panel__title">{{ $t('editor.title') }}</h2>
         <div class="panel__actions">
           <div class="panel__action-group">
-            <!-- Row settings toggle -->
+            <!-- ── View controls ─────────────────────────────────── -->
             <button
               v-if="appStore.toolbarMode === 'all'"
               class="editor-settings-btn"
@@ -25,7 +25,6 @@
               {{ $t('editor.rows') }}
             </button>
 
-            <!-- Toolbar mode toggle -->
             <q-btn-toggle
               v-model="toolbarModeModel"
               flat
@@ -48,33 +47,7 @@
               </template>
             </q-btn-toggle>
 
-            <!-- Word count -->
-            <span class="panel__word-count q-ml-xs">
-              {{ wordCount }} {{ $t('editor.words') }}
-            </span>
-
-            <!-- Copy all -->
-            <q-btn
-              flat
-              dense
-              icon="content_copy"
-              :title="$t('editor.copyAll')"
-              class="q-ml-xs"
-              @click="copyAllText"
-            />
-
-            <!-- Clear -->
-            <q-btn
-              flat
-              dense
-              icon="delete_outline"
-              color="negative"
-              :title="$t('editor.clear')"
-              class="q-ml-xs"
-              @click="clearText"
-            />
-
-            <!-- ── Spellcheck / LT toggles ────────────────────── -->
+            <!-- ── Spellcheck / LT toggles ───────────────────────── -->
             <span class="stress-sep" />
             <q-btn-group unelevated class="stress-source-group">
               <q-btn
@@ -245,6 +218,27 @@
                 </q-menu>
               </q-btn>
             </q-btn-group>
+
+            <!-- ── Document actions (pushed to right) ────────────── -->
+            <span class="toolbar-spacer" />
+            <span class="panel__word-count">{{ wordCount }} {{ $t('editor.words') }}</span>
+            <q-btn flat dense icon="content_copy" class="q-ml-xs" @click="copyAllText">
+              <q-tooltip anchor="bottom middle" self="top middle" :offset="[0, 6]">
+                {{ $t('editor.copyAll') }}
+              </q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              dense
+              icon="delete_outline"
+              color="negative"
+              class="q-ml-xs"
+              @click="clearText"
+            >
+              <q-tooltip anchor="bottom middle" self="top middle" :offset="[0, 6]">
+                {{ $t('editor.clear') }}
+              </q-tooltip>
+            </q-btn>
           </div>
         </div>
       </div>
@@ -776,7 +770,7 @@ async function copyAllText() {
     align-items: center;
     gap: 6px;
     white-space: nowrap;
-    flex: 0 0 auto;
+    flex: 1 1 auto; // allow the group itself to grow so spacer works
     margin-right: 8px;
     margin-bottom: 6px;
   }
@@ -971,6 +965,11 @@ async function copyAllText() {
   background: rgba(255, 255, 255, 0.12);
   margin: 0 6px;
   flex-shrink: 0;
+}
+
+// Pushes document-action cluster (word count / copy / clear) to the right
+.toolbar-spacer {
+  flex: 1 1 auto;
 }
 
 .stress-source-group {
