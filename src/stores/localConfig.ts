@@ -13,7 +13,7 @@ export interface LocalConfig {
 
 export const DEFAULT_LOCAL_CONFIG: LocalConfig = {
   darkMode: 'auto',
-  toolbarMode: 'active',
+  toolbarMode: 'all',
   useDbStress: true,
   useMlStress: true,
   locale: 'uk',
@@ -29,7 +29,7 @@ export function getLocalConfig(): LocalConfig {
     if (stored) {
       const parsed = JSON.parse(stored) as Record<string, unknown>;
       const toolbarMode: ToolbarMode =
-        parsed['toolbarMode'] === 'all' ? 'all' : DEFAULT_LOCAL_CONFIG.toolbarMode;
+        parsed['toolbarMode'] === 'active' ? 'active' : DEFAULT_LOCAL_CONFIG.toolbarMode;
       const useDbStress: boolean = parsed['useDbStress'] !== false;
       const useMlStress: boolean = parsed['useMlStress'] !== false;
       // Accept locale from localConfig; fall back to legacy standalone 'locale' key
