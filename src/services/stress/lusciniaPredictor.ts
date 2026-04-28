@@ -6,6 +6,7 @@
  */
 
 import type { IMlStressPredictor } from './types';
+import { mlLog } from 'src/services/logging';
 
 /** Human-readable display name shown in UI tooltips. */
 export const LUSCINIA_MODEL_DISPLAY = 'Luscinia LGBMv1';
@@ -41,7 +42,7 @@ export class LusciniaPredictor implements IMlStressPredictor {
     this.modelReady = new Promise<void>((resolve) => {
       this._modelReadyResolve = resolve;
     });
-    console.debug('[LusciniaPredictor] created with modelUrl:', modelUrl);
+    mlLog.info('loading neural stress model…');
     // Eagerly spawn the worker and start model loading immediately.
     this.getWorker();
   }
@@ -101,7 +102,7 @@ export class LusciniaPredictor implements IMlStressPredictor {
     if (signal?.aborted) return null;
 
     const id = String(this.nextId++);
-    console.debug(`[LusciniaPredictor] predict id=${id} word="${word}"`);
+    mlLog.debug(`queued inference for “${word}”`);
     return new Promise<number | null>((resolve) => {
       this.pending.set(id, { resolve });
       this.getWorker().postMessage({ type: 'infer', id, word, modelUrl: this.modelUrl });
@@ -110,7 +111,7 @@ export class LusciniaPredictor implements IMlStressPredictor {
         'abort',
         () => {
           if (this.pending.has(id)) {
-            console.debug(`[LusciniaPredictor] id=${id} aborted — dropping result`);
+            mlLog.debug(`inference for “${word}” cancelled`);
             this.pending.delete(id);
             resolve(null);
           }

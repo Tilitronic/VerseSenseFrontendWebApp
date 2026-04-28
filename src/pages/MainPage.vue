@@ -707,6 +707,11 @@ function clearText() {
     }
   }
 
+  &__activity {
+    flex-shrink: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
   &__split-main {
     flex: 1;
     min-width: 0;

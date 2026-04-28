@@ -12,6 +12,7 @@ import { ref, shallowRef, readonly, markRaw } from 'vue';
 import { UaStressTrie } from 'ua-word-stress';
 import { UaStressResolver } from 'src/services/stress/uaStressResolver';
 import type { IMlStressPredictor } from 'src/services/stress/types';
+import { trieLog } from 'src/services/logging';
 
 // Import the trie data file as a URL so Vite handles it as a static asset.
 // In dev, Vite resolves this to /@fs/...ctrie.gz (served from node_modules).
@@ -40,12 +41,12 @@ export async function initStressTrie(ml: IMlStressPredictor | null = null): Prom
 
   _initPromise = UaStressTrie.fromUrl(trieUrl)
     .then((trie) => {
-      console.debug('[useStressTrie] trie loaded successfully, wordCount =', trie.wordCount);
+      trieLog.info(`trie loaded — ${trie.wordCount.toLocaleString()} word forms`, trieUrl);
       _resolver.value = markRaw(new UaStressResolver(trie, ml));
     })
     .catch((err: unknown) => {
       _error.value = err instanceof Error ? err : new Error(String(err));
-      console.error('[useStressTrie] trie load FAILED — trieUrl was:', trieUrl, err);
+      trieLog.error('trie load FAILED', trieUrl, err);
       _initPromise = null; // allow retry
     })
     .finally(() => {

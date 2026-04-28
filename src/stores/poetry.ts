@@ -1,4 +1,4 @@
-/**
+﻿/**
  * poetry.ts — Pinia store
  *
  * Holds the raw poem text, detected document-level language, and per-word
@@ -26,6 +26,7 @@ import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
 import { useStressTrie } from 'src/composables/useStressTrie';
 import { useAppStore } from 'src/stores/app';
+import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
 
 const STORAGE_KEY_TEXT = 'verseSense_poemText';
 const STORAGE_KEY_DOC_LANG = 'verseSense_docLanguage';
@@ -616,7 +617,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     // Debounce stress resolution — don't run while the user is still typing
     if (stressDebounceTimer) clearTimeout(stressDebounceTimer);
     stressDebounceTimer = setTimeout(() => {
-      console.debug('[stress] debounce fired — running sync + async resolve');
+      stressSyncLog.debug('debounce fired — running sync + async resolve');
       autoDetectAndStressWords();
       void resolveAllStressAsync();
     }, STRESS_DEBOUNCE_MS);
@@ -771,8 +772,8 @@ export const usePoetryStore = defineStore('poetry', () => {
         if (tok.stressIndex === null) {
           const effectiveLang = langChanges.get(tok.id) ?? tok.language;
           const vowelCount = countVowels(tok.text, effectiveLang);
-          console.debug(
-            `[stress:sync] word="${tok.text}" lang=${effectiveLang} vowels=${vowelCount} resolverReady=${!!stressResolver.value}`,
+          stressSyncLog.debug(
+            `word="${tok.text}" lang=${effectiveLang} vowels=${vowelCount} resolverReady=${!!stressResolver.value}`,
           );
 
           if (vowelCount === 1) {
@@ -783,7 +784,7 @@ export const usePoetryStore = defineStore('poetry', () => {
               source: 'monosyllable',
               stresses: [],
             });
-            console.debug(`[stress:sync]   -> monosyllable`);
+            stressSyncLog.debug('monosyllable — auto-stressed');
           } else if (
             vowelCount > 1 &&
             effectiveLang === 'ua' &&
@@ -792,7 +793,9 @@ export const usePoetryStore = defineStore('poetry', () => {
           ) {
             // Multi-syllable Ukrainian word — synchronous trie lookup.
             const resolution = stressResolver.value.resolveSync(tok.text);
-            console.debug(`[stress:sync]   -> resolveSync result:`, resolution);
+            stressSyncLog.debug(
+              `resolveSync result: syllable ${resolution.syllableIndex} (${resolution.source})`,
+            );
             if (resolution.syllableIndex !== null) {
               stressChanges.set(tok.id, {
                 syllableIndex: resolution.syllableIndex,
@@ -802,13 +805,13 @@ export const usePoetryStore = defineStore('poetry', () => {
               });
             }
           } else if (vowelCount > 1 && effectiveLang !== 'ua') {
-            console.debug(`[stress:sync]   -> skipped (non-UA lang: ${effectiveLang})`);
+            stressSyncLog.debug(`skipped (non-UA lang: ${effectiveLang})`);
           } else if (vowelCount > 1 && !stressResolver.value) {
-            console.debug(`[stress:sync]   -> skipped (resolver not ready yet)`);
+            stressSyncLog.debug('skipped (resolver not ready yet)');
           }
         } else {
-          console.debug(
-            `[stress:sync] word="${tok.text}" already has stressIndex=${tok.stressIndex} — skipped`,
+          stressSyncLog.debug(
+            `word="${tok.text}" already has stressIndex=${tok.stressIndex} — skipped`,
           );
         }
       } // end for tok
@@ -976,18 +979,20 @@ export const usePoetryStore = defineStore('poetry', () => {
     const signal = ctl.signal;
 
     if (!stressResolver.value) {
-      console.debug('[stress:async] resolver not ready — skipping');
+      stressAsyncLog.debug('resolver not ready — skipping');
       return;
     }
     if (!appStore.useMlStress) {
-      console.debug('[stress:async] ML disabled — skipping');
+      stressAsyncLog.debug('ML disabled — skipping');
       return;
     }
     const resolver = stressResolver.value;
     const unresolvedTokens = allWordTokens.value.filter(
       (t) => t.stressIndex === null && t.language === 'ua',
     );
-    console.debug(`[stress:async] starting — ${unresolvedTokens.length} unresolved UA words`);
+    stressAsyncLog.info(
+      `accenting ${unresolvedTokens.length} word${unresolvedTokens.length === 1 ? '' : 's'} via neural model…`,
+    );
 
     const patches = new Map<
       string,
@@ -1001,23 +1006,23 @@ export const usePoetryStore = defineStore('poetry', () => {
 
     for (const tok of allWordTokens.value) {
       if (signal.aborted) {
-        console.debug('[stress:async] aborted — stopping loop early');
+        stressAsyncLog.debug('aborted — stopping');
         return;
       }
       if (tok.stressIndex !== null) {
-        console.debug(`[stress:async] "${tok.text}" already resolved (${tok.stressIndex}) — skip`);
+        stressAsyncLog.debug(`"${tok.text}" already resolved (${tok.stressIndex}) — skip`);
         continue;
       }
       if (tok.language !== 'ua') {
-        console.debug(`[stress:async] "${tok.text}" lang=${tok.language} — skip`);
+        stressAsyncLog.debug(`"${tok.text}" lang=${tok.language} — skip`);
         continue;
       }
       const textAtDispatch = tok.text;
-      console.debug(`[stress:async] resolving "${tok.text}"...`);
+      stressAsyncLog.info(`accenting “${tok.text}”…`);
       const resolution = await resolver.resolve(tok.text, signal);
 
       if (signal.aborted) {
-        console.debug('[stress:async] aborted while awaiting resolve — stopping');
+        stressAsyncLog.debug('aborted while awaiting resolve — stopping');
         return;
       }
 
@@ -1025,13 +1030,13 @@ export const usePoetryStore = defineStore('poetry', () => {
       const currentTok = document.value.tokenIndex.get(tok.id);
       const currentWord = currentTok?.kind === 'WORD' ? currentTok : null;
       if (!currentWord || currentWord.text !== textAtDispatch) {
-        console.debug(
-          `[stress:async] "${tok.id}" changed ("${textAtDispatch}" -> "${currentWord?.text ?? 'gone'}") — discarding result`,
-        );
+        stressAsyncLog.debug(`"${tok.id}" changed — discarding result`);
         continue;
       }
 
-      console.debug(`[stress:async]   -> result:`, resolution);
+      stressAsyncLog.debug(
+        `“${tok.text}” → syllable ${resolution.syllableIndex} via ${resolution.source}`,
+      );
       if (resolution.syllableIndex !== null) {
         patches.set(tok.id, {
           syllableIndex: resolution.syllableIndex,
@@ -1042,10 +1047,7 @@ export const usePoetryStore = defineStore('poetry', () => {
       }
     }
 
-    console.debug(
-      `[stress:async] patches collected: ${patches.size}`,
-      [...patches.entries()].map(([id, p]) => `${id}→syllable${p.syllableIndex}(${p.source})`),
-    );
+    stressAsyncLog.info(`accented ${patches.size} word${patches.size === 1 ? '' : 's'}`);
     if (patches.size === 0) return;
 
     const newTokenIndex = new Map(document.value.tokenIndex);
