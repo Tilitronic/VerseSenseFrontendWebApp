@@ -2,6 +2,16 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Serve the gzip-compressed trie with Content-Encoding: gzip so the browser
+# auto-decompresses it transparently. This bypasses ua-word-stress's client-side
+# DecompressionStream path, which deadlocks on large files (9.8 MB compressed →
+# ~80 MB decompressed) when the readable buffer fills before anyone drains it.
+# With Content-Encoding: gzip, fetch(url).arrayBuffer() returns the raw ctrie
+# bytes directly — no DecompressionStream involved.
+/assets/*.gz
+  Content-Type: application/octet-stream
+  Content-Encoding: gzip
+
 # HTML entry point — always revalidate
 /index.html
   Cache-Control: no-cache
