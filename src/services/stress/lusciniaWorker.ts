@@ -38,6 +38,30 @@ if (typeof SharedArrayBuffer === 'undefined') {
 if (import.meta.env.PROD) {
   ort.env.wasm.wasmPaths = '/ort/';
   console.debug('[LusciniaWorker] PROD — ort.env.wasm.wasmPaths = /ort/');
+
+  // Diagnostic: check which WASM binaries are actually reachable at /ort/.
+  // numThreads=1 may cause ort to load the non-threaded binary (ort-wasm-simd.wasm)
+  // instead of ort-wasm-simd-threaded.wasm — if that file is missing we get a
+  // 200 HTML SPA-fallback response which is not valid WASM → silent hang.
+  const wasmCandidates = [
+    'ort-wasm-simd-threaded.wasm',
+    'ort-wasm-simd.wasm',
+    'ort-wasm.wasm',
+    'ort-wasm-simd-threaded.mjs',
+  ];
+  for (const f of wasmCandidates) {
+    void fetch(`/ort/${f}`, { method: 'HEAD' })
+      .then((r) =>
+        console.debug(
+          `[LusciniaWorker] /ort/${f} →`,
+          r.status,
+          r.ok ? 'OK' : 'MISSING/ERROR',
+          'content-type:',
+          r.headers.get('content-type'),
+        ),
+      )
+      .catch((e) => console.error(`[LusciniaWorker] HEAD /ort/${f} failed:`, e));
+  }
 } else {
   console.debug('[LusciniaWorker] DEV — using default ort WASM path resolution');
 }
@@ -71,7 +95,15 @@ function getPredictor(modelUrl: string): Promise<LusciniaPredictor> {
   }
   console.debug('[LusciniaWorker] loading model from', modelUrl);
   currentModelUrl = modelUrl;
-  predictorPromise = LusciniaPredictor.fromUrl(modelUrl, ort, ORT_SESSION_OPTIONS)
+  predictorPromise = Promise.race([
+    LusciniaPredictor.fromUrl(modelUrl, ort, ORT_SESSION_OPTIONS),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('[LusciniaWorker] model load timed out after 30 s')),
+        30_000,
+      ),
+    ),
+  ])
     .then((p) => {
       console.debug('[LusciniaWorker] model loaded successfully');
       return p;

@@ -38,7 +38,31 @@ export async function initStressTrie(ml: IMlStressPredictor | null = null): Prom
   _error.value = null;
   console.debug('[useStressTrie] starting trie load from:', trieUrl);
 
-  _initPromise = UaStressTrie.fromUrl(trieUrl)
+  // Diagnostic: check response headers so we can detect Netlify transparent
+  // gzip-encoding the .gz file (Content-Encoding: gzip → browser decompresses →
+  // DecompressionStream inside ua-word-stress receives raw bytes → hang).
+  void fetch(trieUrl, { method: 'HEAD' })
+    .then((r) =>
+      console.debug('[useStressTrie] HEAD response:', {
+        status: r.status,
+        ok: r.ok,
+        contentType: r.headers.get('content-type'),
+        contentEncoding: r.headers.get('content-encoding'),
+        contentLength: r.headers.get('content-length'),
+        cacheControl: r.headers.get('cache-control'),
+      }),
+    )
+    .catch((e) => console.warn('[useStressTrie] HEAD request failed:', e));
+
+  // Race trie load against a timeout so a silent hang is surfaced in the logs.
+  const _trieLoad = Promise.race([
+    UaStressTrie.fromUrl(trieUrl),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('[useStressTrie] trie load timed out after 30 s')), 30_000),
+    ),
+  ]);
+
+  _initPromise = _trieLoad
     .then((trie) => {
       console.debug('[useStressTrie] trie loaded successfully, wordCount =', trie.wordCount);
       _resolver.value = markRaw(new UaStressResolver(trie, ml));
