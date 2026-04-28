@@ -24,7 +24,7 @@ export default {
     spellcheckOn: 'Browser spellcheck enabled',
     spellcheckOff: 'Browser spellcheck disabled',
     spellcheckHint:
-      'The browser checks spelling using its own dictionaries or the LanguageTool extension — which is more accurate than the public API.',
+      'Hides browser spell-check underlines. The LanguageTool extension always detects this field regardless of this toggle.',
     lt: 'LT',
     ltOn: 'LanguageTool API enabled',
     ltOff: 'LanguageTool API disabled',

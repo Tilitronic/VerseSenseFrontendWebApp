@@ -24,7 +24,7 @@ export default {
     spellcheckOn: 'Sprawdzanie pisowni przeglądarki włączone',
     spellcheckOff: 'Sprawdzanie pisowni przeglądarki wyłączone',
     spellcheckHint:
-      'Przeglądarka sprawdza pisownię własnymi słownikami lub rozszerzeniem LanguageTool — dokładniejszym niż publiczne API.',
+      'Ukrywa czerwone podkreślenia przeglądarki. Rozszerzenie LanguageTool zawsze widzi to pole niezależnie od tego przełącznika.',
     lt: 'LT',
     ltOn: 'LanguageTool API włączone',
     ltOff: 'LanguageTool API wyłączone',
