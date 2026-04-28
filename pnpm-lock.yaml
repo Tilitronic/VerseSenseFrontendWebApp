@@ -48,11 +48,11 @@ importers:
         specifier: ^2.16.0
         version: 2.18.6
       ua-stress-ml:
-        specifier: ^1.0.0
-        version: 1.0.0(onnxruntime-web@1.24.3)
+        specifier: ^1.0.1
+        version: 1.0.1(onnxruntime-web@1.24.3)
       ua-word-stress:
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.1
+        version: 1.0.1
       vue:
         specifier: ^3.5.22
         version: 3.5.25(typescript@5.9.3)
@@ -2759,13 +2759,13 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  ua-stress-ml@1.0.0:
-    resolution: {integrity: sha512-a5fQ92SZjTP4rARVAsrbKzUDTHkzTnl7LC6ejzZanhtasbenuvA29g5s5pBZ83wlcLSEccCdfN5xlQyr5MzyPQ==}
+  ua-stress-ml@1.0.1:
+    resolution: {integrity: sha512-Ttn0rxqozOwECQ3f+PWg6Uque2U9Mk+oI2qQI+gycxt73oj/4LQDJMMarCARBNltsN13fVjWbEHP8LfoLv3deg==}
     peerDependencies:
       onnxruntime-web: '>=1.18.0'
 
-  ua-word-stress@1.0.0:
-    resolution: {integrity: sha512-K3sND80HCXR/6W1UoS5YSU3CKjRNe9FKmg1Za0smVzPIOFF6pOGW3pDW2U5TV925iFj3fbKS7E19+PJmx2HzAw==}
+  ua-word-stress@1.0.1:
+    resolution: {integrity: sha512-S2RktqPqAXPm8j6q/DUV6l01KOm8s90ynY6ZhVMFWOKM+NzdYq53N02Nr3Bf83yqE603tf44t3HmvF8IghPxfQ==}
 
   ufo@1.6.1:
     resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
@@ -5706,11 +5706,11 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  ua-stress-ml@1.0.0(onnxruntime-web@1.24.3):
+  ua-stress-ml@1.0.1(onnxruntime-web@1.24.3):
     dependencies:
       onnxruntime-web: 1.24.3
 
-  ua-word-stress@1.0.0: {}
+  ua-word-stress@1.0.1: {}
 
   ufo@1.6.1: {}
 
