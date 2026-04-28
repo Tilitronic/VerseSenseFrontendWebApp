@@ -31,18 +31,6 @@ function cleanWord(word: string): string {
   return word.replace(/[^\u0400-\u04FF'\u2019\u02BC]/g, '');
 }
 
-/**
- * Returns true if the word contains at least one character that is
- * exclusive to Ukrainian Cyrillic and cannot appear in Russian or Belarusian.
- * Ukrainian-specific code points: і (0456), ї (0457), є (0454), ґ (0491)
- * and their uppercase equivalents.
- * A word that is pure common-Cyrillic (no UA-exclusive letters) is treated
- * as non-Ukrainian and rejected.
- */
-function isUkrainianWord(word: string): boolean {
-  return /[\u0404\u0406\u0407\u0490\u0454\u0456\u0457\u0491]/.test(word);
-}
-
 export class UaStressResolver {
   private readonly trie: UaStressTrie;
   private readonly ml: IMlStressPredictor | null;
@@ -56,13 +44,16 @@ export class UaStressResolver {
    * Resolve the stressed syllable for `word`.
    *
    * `word` may be in any case; it is normalised internally.
+   * Pass an `AbortSignal` to cancel an in-flight ML call when the word changes.
    */
-  async resolve(word: string): Promise<StressResolution> {
-    if (!isUkrainianWord(word)) {
+  async resolve(word: string, signal?: AbortSignal): Promise<StressResolution> {
+    if (signal?.aborted) {
       return { syllableIndex: null, confirmed: false, source: 'unresolved' };
     }
 
     const lower = cleanWord(word).toLowerCase();
+    if (!lower) return { syllableIndex: null, confirmed: false, source: 'unresolved' };
+
     const vowelCount = countVowels(lower);
 
     // ── Rule 1: monosyllable ────────────────────────────────────────────────
@@ -97,7 +88,10 @@ export class UaStressResolver {
 
     // ── Rule 4: ML fallback ─────────────────────────────────────────────────
     if (this.ml !== null) {
-      const predicted = await this.ml.predict(lower);
+      const predicted = await this.ml.predict(lower, signal);
+      if (signal?.aborted) {
+        return { syllableIndex: null, confirmed: false, source: 'unresolved' };
+      }
       if (predicted !== null) {
         const clamped = Math.max(0, Math.min(predicted, vowelCount - 1));
         return { syllableIndex: clamped, confirmed: false, source: 'ml' };
@@ -113,11 +107,9 @@ export class UaStressResolver {
    * Useful when you need an immediate best-guess without waiting for a model.
    */
   resolveSync(word: string): StressResolution {
-    if (!isUkrainianWord(word)) {
-      return { syllableIndex: null, confirmed: false, source: 'unresolved' };
-    }
-
     const lower = cleanWord(word).toLowerCase();
+    if (!lower) return { syllableIndex: null, confirmed: false, source: 'unresolved' };
+
     const vowelCount = countVowels(lower);
 
     if (vowelCount <= 1) {

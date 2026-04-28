@@ -63,6 +63,7 @@ export interface IMlStressPredictor {
   /**
    * Predict the stressed vowel index (0-based) for a word not found in the DB.
    * Return `null` if the model cannot make a prediction.
+   * If `signal` is aborted before the result arrives, resolve with `null`.
    */
-  predict(word: string): Promise<number | null>;
+  predict(word: string, signal?: AbortSignal): Promise<number | null>;
 }

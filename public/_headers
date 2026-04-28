@@ -12,3 +12,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  # Required for SharedArrayBuffer — used by onnxruntime-web threaded WASM backend.
+  # All resources are self-hosted so COEP: require-corp is safe here.
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

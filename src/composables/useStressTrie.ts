@@ -13,8 +13,11 @@ import { UaStressTrie } from 'ua-word-stress';
 import { UaStressResolver } from 'src/services/stress/uaStressResolver';
 import type { IMlStressPredictor } from 'src/services/stress/types';
 
-// Import the data file as a URL so Vite handles content-hashing and copying.
-// Requires `assetsInclude: ['**/*.ctrie.gz']` in Vite config (set in quasar.config.ts).
+// Import the trie data file as a URL so Vite handles it as a static asset.
+// In dev, Vite resolves this to /@fs/...ctrie.gz (served from node_modules).
+// In production, Vite copies it to the dist/assets folder (content-hashed).
+// ua-word-stress must be in optimizeDeps.exclude (quasar.config.ts) so Vite
+// does not pre-bundle it, which would break the ?url asset import.
 import trieUrl from 'ua-word-stress/data/ua_stress.ctrie.gz?url';
 
 // ── Module-level singletons (shared across all composable calls) ──────────────
@@ -33,13 +36,16 @@ export async function initStressTrie(ml: IMlStressPredictor | null = null): Prom
 
   _loading.value = true;
   _error.value = null;
+  console.debug('[useStressTrie] starting trie load from:', trieUrl);
 
   _initPromise = UaStressTrie.fromUrl(trieUrl)
     .then((trie) => {
+      console.debug('[useStressTrie] trie loaded successfully, wordCount =', trie.wordCount);
       _resolver.value = markRaw(new UaStressResolver(trie, ml));
     })
     .catch((err: unknown) => {
       _error.value = err instanceof Error ? err : new Error(String(err));
+      console.error('[useStressTrie] trie load FAILED — trieUrl was:', trieUrl, err);
       _initPromise = null; // allow retry
       return; // ensure catch handler returns void, not null
     })

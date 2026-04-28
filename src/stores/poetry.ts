@@ -954,13 +954,27 @@ export const usePoetryStore = defineStore('poetry', () => {
   // Trigger one immediate save so fresh annotations are in sync
   saveAnnotations();
 
+  // AbortController for the current async stress resolution pass.
+  // Replaced each time resolveAllStressAsync() is called so an in-flight
+  // ML call for a word the user has already edited is silently discarded.
+  let _asyncStressAbort: AbortController | null = null;
+
   /**
    * Async pass: resolve stress for Ukrainian words that are still unresolved
    * (stressIndex === null) using the full resolver (sync trie + optional ML).
    * Only words that didn't get a sync result (OOV) are passed through the
    * async ML path. Results still needing confirmation are NOT auto-confirmed.
+   *
+   * Each new call aborts the previous pass so stale ML results for edited
+   * words are never applied.
    */
   async function resolveAllStressAsync(): Promise<void> {
+    // Abort any previous in-progress async pass.
+    _asyncStressAbort?.abort();
+    const ctl = new AbortController();
+    _asyncStressAbort = ctl;
+    const signal = ctl.signal;
+
     if (!stressResolver.value) {
       console.debug('[stress:async] resolver not ready — skipping');
       return;
@@ -986,6 +1000,10 @@ export const usePoetryStore = defineStore('poetry', () => {
     >();
 
     for (const tok of allWordTokens.value) {
+      if (signal.aborted) {
+        console.debug('[stress:async] aborted — stopping loop early');
+        return;
+      }
       if (tok.stressIndex !== null) {
         console.debug(`[stress:async] "${tok.text}" already resolved (${tok.stressIndex}) — skip`);
         continue;
@@ -994,8 +1012,25 @@ export const usePoetryStore = defineStore('poetry', () => {
         console.debug(`[stress:async] "${tok.text}" lang=${tok.language} — skip`);
         continue;
       }
+      const textAtDispatch = tok.text;
       console.debug(`[stress:async] resolving "${tok.text}"...`);
-      const resolution = await resolver.resolve(tok.text);
+      const resolution = await resolver.resolve(tok.text, signal);
+
+      if (signal.aborted) {
+        console.debug('[stress:async] aborted while awaiting resolve — stopping');
+        return;
+      }
+
+      // Validate the token still exists as a WORD and hasn't been edited since we dispatched.
+      const currentTok = document.value.tokenIndex.get(tok.id);
+      const currentWord = currentTok?.kind === 'WORD' ? currentTok : null;
+      if (!currentWord || currentWord.text !== textAtDispatch) {
+        console.debug(
+          `[stress:async] "${tok.id}" changed ("${textAtDispatch}" -> "${currentWord?.text ?? 'gone'}") — discarding result`,
+        );
+        continue;
+      }
+
       console.debug(`[stress:async]   -> result:`, resolution);
       if (resolution.syllableIndex !== null) {
         patches.set(tok.id, {

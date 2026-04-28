@@ -18,12 +18,25 @@ const LUSCINIA_ROUTE = '/models/luscinia.onnx.gz';
  * Vite plugin: serve the Luscinia ONNX model during dev and emit it as a build asset.
  * The model is gzip-compressed; the browser decompresses it via DecompressionStream
  * in LusciniaPredictor before passing the raw ONNX bytes to onnxruntime-web.
+ *
+ * The stress trie (ua-word-stress) is handled via a `?url` import in useStressTrie.ts;
+ * Vite copies the file to the dist/assets folder automatically during build.
  */
 function lusciniaModelPlugin(): Plugin {
   return {
     name: 'luscinia-model',
-    // Dev server: serve the model from its original location without reading into memory up-front.
     configureServer(server) {
+      // SharedArrayBuffer (required by onnxruntime-web threaded WASM) is only
+      // available when the page is cross-origin isolated. Set COOP+COEP on every
+      // dev-server response via a middleware that runs before Vite's own handlers.
+      // (devServer.headers in quasar.config is a less reliable path for this.)
+      server.middlewares.use((_req, res, next) => {
+        res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+        res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+        next();
+      });
+
+      // Serve the ONNX model from node_modules.
       server.middlewares.use(LUSCINIA_ROUTE, (_req, res) => {
         try {
           res.setHeader('Content-Type', 'application/octet-stream');
@@ -35,7 +48,7 @@ function lusciniaModelPlugin(): Plugin {
         }
       });
     },
-    // Build: emit the model as a static asset under models/.
+    // Build: emit the ONNX model as a static asset under models/.
     generateBundle() {
       try {
         this.emitFile({
@@ -117,12 +130,15 @@ export default defineConfig((ctx) => {
           : [];
         viteConf.assetsInclude = [...existing, '**/*.ctrie.gz', '**/*.onnx.gz', '**/*.onnx'];
 
-        // Exclude ua-stress-ml from Vite's dep pre-bundler so it is always
-        // served directly from node_modules/ua-stress-ml/dist/index.js.
-        // This prevents stale pre-bundle cache from serving an old version.
+        // Exclude heavy packages with binary data files or WASM backends from Vite's
+        // dep pre-bundler. Pre-bundling breaks their internal dynamic imports:
+        // - ua-stress-ml / ua-word-stress: ?url asset imports for data files
+        // - onnxruntime-web: dynamic imports of Emscripten .mjs glue files —
+        //   when pre-bundled, Vite transforms the absolute glue URLs with ?import
+        //   and corrupts the Emscripten output (NS_ERROR_CORRUPTED_CONTENT).
         viteConf.optimizeDeps ??= {};
         viteConf.optimizeDeps.exclude ??= [];
-        viteConf.optimizeDeps.exclude.push('ua-stress-ml');
+        viteConf.optimizeDeps.exclude.push('ua-stress-ml', 'ua-word-stress', 'onnxruntime-web');
       },
       // viteVuePluginOptions: {},
 
@@ -166,6 +182,12 @@ export default defineConfig((ctx) => {
         app: {
           name: 'C:\\Program Files\\Firefox Developer Edition\\firefox.exe',
         },
+      },
+      // Mirror the Netlify _headers COOP/COEP rules so SharedArrayBuffer is
+      // available in dev (required by onnxruntime-web threaded WASM backend).
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
       },
     },
 
