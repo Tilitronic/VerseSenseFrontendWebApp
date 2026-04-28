@@ -51,8 +51,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1(onnxruntime-web@1.24.3)
       ua-word-stress:
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.0.2
+        version: 1.0.2
       vue:
         specifier: ^3.5.22
         version: 3.5.25(typescript@5.9.3)
@@ -2764,8 +2764,8 @@ packages:
     peerDependencies:
       onnxruntime-web: '>=1.18.0'
 
-  ua-word-stress@1.0.1:
-    resolution: {integrity: sha512-S2RktqPqAXPm8j6q/DUV6l01KOm8s90ynY6ZhVMFWOKM+NzdYq53N02Nr3Bf83yqE603tf44t3HmvF8IghPxfQ==}
+  ua-word-stress@1.0.2:
+    resolution: {integrity: sha512-jU+ftWsZ/0Bi6FLr4sIJcs+Qnak37CPyg4m3G5Sj46hHwfqNN53l9Lw3Bg0JATnBs+1MddfE7u/ycnbG+TuMjQ==}
 
   ufo@1.6.1:
     resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
@@ -5710,7 +5710,7 @@ snapshots:
     dependencies:
       onnxruntime-web: 1.24.3
 
-  ua-word-stress@1.0.1: {}
+  ua-word-stress@1.0.2: {}
 
   ufo@1.6.1: {}
 
