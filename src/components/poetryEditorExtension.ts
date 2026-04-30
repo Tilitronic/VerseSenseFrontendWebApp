@@ -41,7 +41,6 @@ class NewlineWidget extends WidgetType {
   toDOM() {
     const span = document.createElement('span');
     span.className = 'cm-poetry-nl';
-    span.textContent = '↵';
     span.setAttribute('aria-hidden', 'true');
     span.setAttribute('contenteditable', 'false');
     return span;
@@ -58,7 +57,6 @@ class TabWidget extends WidgetType {
   toDOM() {
     const span = document.createElement('span');
     span.className = 'cm-poetry-tab';
-    span.textContent = '\u2192'; // →
     span.setAttribute('aria-hidden', 'true');
     span.setAttribute('contenteditable', 'false');
     return span;
@@ -76,7 +74,7 @@ class SpaceWidget extends WidgetType {
   toDOM() {
     const span = document.createElement('span');
     span.className = 'cm-poetry-space';
-    span.textContent = '\u00b7'; // ·
+    span.textContent = ' '; // real space — LT addon and DOM readers see it as a word separator
     span.setAttribute('aria-hidden', 'true');
     span.setAttribute('contenteditable', 'false');
     return span;
@@ -341,29 +339,44 @@ export const stressGutter = gutter({
 
 export const poetryThemeBase = EditorView.baseTheme({
   '.cm-poetry-nl': {
-    color: 'rgba(255,255,255,0.20)',
     fontStyle: 'normal',
     userSelect: 'none',
     '-webkit-user-select': 'none',
     pointerEvents: 'none',
     cursor: 'default',
   },
+  '.cm-poetry-nl::before': {
+    content: "'↵'",
+    color: 'rgba(255,255,255,0.20)',
+  },
   '.cm-poetry-tab': {
-    color: 'rgba(120,180,255,0.45)' /* blue-ish — indentation */,
     userSelect: 'none',
     '-webkit-user-select': 'none',
     pointerEvents: 'none',
     display: 'inline-block',
-    width: '1ch' /* exactly one monofont character cell */,
+    width: '1ch',
     textAlign: 'center',
   },
+  '.cm-poetry-tab::before': {
+    content: "'→'",
+    color: 'rgba(120,180,255,0.45)',
+  },
   '.cm-poetry-space': {
-    color: 'rgba(255,255,255,0.22)' /* grey — word separator */,
     userSelect: 'none',
     '-webkit-user-select': 'none',
     pointerEvents: 'none',
     display: 'inline-block',
-    width: '1ch' /* exactly one monofont character cell */,
+    width: '1ch',
+    textAlign: 'center',
+    color: 'transparent',
+    position: 'relative',
+  },
+  '.cm-poetry-space::before': {
+    content: "'\u00b7'",
+    color: 'rgba(255,255,255,0.22)',
+    position: 'absolute',
+    left: '0',
+    right: '0',
     textAlign: 'center',
   },
   '.cm-stress-gutter': {

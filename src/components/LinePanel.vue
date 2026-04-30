@@ -108,6 +108,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { usePoetryStore } from 'src/stores/poetry';
 import type { IWordToken, ILine } from 'src/model/Token';
 import { LANGUAGE_META, type Language } from 'src/model/Language';
@@ -119,6 +120,8 @@ import {
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { LUSCINIA_MODEL_DISPLAY } from 'src/services/stress/lusciniaPredictor';
 import { applyStressMark } from 'ua-word-stress';
+
+const { t } = useI18n();
 
 const props = defineProps<{ line: ILine }>();
 
@@ -191,18 +194,20 @@ function stressTitle(tok: IWordToken, slot: CharSlot): string {
 
   if (pending === 'ml') {
     return isStressedVowel(tok, slot)
-      ? `ML prediction \u00b7 ${LUSCINIA_MODEL_DISPLAY}`
-      : `Click to override ML prediction`;
+      ? t('stressTooltip.mlPrediction', { model: LUSCINIA_MODEL_DISPLAY })
+      : t('stressTooltip.mlOverride');
   }
 
   // heteronym or variative — show both marked variants if available
   const alts = store.pendingStressAlts.get(tok.id);
   if (alts && alts.length >= 2) {
     const variants = alts.map((idx) => markedVariant(tok.text, idx)).join(' / ');
-    const kind = pending === 'variative' ? 'Free variants' : 'Context-dependent stress';
-    return `${kind}: ${variants} \u00b7 click a vowel to choose`;
+    const kind = t(
+      pending === 'variative' ? 'stressTooltip.freeVariants' : 'stressTooltip.contextDependent',
+    );
+    return t('stressTooltip.variantsHint', { kind, variants });
   }
-  return 'Multiple stress variants \u00b7 click a vowel to choose';
+  return t('stressTooltip.multipleVariants');
 }
 
 function setStress(tok: IWordToken, slot: CharSlot) {

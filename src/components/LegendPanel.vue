@@ -108,8 +108,7 @@
     <div class="lp-demo-notice">
       <span class="lp-demo-notice__badge">Demo</span>
       <span class="lp-demo-notice__text">
-        This is a demo version and may contain inaccuracies in transcription, syllabification, and
-        pattern analysis. Results should not be used as academic sources.
+        {{ $t('legend.demoNotice') }}
       </span>
     </div>
   </div>

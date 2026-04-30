@@ -29,7 +29,7 @@ const savedLocale = ((): MessageLanguages => {
   } catch {
     /* SSR / server-render safety */
   }
-  return 'uk';
+  return 'en-US';
 })();
 
 /** Exported so language-switcher components can call i18n.global.locale.value */

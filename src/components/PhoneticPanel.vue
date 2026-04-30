@@ -118,8 +118,17 @@
       </div>
     </template>
 
-    <!-- Demo badge â always-visible notice in the bottom-right corner -->
-    <div class="pp-demo-badge" title="Demo Version — може містити неточності та похибки">Demo</div>
+    <!-- Demo badge — always-visible notice in the bottom-right corner -->
+    <div class="pp-demo-badge">
+      Demo
+      <q-tooltip anchor="top right" self="bottom right" :offset="[0, 6]" class="pp-demo-tooltip">
+        <div class="pp-demo-tooltip__title">
+          <q-icon name="science" size="16px" color="amber-4" class="q-mr-xs" />
+          {{ $t('about.demoTitle') }}
+        </div>
+        <div class="pp-demo-tooltip__body">{{ $t('about.demoText') }}</div>
+      </q-tooltip>
+    </div>
   </div>
 </template>
 
@@ -478,11 +487,35 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   padding: 2px 6px;
   border: 1px solid rgba(180, 30, 30, 0.25);
   border-radius: 3px;
-  pointer-events: none;
   user-select: none;
   background: rgba(255, 255, 255, 0.85);
   z-index: 20;
   cursor: help;
+}
+
+.pp-demo-tooltip {
+  max-width: 320px;
+  padding: 10px 12px;
+  background: #1e2330;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+
+  &__title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ffd54f;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+  }
+
+  &__body {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: #c9d1d9;
+    white-space: normal;
+  }
 }
 
 // ── grid wrapper (scrollable) ────────────────────────────────────────────────

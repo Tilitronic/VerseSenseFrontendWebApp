@@ -8,7 +8,7 @@
           v-if="settings.hidden.length > 0"
           class="ecm__reveal-btn"
           :class="{ 'ecm__reveal-btn--open': showHiddenPanel }"
-          :title="`${settings.hidden.length} прихованих`"
+          :title="`${settings.hidden.length} ${$t('contextMenu.hiddenCount', { n: settings.hidden.length })}`"
           @click="showHiddenPanel = !showHiddenPanel"
         >
           <span class="material-icons ecm__reveal-icon">visibility_off</span>
@@ -20,27 +20,33 @@
       <div v-if="showHiddenPanel" class="ecm__hidden-panel">
         <div v-for="s in allHiddenSearches" :key="s.key" class="ecm__hidden-row">
           <span class="ecm__hidden-label">{{ s.label }}</span>
-          <button class="ecm__unhide-btn" title="Показати" @click="unhide(s.key)">
+          <button
+            class="ecm__unhide-btn"
+            :title="$t('contextMenu.showHidden')"
+            @click="unhide(s.key)"
+          >
             <span class="material-icons">visibility</span>
           </button>
         </div>
-        <div v-if="allHiddenSearches.length === 0" class="ecm__hidden-empty">Немає прихованих</div>
+        <div v-if="allHiddenSearches.length === 0" class="ecm__hidden-empty">
+          {{ $t('contextMenu.noHidden') }}
+        </div>
       </div>
 
       <!-- ── Group: Text editing ─────────────────────────────────────── -->
-      <div class="ecm__group-title">Редагування</div>
+      <div class="ecm__group-title">{{ $t('contextMenu.groupEdit') }}</div>
       <div class="ecm__action-row">
         <button class="ecm__action-btn" @click="onCopy">
           <span class="material-icons ecm__action-icon">content_copy</span>
-          Копіювати
+          {{ $t('contextMenu.copy') }}
         </button>
         <button class="ecm__action-btn" :disabled="!word" @click="onCut">
           <span class="material-icons ecm__action-icon">content_cut</span>
-          Вирізати
+          {{ $t('contextMenu.cut') }}
         </button>
         <button class="ecm__action-btn" @click="onPaste">
           <span class="material-icons ecm__action-icon">content_paste</span>
-          Вставити
+          {{ $t('contextMenu.paste') }}
         </button>
       </div>
 
@@ -49,23 +55,23 @@
         <button
           class="ecm__case-btn"
           :disabled="!word"
-          title="Перша велика + решта малі"
+          :title="$t('contextMenu.titleCapitalize')"
           @click="doTransform('capitalize')"
         >
-          Аа
+          Aa
         </button>
         <button
           class="ecm__case-btn"
           :disabled="!word"
-          title="Всі малі"
+          :title="$t('contextMenu.titleLowercase')"
           @click="doTransform('lowercase')"
         >
-          аа
+          aa
         </button>
         <button
           class="ecm__case-btn"
           :disabled="!word"
-          title="Всі великі"
+          :title="$t('contextMenu.titleUppercase')"
           @click="doTransform('uppercase')"
         >
           АА
@@ -93,7 +99,9 @@
             />
             {{ s.label }}
           </a>
-          <button class="ecm__hide-btn" title="Сховати" @click="hide(s.key)">×</button>
+          <button class="ecm__hide-btn" :title="$t('contextMenu.hideBtn')" @click="hide(s.key)">
+            ×
+          </button>
         </div>
       </template>
 
@@ -103,18 +111,16 @@
           class="ecm__tab-toggle"
           :class="{ 'ecm__tab-toggle--bg': openInBackground }"
           :title="
-            openInBackground
-              ? 'Фоновий режим: вкладка відкривається, едитор лишається активним'
-              : 'Режим переходу: браузер перемикається до нової вкладки'
+            openInBackground ? $t('contextMenu.bgModeTitle') : $t('contextMenu.focusModeTitle')
           "
           @click.stop="openInBackground = !openInBackground"
         >
           <span class="material-icons ecm__tab-icon">{{
             openInBackground ? 'tab_unselected' : 'open_in_new'
           }}</span>
-          {{ openInBackground ? 'Фон' : 'Перейти' }}
+          {{ openInBackground ? $t('contextMenu.bgModeLabel') : $t('contextMenu.focusModeLabel') }}
         </button>
-        <button class="ecm__close-btn" @click="emit('close')">Закрити</button>
+        <button class="ecm__close-btn" @click="emit('close')">{{ $t('contextMenu.close') }}</button>
       </div>
     </div>
   </Teleport>
@@ -122,7 +128,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { getWordScriptInfo, type WordScriptInfo } from 'src/services/languageDetection/wordScript';
+
+const { t } = useI18n();
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type ShowForFn = (info: WordScriptInfo) => boolean;
@@ -302,11 +311,11 @@ const ALL_SEARCHES: SearchDef[] = [
   },
 ];
 
-const GROUP_DEFS: GroupDef[] = [
-  { id: 'ua-dict', label: '🇺🇦 Словники' },
-  { id: 'translate', label: '🌐 Переклад' },
-  { id: 'web', label: '🔍 Веб' },
-];
+const GROUP_DEFS = computed<GroupDef[]>(() => [
+  { id: 'ua-dict', label: t('contextMenu.groupDictUA') },
+  { id: 'translate', label: t('contextMenu.groupTranslate') },
+  { id: 'web', label: t('contextMenu.groupWeb') },
+]);
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_CHECKED: Record<string, boolean> = Object.fromEntries(
@@ -431,12 +440,14 @@ onUnmounted(() => {
 // ── Visible search groups ─────────────────────────────────────────────────────
 const visibleGroups = computed(() => {
   const info = wordInfo.value;
-  return GROUP_DEFS.map((grp) => ({
-    ...grp,
-    searches: ALL_SEARCHES.filter(
-      (s) => s.group === grp.id && s.showFor(info) && !settings.hidden.includes(s.key),
-    ),
-  })).filter((grp) => grp.searches.length > 0);
+  return GROUP_DEFS.value
+    .map((grp) => ({
+      ...grp,
+      searches: ALL_SEARCHES.filter(
+        (s) => s.group === grp.id && s.showFor(info) && !settings.hidden.includes(s.key),
+      ),
+    }))
+    .filter((grp) => grp.searches.length > 0);
 });
 
 const allHiddenSearches = computed(() =>

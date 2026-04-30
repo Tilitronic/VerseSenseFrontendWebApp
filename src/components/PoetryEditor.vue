@@ -2,7 +2,7 @@
   <div class="poetry-editor" :class="{ 'poetry-editor--all': appStore.toolbarMode === 'all' }">
     <!-- ── CM editor pane ─────────────────────────────────────── -->
     <div class="pe-pane pe-pane--editor" :style="editorPaneStyle">
-      <div class="poetry-editor__cm-wrap" :lang="docLang" @contextmenu="onContextMenu">
+      <div class="poetry-editor__cm-wrap" @contextmenu="onContextMenu">
         <codemirror
           v-model="text"
           :extensions="extensions"
@@ -240,15 +240,6 @@ const fontTheme = EditorView.theme({
   // Selection
   '.cm-selectionBackground': { background: 'rgba(100,180,255,0.18) !important' },
   '&.cm-focused .cm-selectionBackground': { background: 'rgba(100,180,255,0.25) !important' },
-  // When native browser spellcheck is toggled off via "Орфо", suppress the
-  // browser's red squiggles. spellcheck="true" is always kept on the content
-  // div so grammar extensions (LanguageTool) can still detect the field.
-  // ::spelling-error is supported in Firefox; Chrome ignores it (minor UX cost
-  // vs. silently breaking LT extension detection if we set spellcheck="false").
-  '&.cm-native-spell-off .cm-content::spelling-error': {
-    textDecoration: 'none',
-    color: 'inherit',
-  },
   // ── Lint / LanguageTool tooltip ───────────────────────────────────────────
   // CM6 inserts these directly into the editor DOM; they need explicit theming
   // because Quasar's dark-mode resets don't reach them.
@@ -391,6 +382,7 @@ const baseExtensions = [
   keymap.of([insertLiteralTab, ...defaultKeymap, ...historyKeymap]),
   EditorState.tabSize.of(1),
   EditorView.lineWrapping,
+
   // Prevent consecutive spaces (LaTeX/Markdown convention)
   EditorState.transactionFilter.of((tr) => {
     if (!tr.docChanged) return tr;
@@ -415,46 +407,11 @@ const baseExtensions = [
 
 // ── Compartments for hot-swappable settings ───────────────────────────────────
 const spellcheckCompartment = new Compartment();
-const langCompartment = new Compartment();
 const ltCompartment = new Compartment();
 const lintGutterCompartment = new Compartment();
 
-/**
- * The LanguageTool browser extension (and any other grammar extension) detects
- * editable fields by checking for `spellcheck="true"` + a `lang` attribute.
- * If we set `spellcheck="false"`, the extension silently skips the field.
- *
- * Solution: `spellcheck` is ALWAYS "true" so the extension always finds the
- * editor. When the user turns off "Орфо", we instead add a CSS class
- * `.cm-native-spell-off` to the editor root and suppress `::spelling-error`
- * pseudo-element styling (works in Firefox; Chrome ignores the pseudo-element
- * but the underlines are minor noise compared to losing LT extension support).
- */
 function spellcheckExt(enabled: boolean) {
-  return [
-    EditorView.contentAttributes.of({ spellcheck: 'true' }),
-    EditorView.editorAttributes.of(enabled ? {} : { class: 'cm-native-spell-off' }),
-  ];
-}
-
-/** Map app Language → BCP-47 tag for the `lang` attribute.
- * Also used on the outer wrapper div so browser extensions (LT, Grammarly)
- * can detect the language without inspecting deep CM internals.
- */
-const LANG_BCP47: Record<string, string> = {
-  ua: 'uk',
-  pl: 'pl',
-  'en-us': 'en',
-  'en-gb': 'en-GB',
-};
-
-const docLang = computed(() =>
-  appStore.spellcheckEnabled ? (LANG_BCP47[poetryStore.documentLanguage] ?? 'uk') : undefined,
-);
-
-function langExt(language: string) {
-  const tag = LANG_BCP47[language] ?? 'uk';
-  return EditorView.contentAttributes.of({ lang: tag });
+  return EditorView.contentAttributes.of({ spellcheck: enabled ? 'true' : 'false' });
 }
 
 function ltExt(enabled: boolean) {
@@ -468,7 +425,6 @@ function lintGutterExt(enabled: boolean) {
 const extensions = [
   ...baseExtensions,
   spellcheckCompartment.of(spellcheckExt(appStore.spellcheckEnabled)),
-  langCompartment.of(langExt(poetryStore.documentLanguage)),
   ltCompartment.of(ltExt(appStore.ltEnabled)),
   lintGutterCompartment.of(lintGutterExt(appStore.ltEnabled)),
 ];
@@ -478,7 +434,7 @@ watch(
   () => appStore.spellcheckEnabled,
   (val) => {
     cmView.value?.dispatch({
-      effects: spellcheckCompartment.reconfigure(spellcheckExt(val)),
+      effects: [spellcheckCompartment.reconfigure(spellcheckExt(val))],
     });
   },
 );
@@ -495,13 +451,12 @@ watch(
   },
 );
 
-// If document language changes while LT is on, reconfigure with updated lang
+// If document language changes while LT is on, reconfigure the linter
 watch(
   () => poetryStore.documentLanguage,
-  (lang) => {
-    const effects = [langCompartment.reconfigure(langExt(lang))];
-    if (appStore.ltEnabled) effects.push(ltCompartment.reconfigure(ltExt(true)));
-    cmView.value?.dispatch({ effects });
+  () => {
+    if (appStore.ltEnabled)
+      cmView.value?.dispatch({ effects: [ltCompartment.reconfigure(ltExt(true))] });
   },
 );
 

@@ -18,7 +18,7 @@ export const DEFAULT_LOCAL_CONFIG: LocalConfig = {
   toolbarMode: 'all',
   useDbStress: true,
   useMlStress: true,
-  locale: 'uk',
+  locale: 'en-US',
   spellcheckEnabled: true,
   ltEnabled: false,
 };
