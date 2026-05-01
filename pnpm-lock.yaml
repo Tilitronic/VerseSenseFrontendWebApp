@@ -27,8 +27,8 @@ importers:
         specifier: ^1.16.4
         version: 1.17.0
       '@tilitronic/polish-stress-wasm':
-        specifier: ^0.2.1
-        version: 0.2.1
+        specifier: ^0.2.4
+        version: 0.2.4
       axios:
         specifier: ^1.2.1
         version: 1.13.2
@@ -795,9 +795,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tilitronic/polish-stress-wasm@0.2.1':
-    resolution: {integrity: sha512-f1OWDvsqEMzsE8g0M7kVHCWefCH+HkoENz+PMxG6Jb+21vnfqiqjJbaWzZ3aTmTGasqKvl224uOTW3O4QFPQjA==}
-    engines: {node: '>=16.0.0'}
+  '@tilitronic/polish-stress-wasm@0.2.4':
+    resolution: {integrity: sha512-8rNR2NNrRTn4zCGOn2EmXCEx+WjY/hUg/5O6o3FtM9tC+WTuzhaRfdayECPscdGt+wUCLWci1Yrt7HM1MZu83w==}
 
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
@@ -3630,7 +3629,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tilitronic/polish-stress-wasm@0.2.1': {}
+  '@tilitronic/polish-stress-wasm@0.2.4': {}
 
   '@types/body-parser@1.19.6':
     dependencies:

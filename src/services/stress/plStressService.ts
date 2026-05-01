@@ -30,6 +30,48 @@ function normalizeWord(word: string): string {
 }
 
 const POLISH_VOWELS = new Set(['a', 'e', 'i', 'o', 'u', 'y', 'ą', 'ę', 'ó']);
+const POLISH_CONSONANTS = new Set([
+  'b',
+  'c',
+  'ć',
+  'd',
+  'f',
+  'g',
+  'h',
+  'j',
+  'k',
+  'l',
+  'ł',
+  'm',
+  'n',
+  'ń',
+  'p',
+  'q',
+  'r',
+  's',
+  'ś',
+  't',
+  'v',
+  'w',
+  'x',
+  'z',
+  'ź',
+  'ż',
+]);
+
+function isFallbackNucleus(chars: string[], index: number): boolean {
+  const ch = chars[index];
+  if (!ch || !POLISH_VOWELS.has(ch)) return false;
+
+  // In Polish, "i" before another vowel after a consonant often softens and is not a nucleus.
+  if (ch !== 'i') return true;
+
+  const prev = chars[index - 1] ?? '';
+  const next = chars[index + 1] ?? '';
+
+  if (!next || !POLISH_VOWELS.has(next)) return true;
+  return !POLISH_CONSONANTS.has(prev);
+}
 
 function splitPolishWordToSyllables(word: string): string[] {
   if (!word) return [];
@@ -37,7 +79,7 @@ function splitPolishWordToSyllables(word: string): string[] {
   const chars = [...word];
   const vowelIdx: number[] = [];
   for (let i = 0; i < chars.length; i++) {
-    if (POLISH_VOWELS.has(chars[i]!)) vowelIdx.push(i);
+    if (isFallbackNucleus(chars, i)) vowelIdx.push(i);
   }
 
   if (vowelIdx.length === 0) return [word];
