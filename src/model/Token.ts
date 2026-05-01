@@ -6,7 +6,7 @@
  */
 import type { Language } from './Language';
 
-export type TokenKind = 'WORD' | 'GAP' | 'TAB' | 'HYPHEN';
+export type TokenKind = 'WORD' | 'GAP' | 'TAB' | 'HYPHEN' | 'PUNCT';
 
 let _idCounter = 0;
 export function makeId(): string {
@@ -46,7 +46,14 @@ export interface IHyphenToken {
   kind: 'HYPHEN';
 }
 
-export type IToken = IWordToken | IGapToken | ITabToken | IHyphenToken;
+/** Standalone punctuation token, e.g. ',', '.', '„', '”', '!' */
+export interface IPunctToken {
+  id: string;
+  kind: 'PUNCT';
+  text: string;
+}
+
+export type IToken = IWordToken | IGapToken | ITabToken | IHyphenToken | IPunctToken;
 
 // ── Line ──────────────────────────────────────────────────────────────────────
 

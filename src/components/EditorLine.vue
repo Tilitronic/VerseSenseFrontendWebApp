@@ -15,6 +15,9 @@
 
         <!-- WORD -->
         <WordChip v-else-if="token.kind === 'WORD'" :token="token" />
+
+        <!-- PUNCT -->
+        <span v-else-if="token.kind === 'PUNCT'" class="editor-line__punct">{{ token.text }}</span>
       </template>
     </template>
   </div>
@@ -50,6 +53,11 @@ defineProps<{
   &__tab {
     display: inline-block;
     width: 2.5rem;
+  }
+
+  &__punct {
+    display: inline-block;
+    line-height: 1.6;
   }
 }
 </style>

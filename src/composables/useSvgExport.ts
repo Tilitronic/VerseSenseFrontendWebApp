@@ -57,10 +57,6 @@ function esc(s: string): string {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isPunct(text: string): boolean {
-  return !/[\p{L}]/u.test(text);
-}
-
 const VOWEL_RE = /[æɛɪɒʌɑɔəɜʊaeiouаеєиіїоуюя]/i;
 function isVowelTok(tok: string): boolean {
   return VOWEL_RE.test(tok[0] ?? '');
@@ -94,9 +90,7 @@ function buildRows(lines: ILine[], isLineConfirmed: (id: string) => boolean): Gr
 
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li]!;
-    const wordTokens = line.tokens.filter(
-      (t): t is IWordToken => t.kind === 'WORD' && !isPunct(t.text),
-    );
+    const wordTokens = line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
 
     if (line.tokens.length === 0 || (wordTokens.length === 0 && !isLineConfirmed(line.id))) {
       rows.push({ lineIdx: li, kind: 'blank', cells: [] });
@@ -114,7 +108,7 @@ function buildRows(lines: ILine[], isLineConfirmed: (id: string) => boolean): Gr
         cells.push({ type: 'tab' });
         continue;
       }
-      if (tok.kind !== 'WORD' || isPunct(tok.text)) continue;
+      if (tok.kind !== 'WORD') continue;
 
       const tw = transcribeWord(tok);
       for (let si = 0; si < tw.syllables.length; si++) {

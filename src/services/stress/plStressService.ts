@@ -22,7 +22,11 @@ let moduleUnavailable = false;
 let moduleFailureLogged = false;
 
 function normalizeWord(word: string): string {
-  return word.trim().toLowerCase();
+  return word
+    .trim()
+    .toLowerCase()
+    .replace(/^[^\p{L}\p{N}'\u02bc\u2019]+/gu, '')
+    .replace(/[^\p{L}\p{N}'\u02bc\u2019]+$/gu, '');
 }
 
 const POLISH_VOWELS = new Set(['a', 'e', 'i', 'o', 'u', 'y', 'ą', 'ę', 'ó']);

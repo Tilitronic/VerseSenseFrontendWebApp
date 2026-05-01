@@ -207,6 +207,26 @@ describe('getPolishStressInfo – edge cases', () => {
     expect(result).not.toBeNull();
   });
 
+  it('normalizes trailing punctuation before resolving', async () => {
+    const plain = await getPolishStressInfo('matematyka');
+    const punct = await getPolishStressInfo('matematyka.');
+    expect(punct).not.toBeNull();
+    if (!plain || !punct) return;
+    expect(punct.word).toBe('matematyka');
+    expect(punct.syllables).toEqual(plain.syllables);
+    expect(punct.syllableIndex).toBe(plain.syllableIndex);
+  });
+
+  it('normalizes leading and trailing punctuation before resolving', async () => {
+    const plain = await getPolishStressInfo('cześć');
+    const punct = await getPolishStressInfo('„cześć,”');
+    expect(punct).not.toBeNull();
+    if (!plain || !punct) return;
+    expect(punct.word).toBe('cześć');
+    expect(punct.syllables).toEqual(plain.syllables);
+    expect(punct.syllableIndex).toBe(plain.syllableIndex);
+  });
+
   it('AbortSignal already aborted returns null', async () => {
     const controller = new AbortController();
     controller.abort();

@@ -18,6 +18,7 @@ import type {
   IGapToken,
   ITabToken,
   IHyphenToken,
+  IPunctToken,
   IToken,
   ILine,
   IPoetryDocument,
@@ -29,6 +30,96 @@ export function parseDocument(
   rawText: string,
   defaultLanguage: Language = DEFAULT_LANGUAGE,
 ): IPoetryDocument {
+  const WORD_CHAR_RE = /[\p{L}\p{N}]/u;
+  const APOSTROPHE_CHAR_RE = /['\u02BC\u2019]/u;
+
+  function isWordChar(ch: string): boolean {
+    return WORD_CHAR_RE.test(ch);
+  }
+
+  function isApostrophe(ch: string): boolean {
+    return APOSTROPHE_CHAR_RE.test(ch);
+  }
+
+  function chunkHasWordChars(chunk: string): boolean {
+    for (let i = 0; i < chunk.length; i++) {
+      if (isWordChar(chunk[i]!)) return true;
+    }
+    return false;
+  }
+
+  function chunkStartsWithWord(chunk: string, index: number): boolean {
+    return index < chunk.length && isWordChar(chunk[index]!);
+  }
+
+  function tokenizeChunk(chunk: string): IToken[] {
+    const out: IToken[] = [];
+    let i = 0;
+
+    while (i < chunk.length) {
+      const ch = chunk[i]!;
+
+      if (isWordChar(ch)) {
+        let j = i + 1;
+        while (j < chunk.length) {
+          const cur = chunk[j]!;
+          if (isWordChar(cur)) {
+            j++;
+            continue;
+          }
+          if (isApostrophe(cur) && chunkStartsWithWord(chunk, j + 1)) {
+            j += 2;
+            while (j < chunk.length && isWordChar(chunk[j]!)) j++;
+            continue;
+          }
+          break;
+        }
+
+        out.push(
+          addToken<IWordToken>({
+            id: makeId(),
+            kind: 'WORD',
+            text: chunk.slice(i, j),
+            language: defaultLanguage,
+            stressIndex: null,
+          }),
+        );
+        i = j;
+        continue;
+      }
+
+      if (
+        ch === '-' &&
+        out.length > 0 &&
+        out[out.length - 1]!.kind === 'WORD' &&
+        chunkStartsWithWord(chunk, i + 1)
+      ) {
+        out.push(addToken<IHyphenToken>({ id: makeId(), kind: 'HYPHEN' }));
+        i++;
+        continue;
+      }
+
+      let j = i + 1;
+      while (j < chunk.length) {
+        const cur = chunk[j]!;
+        if (isWordChar(cur)) break;
+        if (
+          cur === '-' &&
+          out.length > 0 &&
+          out[out.length - 1]!.kind === 'WORD' &&
+          chunkStartsWithWord(chunk, j + 1)
+        ) {
+          break;
+        }
+        j++;
+      }
+      out.push(addToken<IPunctToken>({ id: makeId(), kind: 'PUNCT', text: chunk.slice(i, j) }));
+      i = j;
+    }
+
+    return out;
+  }
+
   const tokenIndex = new Map<string, IToken>();
 
   function addToken<T extends IToken>(tok: T): T {
@@ -62,59 +153,21 @@ export function parseDocument(
       return { id: lineId, tokens };
     }
 
-    // 4. Split on whitespace runs → chunks, then split each chunk on hyphens
-    // e.g. "Pegging-потяг" → WORD("Pegging") HYPHEN WORD("потяг")
-    // Chunks with no letter characters (e.g. "—", ";") are skipped entirely.
-    const HAS_LETTER = /\p{L}/u;
+    // 4. Split on whitespace runs → chunks.
+    // Each chunk is tokenized into WORD/HYPHEN/PUNCT preserving punctuation.
     const chunks = trimmedLine.split(/\s+/).filter((w) => w.length > 0);
 
-    let wordEmitted = false; // tracks whether any WORD has been emitted (for GAP placement)
+    let emittedAny = false;
     chunks.forEach((chunk) => {
-      // Skip purely punctuation / symbol chunks (no letter content)
-      if (!HAS_LETTER.test(chunk)) return;
+      if (!chunkHasWordChars(chunk) && chunk.trim().length === 0) return;
 
-      // GAP between word-bearing chunks
-      if (wordEmitted) {
+      if (emittedAny) {
         tokens.push(addToken<IGapToken>({ id: makeId(), kind: 'GAP' }));
       }
 
-      // Split the chunk on hyphens, keeping non-empty parts with letter content
-      // A leading/trailing hyphen (e.g. "-word" or "word-") is kept as-is
-      // to avoid creating empty WORD tokens.
-      const parts = chunk.split('-').filter((p) => p.length > 0 && HAS_LETTER.test(p));
-
-      if (parts.length === 0) return; // chunk was all hyphens / punctuation
-
-      if (parts.length <= 1) {
-        // No hyphen — emit single WORD
-        tokens.push(
-          addToken<IWordToken>({
-            id: makeId(),
-            kind: 'WORD',
-            text: chunk,
-            language: defaultLanguage,
-            stressIndex: null,
-          }),
-        );
-        wordEmitted = true;
-      } else {
-        // Multiple parts — emit WORD HYPHEN WORD HYPHEN …
-        parts.forEach((part, partIdx) => {
-          if (partIdx > 0) {
-            tokens.push(addToken<IHyphenToken>({ id: makeId(), kind: 'HYPHEN' }));
-          }
-          tokens.push(
-            addToken<IWordToken>({
-              id: makeId(),
-              kind: 'WORD',
-              text: part,
-              language: defaultLanguage,
-              stressIndex: null,
-            }),
-          );
-        });
-        wordEmitted = true;
-      }
+      const chunkTokens = tokenizeChunk(chunk);
+      for (const t of chunkTokens) tokens.push(t);
+      emittedAny = chunkTokens.length > 0;
     });
 
     return { id: lineId, tokens };
@@ -135,6 +188,7 @@ export function serializeDocument(doc: IPoetryDocument): string {
           if (tok.kind === 'TAB') return '\t';
           if (tok.kind === 'GAP') return ' ';
           if (tok.kind === 'HYPHEN') return '-';
+          if (tok.kind === 'PUNCT') return tok.text;
           return tok.text;
         })
         .join(''),

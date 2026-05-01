@@ -68,7 +68,7 @@
               <div class="pp-cells">
                 <template v-for="tok in line.tokens" :key="tok.id">
                   <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
-                  <template v-else-if="tok.kind === 'WORD' && !isPunctuation(tok.text)">
+                  <template v-else-if="tok.kind === 'WORD'">
                     <template v-for="(syl, si) in transcribedWord(tok).syllables" :key="si">
                       <div
                         class="pp-cell"
@@ -169,14 +169,8 @@ watch(
   },
 );
 
-/** True when a word token is purely punctuation / dash with no phonetic content */
-function isPunctuation(text: string): boolean {
-  // Strip every character that is a letter or apostrophe; if nothing remains → punctuation
-  return !/[\p{L}]/u.test(text);
-}
-
 function wordTokensInLine(line: ILine): IWordToken[] {
-  return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD' && !isPunctuation(t.text));
+  return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
 }
 
 function lineSyllableCount(line: ILine): number {
@@ -264,7 +258,6 @@ const indexedTokens = computed<IndexedToken[]>(() => {
     if (!store.isLineConfirmed(line.id)) continue;
     for (const tok of line.tokens) {
       if (tok.kind !== 'WORD') continue;
-      if (isPunctuation((tok as IWordToken).text)) continue;
       const tw = transcribeWord(tok as IWordToken);
       for (let si = 0; si < tw.syllables.length; si++) {
         const syl = tw.syllables[si]!;

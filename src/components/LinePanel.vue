@@ -6,6 +6,7 @@
         <span v-if="tok.kind === 'TAB'" class="lp-tab" />
         <span v-else-if="tok.kind === 'GAP'" class="lp-gap" />
         <span v-else-if="tok.kind === 'HYPHEN'" class="lp-hyphen" />
+        <span v-else-if="tok.kind === 'PUNCT'" class="lp-punct">{{ tok.text }}</span>
 
         <!-- Word box: chars on top, lang badge/dropdown below, aligned left -->
         <span v-else-if="tok.kind === 'WORD'" class="lp-word">
@@ -189,6 +190,11 @@ function stressedPolishVowelIndex(tok: IWordToken): number | null {
   if (tok.language !== 'pl' || tok.stressIndex === null) return null;
 
   const ranges = polishSyllableRanges(tok);
+  if (ranges.length === 0) {
+    // Fallback: when grapheme-to-syllable ranges cannot be aligned (e.g. due to
+    // transcription length drift), treat stressIndex as vowel ordinal.
+    return vowelCharIndex(wordDisplayText(tok), tok.language, tok.stressIndex);
+  }
   const range = ranges[tok.stressIndex];
   if (!range) return null;
 
@@ -322,7 +328,7 @@ function langCode(lang: Language): string {
 }
 .lp-gap {
   display: inline-block;
-  width: 1ch;
+  width: 0.35em;
 }
 .lp-hyphen {
   // Renders as a short horizontal line aligned to the char row midline.
@@ -340,11 +346,23 @@ function langCode(lang: Language): string {
   }
 }
 
+.lp-punct {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  height: 1.6rem;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.6;
+  white-space: pre;
+}
+
 // Per-word vertical box — width = max(chars width, badge width)
 .lp-word {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start; // left-align both rows
+  padding-bottom: 0.95rem; // reserve vertical room for the language control row
 
   // Chars row: let it be as wide as the content naturally is
   &__chars {
@@ -357,9 +375,13 @@ function langCode(lang: Language): string {
 
   // Lang row: left-aligned, no extra width forcing
   &__lang {
-    display: flex;
+    position: absolute;
+    left: 0;
+    top: calc(100% - 0.9rem);
+    display: inline-flex;
     align-items: center;
-    margin-top: 1px;
+    margin-top: 0;
+    z-index: 1;
   }
 }
 
@@ -521,13 +543,22 @@ function langCode(lang: Language): string {
 
 .lp-lang-btn {
   // Active dropdown — full brightness + tinted border signals interactivity
+  display: inline-block;
   color: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(100, 180, 255, 0.5);
   background: rgba(100, 180, 255, 0.08);
+  min-width: 0 !important;
+  width: auto;
   &:hover {
     color: #fff;
     border-color: rgba(100, 180, 255, 0.8);
     background: rgba(100, 180, 255, 0.15);
+  }
+
+  :deep(.q-btn) {
+    min-width: 0 !important;
+    width: auto;
+    padding: 1px 4px;
   }
 
   :deep(.q-btn__content) {
