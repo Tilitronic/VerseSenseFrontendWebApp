@@ -1,4 +1,5 @@
 import type { MessageLanguages } from 'src/boot/i18n';
+import type { Language } from 'src/model/Language';
 
 export type DarkMode = 'auto' | 'on' | 'off';
 export type ToolbarMode = 'active' | 'all';
@@ -8,16 +9,25 @@ export interface LocalConfig {
   toolbarMode: ToolbarMode;
   useDbStress: boolean;
   useMlStress: boolean;
+  enabledLanguages: Record<Language, boolean>;
   locale: MessageLanguages;
   spellcheckEnabled: boolean;
   ltEnabled: boolean;
 }
+
+export const DEFAULT_ENABLED_LANGUAGES: Record<Language, boolean> = {
+  ua: true,
+  pl: true,
+  'en-us': true,
+  'en-gb': true,
+};
 
 export const DEFAULT_LOCAL_CONFIG: LocalConfig = {
   darkMode: 'auto',
   toolbarMode: 'all',
   useDbStress: true,
   useMlStress: true,
+  enabledLanguages: DEFAULT_ENABLED_LANGUAGES,
   locale: 'en-US',
   spellcheckEnabled: true,
   ltEnabled: false,
@@ -36,6 +46,20 @@ export function getLocalConfig(): LocalConfig {
         parsed['toolbarMode'] === 'active' ? 'active' : DEFAULT_LOCAL_CONFIG.toolbarMode;
       const useDbStress: boolean = parsed['useDbStress'] !== false;
       const useMlStress: boolean = parsed['useMlStress'] !== false;
+      const rawEnabled = parsed['enabledLanguages'];
+      const parsedEnabled =
+        rawEnabled && typeof rawEnabled === 'object'
+          ? (rawEnabled as Partial<Record<Language, unknown>>)
+          : {};
+      const enabledLanguages: Record<Language, boolean> = {
+        ua: parsedEnabled['ua'] !== false,
+        pl: parsedEnabled['pl'] !== false,
+        'en-us': parsedEnabled['en-us'] !== false,
+        'en-gb': parsedEnabled['en-gb'] !== false,
+      };
+      if (!Object.values(enabledLanguages).some(Boolean)) {
+        enabledLanguages.ua = true;
+      }
       const spellcheckEnabled: boolean = parsed['spellcheckEnabled'] !== false;
       const ltEnabled: boolean = parsed['ltEnabled'] === true;
       // Accept locale from localConfig; fall back to legacy standalone 'locale' key
@@ -50,6 +74,7 @@ export function getLocalConfig(): LocalConfig {
         toolbarMode,
         useDbStress,
         useMlStress,
+        enabledLanguages,
         spellcheckEnabled,
         ltEnabled,
         locale,

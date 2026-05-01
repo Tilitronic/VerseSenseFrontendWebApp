@@ -22,6 +22,8 @@
 import { francAll } from 'franc';
 import type { Language } from 'src/model/Language';
 
+const ALL_LANGUAGES: Language[] = ['ua', 'pl', 'en-us', 'en-gb'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +78,40 @@ const FRANC_TO_LANGUAGE: Record<string, Language> = {
 /** ISO 639-3 codes franc will consider; limits search space for performance */
 const ONLY_LANGS = ['ukr', 'bul', 'rus', 'bel', 'pol', 'eng', 'sco'];
 
+const LANGUAGE_TO_FRANC_CODES: Record<Language, string[]> = {
+  ua: ['ukr', 'bul', 'rus', 'bel'],
+  pl: ['pol'],
+  'en-us': ['eng', 'sco', 'afr'],
+  'en-gb': ['eng', 'sco', 'afr'],
+};
+
+export interface DetectionOptions {
+  enabledLanguages?: Iterable<Language>;
+}
+
+function normalizeEnabledLanguages(options?: DetectionOptions): Set<Language> {
+  const fromOptions = options?.enabledLanguages;
+  if (!fromOptions) return new Set(ALL_LANGUAGES);
+  const set = new Set(fromOptions);
+  if (set.size === 0) return new Set(ALL_LANGUAGES);
+  return set;
+}
+
+function mapToEnabledLanguage(lang: Language, enabled: Set<Language>): Language | null {
+  if (enabled.has(lang)) return lang;
+  if ((lang === 'en-us' || lang === 'en-gb') && enabled.has('en-us')) return 'en-us';
+  if ((lang === 'en-us' || lang === 'en-gb') && enabled.has('en-gb')) return 'en-gb';
+  return null;
+}
+
+function francOnlyCodes(enabled: Set<Language>): string[] {
+  const codes = new Set<string>();
+  enabled.forEach((lang) => {
+    for (const code of LANGUAGE_TO_FRANC_CODES[lang]) codes.add(code);
+  });
+  return ONLY_LANGS.filter((code) => codes.has(code));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,11 +135,12 @@ export interface DetectionResult {
  * @param text - The text to analyze
  * @returns DetectionResult with language (nullable) and confidence
  */
-export function detectLanguage(text: string): DetectionResult {
+export function detectLanguage(text: string, options?: DetectionOptions): DetectionResult {
   const trimmed = text.trim();
   if (!trimmed) {
     return { language: null, confidence: 0, method: 'undetermined' };
   }
+  const enabled = normalizeEnabledLanguages(options);
 
   // ── 0. Script guard ─────────────────────────────────────────────────────
   // Pure Latin text cannot be Ukrainian (Cyrillic). Skip all UA heuristics.
@@ -113,29 +150,34 @@ export function detectLanguage(text: string): DetectionResult {
   // ── 1. Heuristic layer ─────────────────────────────────────────────────────
 
   // UA-exclusive Cyrillic characters → definitive UA
-  if (!isLatin && UA_EXCLUSIVE_CHARS.test(trimmed)) {
+  if (!isLatin && UA_EXCLUSIVE_CHARS.test(trimmed) && enabled.has('ua')) {
     return { language: 'ua', confidence: 1.0, method: 'heuristic' };
   }
 
   // Multiple UA-vowel-і characters → strong UA signal
   const uaICount = (trimmed.match(UA_VOWEL_I) ?? []).length;
-  if (!isLatin && uaICount >= 2) {
+  if (!isLatin && uaICount >= 2 && enabled.has('ua')) {
     return { language: 'ua', confidence: 0.95, method: 'heuristic' };
   }
 
   // PL diacritics → definitive PL
-  if (PL_EXCLUSIVE_CHARS.test(trimmed)) {
+  if (PL_EXCLUSIVE_CHARS.test(trimmed) && enabled.has('pl')) {
     return { language: 'pl', confidence: 1.0, method: 'heuristic' };
   }
 
   // Cyrillic but no UA markers → likely UA (our primary Cyrillic language)
-  if (isCyrillic && uaICount === 1) {
+  if (isCyrillic && uaICount === 1 && enabled.has('ua')) {
     return { language: 'ua', confidence: 0.8, method: 'heuristic' };
   }
 
   // ── 2. Franc statistical layer ─────────────────────────────────────────────
 
-  const scores = francAll(trimmed, { only: ONLY_LANGS }) as [string, number][];
+  const onlyCodes = francOnlyCodes(enabled);
+  if (onlyCodes.length === 0) {
+    return { language: null, confidence: 0, method: 'undetermined' };
+  }
+
+  const scores = francAll(trimmed, { only: onlyCodes }) as [string, number][];
   const first = scores[0];
   if (!first) {
     return { language: null, confidence: 0, method: 'undetermined' };
@@ -144,14 +186,15 @@ export function detectLanguage(text: string): DetectionResult {
 
   if (topScore < MIN_CONFIDENCE) {
     // Pure Cyrillic with no UA markers and no clear franc winner → default UA
-    if (isCyrillic) {
+    if (isCyrillic && enabled.has('ua')) {
       return { language: 'ua', confidence: 0.6, method: 'franc' };
     }
     // Latin or other — undetermined; caller uses document default
     return { language: null, confidence: topScore, method: 'undetermined' };
   }
 
-  const mapped = FRANC_TO_LANGUAGE[topCode] ?? null;
+  const mappedRaw = FRANC_TO_LANGUAGE[topCode] ?? null;
+  const mapped = mappedRaw ? mapToEnabledLanguage(mappedRaw, enabled) : null;
   return { language: mapped, confidence: topScore, method: 'franc' };
 }
 
@@ -162,7 +205,13 @@ export function detectLanguage(text: string): DetectionResult {
  * @param fullText - The complete raw poem text
  * @returns The dominant language or 'ua' as fallback
  */
-export function detectDocumentLanguage(fullText: string): Language {
-  const result = detectLanguage(fullText);
-  return result.language ?? 'ua';
+export function detectDocumentLanguage(fullText: string, options?: DetectionOptions): Language {
+  const enabled = normalizeEnabledLanguages(options);
+  const result = detectLanguage(fullText, options);
+  if (result.language) return result.language;
+  if (enabled.has('ua')) return 'ua';
+  if (enabled.has('pl')) return 'pl';
+  if (enabled.has('en-us')) return 'en-us';
+  if (enabled.has('en-gb')) return 'en-gb';
+  return 'ua';
 }

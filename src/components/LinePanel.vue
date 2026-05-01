@@ -111,6 +111,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { usePoetryStore } from 'src/stores/poetry';
+import { useAppStore } from 'src/stores/app';
 import type { IWordToken, ILine } from 'src/model/Token';
 import { LANGUAGE_META, type Language } from 'src/model/Language';
 import {
@@ -127,6 +128,7 @@ const { t } = useI18n();
 const props = defineProps<{ line: ILine }>();
 
 const store = usePoetryStore();
+const appStore = useAppStore();
 
 /** Whether every non-locked word on this line has been confirmed */
 const lineConfirmed = computed(() => store.isLineConfirmed(props.line.id));
@@ -287,10 +289,14 @@ function setStress(tok: IWordToken, slot: CharSlot) {
 /** Returns display metadata for a word's language control */
 function wordInfo(tok: IWordToken): { locked: boolean; options: Language[] } {
   const { lockedLanguage, allowedLanguages } = getWordScriptInfo(tok.text);
-  if (lockedLanguage !== null) {
+  if (lockedLanguage !== null && appStore.isLanguageEnabled(lockedLanguage)) {
     return { locked: true, options: [] };
   }
-  return { locked: false, options: allowedLanguages };
+  const filtered = allowedLanguages.filter((lang) => appStore.isLanguageEnabled(lang));
+  if (filtered.length === 0) {
+    return { locked: false, options: [tok.language] };
+  }
+  return { locked: false, options: filtered };
 }
 
 function setLanguage(tok: IWordToken, lang: Language) {

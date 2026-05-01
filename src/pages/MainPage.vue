@@ -219,6 +219,44 @@
               </q-btn>
             </q-btn-group>
 
+            <!-- ── Detection language filter ─────────────────────── -->
+            <span class="stress-sep" />
+            <q-btn
+              no-caps
+              dense
+              size="sm"
+              padding="2px 10px"
+              color="blue-grey-9"
+              text-color="grey-3"
+              icon="translate"
+              :label="`Lang ${enabledLanguageCount}/${LANGUAGES.length}`"
+            >
+              <q-menu anchor="bottom middle" self="top middle" :offset="[0, 6]">
+                <q-list dense style="min-width: 220px">
+                  <q-item-label header class="text-caption text-grey-5">
+                    Detection languages
+                  </q-item-label>
+                  <q-item v-for="lang in LANGUAGES" :key="lang" dense>
+                    <q-item-section>
+                      <q-checkbox
+                        :model-value="appStore.enabledLanguages[lang]"
+                        :disable="appStore.enabledLanguages[lang] && enabledLanguageCount <= 1"
+                        dense
+                        :label="`${LANGUAGE_META[lang].flag} ${LANGUAGE_META[lang].label}`"
+                        @update:model-value="(v) => onLanguageToggle(lang, v)"
+                      />
+                    </q-item-section>
+                  </q-item>
+                  <q-separator />
+                  <q-item dense>
+                    <q-item-section class="text-caption text-grey-5">
+                      Unchecked languages are excluded from auto-detection and stress services.
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-btn>
+
             <!-- ── Document actions (pushed to right) ────────────── -->
             <span class="toolbar-spacer" />
             <span class="panel__word-count">{{ wordCount }} {{ $t('editor.words') }}</span>
@@ -582,6 +620,7 @@
 import { computed, ref } from 'vue';
 import { useAppStore } from 'stores/app';
 import { usePoetryStore } from 'stores/poetry';
+import { LANGUAGES, LANGUAGE_META, type Language } from 'src/model/Language';
 import type { ToolbarMode } from 'stores/localConfig';
 import PoetryEditor from 'components/PoetryEditor.vue';
 import PhoneticPanel from 'components/PhoneticPanel.vue';
@@ -606,6 +645,13 @@ const exportWithLegend = ref(false);
 const showNumBadge = ref(true);
 const showSylBadge = ref(true);
 const showCvBadge = ref(true);
+const enabledLanguageCount = computed(
+  () => LANGUAGES.filter((lang) => appStore.enabledLanguages[lang]).length,
+);
+
+function onLanguageToggle(lang: Language, checked: boolean | null) {
+  appStore.setLanguageEnabled(lang, checked === true);
+}
 
 // ── Resizable rhymes panel ───────────────────────────────────────────────────
 const splitBodyRef = ref<HTMLElement | null>(null);

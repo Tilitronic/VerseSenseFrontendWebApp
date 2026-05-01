@@ -17,7 +17,7 @@ import {
   detectDocumentLanguage,
   detectLanguage,
 } from 'src/services/languageDetection/LanguageDetector';
-import { DEFAULT_LANGUAGE, type Language } from 'src/model/Language';
+import { DEFAULT_LANGUAGE, LANGUAGES, type Language } from 'src/model/Language';
 import { parseDocument } from 'src/model/DocumentParser';
 import type { IPoetryDocument, IWordToken } from 'src/model/Token';
 import { getPhoneme } from 'src/services/poetryEngines/ua/Phonetizer';
@@ -76,6 +76,38 @@ export const usePoetryStore = defineStore('poetry', () => {
   const { resolver: stressResolver } = useStressTrie();
   const appStore = useAppStore();
 
+  function enabledLanguagesSet(): Set<Language> {
+    return new Set(LANGUAGES.filter((lang) => appStore.enabledLanguages[lang] !== false));
+  }
+
+  function enabledLanguagesList(): Language[] {
+    return LANGUAGES.filter((lang) => appStore.enabledLanguages[lang] !== false);
+  }
+
+  function firstEnabledLanguage(fallback: Language = DEFAULT_LANGUAGE): Language {
+    const enabled = enabledLanguagesList();
+    if (enabled.length > 0) return enabled[0]!;
+    return fallback;
+  }
+
+  function preferEnabledLanguage(
+    lang: Language,
+    allowed?: Language[],
+    fallback: Language = DEFAULT_LANGUAGE,
+  ): Language {
+    const enabled = enabledLanguagesSet();
+    if (enabled.has(lang)) return lang;
+
+    const constrained = (allowed ?? []).filter((l) => enabled.has(l));
+    if (constrained.length > 0) return constrained[0]!;
+
+    if (enabled.has('en-us')) return 'en-us';
+    if (enabled.has('en-gb')) return 'en-gb';
+    if (enabled.has('pl')) return 'pl';
+    if (enabled.has('ua')) return 'ua';
+    return fallback;
+  }
+
   // ── State ──────────────────────────────────────────────────────────────────
 
   /** Raw text as typed by the user */
@@ -99,7 +131,9 @@ export const usePoetryStore = defineStore('poetry', () => {
    */
   const documentLanguage = ref<Language>(
     (localStorage.getItem(STORAGE_KEY_DOC_LANG) as Language | null) ??
-      detectDocumentLanguage(rawText.value) ??
+      detectDocumentLanguage(rawText.value, {
+        enabledLanguages: enabledLanguagesSet(),
+      }) ??
       DEFAULT_LANGUAGE,
   );
 
@@ -108,6 +142,10 @@ export const usePoetryStore = defineStore('poetry', () => {
    * When true, auto-detection will NOT override it on text changes.
    */
   const documentLanguageManual = ref<boolean>(localStorage.getItem(STORAGE_KEY_DOC_LANG) !== null);
+
+  if (!appStore.isLanguageEnabled(documentLanguage.value)) {
+    documentLanguage.value = firstEnabledLanguage(documentLanguage.value);
+  }
 
   /**
    * Per-word language overrides.
@@ -262,9 +300,9 @@ export const usePoetryStore = defineStore('poetry', () => {
           // For Polish, always re-resolve stress from the package on startup.
           // This prevents stale persisted values from masking dictionary exceptions.
           stressIndex: tok.language === 'pl' ? tok.stressIndex : (ann.stress ?? tok.stressIndex),
-          language: ann.lang ?? tok.language,
+          language: preferEnabledLanguage(ann.lang ?? tok.language, undefined, documentLanguage.value),
         };
-        if (ann.lang) newLangMap.set(tok.id, ann.lang);
+        if (ann.lang && appStore.isLanguageEnabled(ann.lang)) newLangMap.set(tok.id, ann.lang);
         if (ann.confirmed) newConfirmed.add(tok.id);
         if (ann.stressPendingSource) newPending.set(tok.id, ann.stressPendingSource);
         newTokenIndex.set(tok.id, newTok);
@@ -300,9 +338,10 @@ export const usePoetryStore = defineStore('poetry', () => {
    * Marks it as manual so auto-detection stops overriding it.
    */
   function setDocumentLanguage(lang: Language) {
-    documentLanguage.value = lang;
+    const nextLang = preferEnabledLanguage(lang, undefined, documentLanguage.value);
+    documentLanguage.value = nextLang;
     documentLanguageManual.value = true;
-    localStorage.setItem(STORAGE_KEY_DOC_LANG, lang);
+    localStorage.setItem(STORAGE_KEY_DOC_LANG, nextLang);
   }
 
   /**
@@ -321,6 +360,7 @@ export const usePoetryStore = defineStore('poetry', () => {
    * @param lang   - Language chosen by the user
    */
   function setWordLanguage(wordId: string, lang: Language) {
+    if (!appStore.isLanguageEnabled(lang)) return;
     const currentTok = document.value.tokenIndex.get(wordId);
     const shouldResetStress = currentTok?.kind === 'WORD' && currentTok.language !== lang;
     wordLanguages.value = new Map(wordLanguages.value).set(wordId, lang);
@@ -352,8 +392,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     const next = new Map(wordLanguages.value);
     next.delete(wordId);
     wordLanguages.value = next;
+    const nextLang = preferEnabledLanguage(documentLanguage.value, undefined, firstEnabledLanguage());
     document.value = replaceTokenField(document.value, wordId, {
-      language: documentLanguage.value,
+      language: nextLang,
     });
     const sc = new Map(syllableCache.value);
     sc.delete(wordId);
@@ -577,6 +618,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     const dirtyWordIds = new Set<string>();
     const dirtyPolishIds = new Set<string>();
     const reusedWordIds = new Map<string, string>(); // newId -> previous stable id
+    const enabled = enabledLanguagesSet();
 
     // Track which text-based snaps were already consumed by a positional match
     // so we don't double-apply them when the same word appears multiple times.
@@ -619,12 +661,13 @@ export const usePoetryStore = defineStore('poetry', () => {
           // with the word's script (e.g. "co" preserved as 'ua'), mark it dirty
           // so the scoped sync re-detects it instead of propagating stale state.
           const scriptInfo = getWordScriptInfo(tok.text);
-          const preservedLangIsValid =
+          const preservedLangIsValidByScript =
             scriptInfo.lockedLanguage !== null
               ? snap.language === scriptInfo.lockedLanguage
               : scriptInfo.allowedLanguages.length === 0 ||
                 scriptInfo.allowedLanguages.includes(snap.language);
-          if (preservedLangIsValid) {
+          const preservedLangIsEnabled = enabled.has(snap.language);
+          if (preservedLangIsValidByScript && preservedLangIsEnabled) {
             preservedTokenLang.set(finalId, snap.language);
           } else {
             // Script mismatch — force re-detection via scoped sync
@@ -729,7 +772,8 @@ export const usePoetryStore = defineStore('poetry', () => {
    */
   function autoDetectAndStressWords(options?: { targetWordIds?: Set<string>; reason?: string }) {
     const targetWordIds = options?.targetWordIds;
-    const docLang = documentLanguage.value;
+    const enabled = enabledLanguagesSet();
+    const docLang = preferEnabledLanguage(documentLanguage.value, undefined, firstEnabledLanguage());
 
     // ── Pre-compute script-aware language hints (two-pass) ───────────────────
     //
@@ -785,8 +829,9 @@ export const usePoetryStore = defineStore('poetry', () => {
         // context to correctly detect language for short/ambiguous words like "co", "to".
         if (wordLanguages.value.has(t.id)) continue;
         const info = getWordScriptInfo(t.text);
-        if (info.lockedLanguage !== null) continue; // locked — no hint needed
-        if (info.allowedLanguages.length === 0) continue; // mixed/other — handled separately
+        const allowed = info.allowedLanguages.filter((l) => enabled.has(l));
+        if (info.lockedLanguage !== null && enabled.has(info.lockedLanguage)) continue; // locked — no hint needed
+        if (allowed.length === 0) continue; // no enabled options for this script
         const sc = wordScript(t.text);
         if (sc) neededHints.add(`${lineIdx}:${sc}`);
       }
@@ -798,7 +843,7 @@ export const usePoetryStore = defineStore('poetry', () => {
 
       // Pass 1: words of matching script from this line only
       let contextText = scriptWords(lines[lineIdx]!, sc);
-      let result = detectLanguage(contextText);
+      let result = detectLanguage(contextText, { enabledLanguages: enabled });
 
       // Pass 2: still too short or undetermined → widen with neighbouring lines
       if (!result.language || contextText.length < MIN_CONTEXT_CHARS) {
@@ -810,7 +855,7 @@ export const usePoetryStore = defineStore('poetry', () => {
           .filter(Boolean)
           .join(' ');
         if (wider.length > contextText.length) {
-          const widerResult = detectLanguage(wider);
+          const widerResult = detectLanguage(wider, { enabledLanguages: enabled });
           if (widerResult.language) result = widerResult;
           contextText = wider;
         }
@@ -839,27 +884,28 @@ export const usePoetryStore = defineStore('poetry', () => {
         if (!wordLanguages.value.has(tok.id)) {
           const scriptInfo = getWordScriptInfo(tok.text);
           let detectedLang: Language;
-          if (scriptInfo.lockedLanguage) {
+          const allowedEnabled = scriptInfo.allowedLanguages.filter((l) => enabled.has(l));
+          if (scriptInfo.lockedLanguage && enabled.has(scriptInfo.lockedLanguage)) {
             // Script uniquely determines language (UA-exclusive chars, PL diacritics)
             detectedLang = scriptInfo.lockedLanguage;
-          } else if (scriptInfo.allowedLanguages.length > 0) {
+          } else if (allowedEnabled.length > 0) {
             // Ambiguous — look up the script-aware hint for this (line, script) pair.
             // This guarantees a Cyrillic word only uses Cyrillic context and vice-versa.
             const sc = wordScript(tok.text);
             const lineHint = sc ? lineScriptHint.get(`${lineIdx}:${sc}`) : undefined;
-            if (lineHint && scriptInfo.allowedLanguages.includes(lineHint)) {
+            if (lineHint && allowedEnabled.includes(lineHint)) {
               detectedLang = lineHint;
             } else {
-              const result = detectLanguage(tok.text);
+              const result = detectLanguage(tok.text, { enabledLanguages: enabled });
               detectedLang =
-                result.language && scriptInfo.allowedLanguages.includes(result.language)
+                result.language && allowedEnabled.includes(result.language)
                   ? result.language
-                  : scriptInfo.allowedLanguages[0]!;
+                  : allowedEnabled[0]!;
             }
           } else {
             // Mixed script or other — run franc directly, fall back to doc lang
-            const result = detectLanguage(tok.text);
-            detectedLang = result.language ?? docLang;
+            const result = detectLanguage(tok.text, { enabledLanguages: enabled });
+            detectedLang = preferEnabledLanguage(result.language ?? docLang, undefined, docLang);
           }
           if (tok.language !== detectedLang) {
             langChanges.set(tok.id, detectedLang);
@@ -969,7 +1015,7 @@ export const usePoetryStore = defineStore('poetry', () => {
 
   function runDetection(text: string) {
     if (!text.trim()) return;
-    const result = detectLanguage(text);
+    const result = detectLanguage(text, { enabledLanguages: enabledLanguagesSet() });
     detectionConfidence.value = result.confidence;
     if (result.language) {
       documentLanguage.value = result.language;
@@ -1015,6 +1061,51 @@ export const usePoetryStore = defineStore('poetry', () => {
     (enabled) => {
       if (enabled) void resolveAllStressAsync({ forcePolish: true, reason: 'watch:useDbStress' });
     },
+  );
+
+  watch(
+    () => appStore.enabledLanguages,
+    () => {
+      const enabled = enabledLanguagesSet();
+      const fallback = firstEnabledLanguage(documentLanguage.value);
+
+      if (!enabled.has(documentLanguage.value)) {
+        documentLanguage.value = fallback;
+      }
+
+      const nextOverrides = new Map(wordLanguages.value);
+      for (const [wordId, lang] of nextOverrides) {
+        if (!enabled.has(lang)) nextOverrides.delete(wordId);
+      }
+      wordLanguages.value = nextOverrides;
+
+      let anyTokenChange = false;
+      const newTokenIndex = new Map(document.value.tokenIndex);
+      const newLines = document.value.lines.map((line) => {
+        let lineChanged = false;
+        const newTokens = line.tokens.map((tok) => {
+          if (tok.kind !== 'WORD') return tok;
+          if (enabled.has(tok.language)) return tok;
+          const scriptInfo = getWordScriptInfo(tok.text);
+          const nextLang = preferEnabledLanguage(tok.language, scriptInfo.allowedLanguages, fallback);
+          const newTok: IWordToken = { ...tok, language: nextLang, stressIndex: null };
+          newTokenIndex.set(tok.id, newTok);
+          lineChanged = true;
+          anyTokenChange = true;
+          syllableCache.value.delete(tok.id);
+          return newTok;
+        });
+        return lineChanged ? { ...line, tokens: newTokens } : line;
+      });
+
+      if (anyTokenChange) {
+        document.value = { lines: newLines, tokenIndex: newTokenIndex };
+      }
+
+      autoDetectAndStressWords({ reason: 'watch:enabledLanguages' });
+      void resolveAllStressAsync({ forcePolish: true, reason: 'watch:enabledLanguages' });
+    },
+    { deep: true },
   );
 
   /**
@@ -1093,7 +1184,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     const signal = ctl.signal;
 
     const hasUaAsync = !!stressResolver.value && appStore.useMlStress;
-    const hasPlAsync = true;
+    const hasPlAsync = appStore.isLanguageEnabled('pl');
     if (!hasUaAsync && !hasPlAsync) {
       stressAsyncLog.debug('all async resolvers disabled — skipping');
       return;
@@ -1120,6 +1211,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
 
     const candidateTokens = allWordTokens.value.filter((t) => {
+      if (!appStore.isLanguageEnabled(t.language)) return false;
       if (t.language === 'ua') return t.stressIndex === null;
       if (t.language !== 'pl') return false;
       if (forcePolish) return true;
