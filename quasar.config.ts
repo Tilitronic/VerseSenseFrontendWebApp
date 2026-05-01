@@ -186,6 +186,10 @@ export default defineConfig((ctx) => {
       // distDir
 
       extendViteConf(viteConf) {
+        // Keep top-level await emitted by wasm bundler loaders (Netlify build fix).
+        viteConf.build ??= {};
+        viteConf.build.target = 'esnext';
+
         // Allow Vite to import .ctrie.gz/.onnx.gz as static asset URLs.
         const existing = viteConf.assetsInclude
           ? Array.isArray(viteConf.assetsInclude)

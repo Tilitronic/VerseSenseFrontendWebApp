@@ -27,3 +27,6 @@ export const stressSyncLog = createLogger('stress.sync', {});
 
 // ── Phonetic pipeline ────────────────────────────────────────────────────────
 export const phoneticLog = createLogger('phonetic', {});
+
+// ── Polish stress resolver (package/cache integration) ──────────────────────
+export const stressPolishLog = createLogger('stress.pl', {});

@@ -22,10 +22,11 @@ import { parseDocument } from 'src/model/DocumentParser';
 import type { IPoetryDocument, IWordToken } from 'src/model/Token';
 import { getPhoneme } from 'src/services/poetryEngines/ua/Phonetizer';
 import { Sylabizer, type Syllable } from 'src/services/poetryEngines/ua/Sylabizer';
+import { transcribePolish } from 'src/services/phonetic/plTranscription';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
 import { useStressTrie } from 'src/composables/useStressTrie';
-import { getPolishStressInfo, peekPolishStressInfo } from 'src/services/stress/plStressService';
+import { getPolishStressInfo } from 'src/services/stress/plStressService';
 import { useAppStore } from 'src/stores/app';
 import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
 
@@ -258,7 +259,9 @@ export const usePoetryStore = defineStore('poetry', () => {
 
         const newTok: IWordToken = {
           ...tok,
-          stressIndex: ann.stress ?? tok.stressIndex,
+          // For Polish, always re-resolve stress from the package on startup.
+          // This prevents stale persisted values from masking dictionary exceptions.
+          stressIndex: tok.language === 'pl' ? tok.stressIndex : (ann.stress ?? tok.stressIndex),
           language: ann.lang ?? tok.language,
         };
         if (ann.lang) newLangMap.set(tok.id, ann.lang);
@@ -325,6 +328,12 @@ export const usePoetryStore = defineStore('poetry', () => {
     const sc = new Map(syllableCache.value);
     sc.delete(wordId);
     syllableCache.value = sc;
+
+    // Manual language override should immediately re-run stress pipelines.
+    // This ensures EN -> PL switch triggers Polish async resolver even when
+    // the word had no stress before override.
+    autoDetectAndStressWords();
+    void resolveAllStressAsync();
   }
 
   /**
@@ -467,17 +476,14 @@ export const usePoetryStore = defineStore('poetry', () => {
     const wt = tok as IWordToken;
     let syllables: Syllable[] = [];
     if (wt.language === 'pl') {
-      const info = peekPolishStressInfo(wt.text);
-      if (info?.syllables.length) {
-        const stressIndex = wt.stressIndex ?? Math.max(0, info.syllableIndex);
-        syllables = info.syllables.map((part, index) => ({
-          phonemes: [],
-          index,
-          isOpen: /[aeiouyąęó]$/i.test(part),
-          stress: index === stressIndex,
-          phonetic: part,
-        }));
-      }
+      const transcribed = transcribePolish(wt.text, wt.stressIndex ?? -1);
+      syllables = transcribed.map((s, index) => ({
+        phonemes: [],
+        index,
+        isOpen: s.isOpen,
+        stress: s.stressed,
+        phonetic: s.text,
+      }));
     } else {
       try {
         const phonemes = getPhoneme(wt.text.toLowerCase());
@@ -925,6 +931,15 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
   });
 
+  // If DB stress gets enabled at runtime, immediately refresh async stress
+  // (including Polish words restored from saved annotations).
+  watch(
+    () => appStore.useDbStress,
+    (enabled) => {
+      if (enabled) void resolveAllStressAsync();
+    },
+  );
+
   /**
    * Computed map: wordId → stress status
    *   'set'   — stressIndex is a number
@@ -962,6 +977,11 @@ export const usePoetryStore = defineStore('poetry', () => {
     return map;
   });
 
+  // AbortController for the current async stress resolution pass.
+  // Replaced each time resolveAllStressAsync() is called so an in-flight
+  // ML call for a word the user has already edited is silently discarded.
+  let _asyncStressAbort: AbortController | null = null;
+
   // ── Expose ─────────────────────────────────────────────────────────────────
 
   // Run detection on initial load so saved text gets correct per-word languages immediately.
@@ -969,13 +989,10 @@ export const usePoetryStore = defineStore('poetry', () => {
   const _savedAnnotations = loadAnnotations();
   if (_savedAnnotations) applyAnnotations(_savedAnnotations);
   autoDetectAndStressWords();
+  // Ensure persisted Polish stresses are reconciled with the resolver on load.
+  void resolveAllStressAsync();
   // Trigger one immediate save so fresh annotations are in sync
   saveAnnotations();
-
-  // AbortController for the current async stress resolution pass.
-  // Replaced each time resolveAllStressAsync() is called so an in-flight
-  // ML call for a word the user has already edited is silently discarded.
-  let _asyncStressAbort: AbortController | null = null;
 
   /**
    * Async pass:
@@ -993,16 +1010,14 @@ export const usePoetryStore = defineStore('poetry', () => {
     const signal = ctl.signal;
 
     const hasUaAsync = !!stressResolver.value && appStore.useMlStress;
-    const hasPlAsync = appStore.useDbStress;
+    const hasPlAsync = true;
     if (!hasUaAsync && !hasPlAsync) {
       stressAsyncLog.debug('all async resolvers disabled — skipping');
       return;
     }
     const resolver = hasUaAsync ? stressResolver.value : null;
     const candidateTokens = allWordTokens.value.filter(
-      (t) =>
-        (t.language === 'ua' && t.stressIndex === null) ||
-        (t.language === 'pl' && t.stressIndex === null),
+      (t) => (t.language === 'ua' && t.stressIndex === null) || t.language === 'pl',
     );
     stressAsyncLog.info(
       `resolving ${candidateTokens.length} word${candidateTokens.length === 1 ? '' : 's'} via async stress services…`,
@@ -1018,7 +1033,7 @@ export const usePoetryStore = defineStore('poetry', () => {
       }
     >();
 
-    for (const tok of allWordTokens.value) {
+    for (const tok of candidateTokens) {
       if (signal.aborted) {
         stressAsyncLog.debug('aborted — stopping');
         return;
@@ -1027,11 +1042,6 @@ export const usePoetryStore = defineStore('poetry', () => {
       const textAtDispatch = tok.text;
 
       if (tok.language === 'pl') {
-        if (!appStore.useDbStress) {
-          stressAsyncLog.debug(`"${tok.text}" Polish service disabled — skip`);
-          continue;
-        }
-
         const info = await getPolishStressInfo(tok.text, signal);
 
         if (signal.aborted) {
@@ -1052,6 +1062,12 @@ export const usePoetryStore = defineStore('poetry', () => {
         }
 
         const syllableIndex = Math.max(0, Math.min(info.syllableIndex, info.syllables.length - 1));
+        if (currentWord.stressIndex === syllableIndex) {
+          stressAsyncLog.debug(
+            `"${tok.text}" already matches Polish service (${syllableIndex}) — skip`,
+          );
+          continue;
+        }
         syllableCache.value.delete(tok.id);
         patches.set(tok.id, {
           syllableIndex,
@@ -1059,7 +1075,9 @@ export const usePoetryStore = defineStore('poetry', () => {
           source: 'db',
           stresses: [syllableIndex],
         });
-        stressAsyncLog.debug(`"${tok.text}" → syllable ${syllableIndex} via Polish service`);
+        stressAsyncLog.debug(
+          `"${tok.text}" ${currentWord.stressIndex ?? 'null'} -> ${syllableIndex} via Polish service`,
+        );
         continue;
       }
 

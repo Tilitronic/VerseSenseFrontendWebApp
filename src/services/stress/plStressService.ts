@@ -4,10 +4,12 @@ export interface PolishStressInfo {
   syllableIndex: number;
   stressFromEnd: number;
   ipa: string | null;
+  ipaSyllables?: string[];
   confidence: 'exact' | 'rule' | 'default';
 }
 
 import type { stressInfo as StressInfoFn } from '@tilitronic/polish-stress-wasm';
+import { stressPolishLog } from 'src/services/logging';
 
 interface PlStressWasmModule {
   stressInfo: typeof StressInfoFn;
@@ -16,6 +18,8 @@ interface PlStressWasmModule {
 const cache = new Map<string, PolishStressInfo>();
 const inflight = new Map<string, Promise<PolishStressInfo | null>>();
 let modulePromise: Promise<PlStressWasmModule | null> | null = null;
+let moduleUnavailable = false;
+let moduleFailureLogged = false;
 
 function normalizeWord(word: string): string {
   return word.trim().toLowerCase();
@@ -84,6 +88,7 @@ function isPolishStressInfo(value: unknown): value is PolishStressInfo {
     typeof info.syllableIndex === 'number' &&
     typeof info.stressFromEnd === 'number' &&
     (typeof info.ipa === 'string' || info.ipa === null) &&
+    (info.ipaSyllables === undefined || Array.isArray(info.ipaSyllables)) &&
     (info.confidence === 'exact' || info.confidence === 'rule' || info.confidence === 'default')
   );
 }
@@ -93,17 +98,26 @@ export function peekPolishStressInfo(word: string): PolishStressInfo | null {
 }
 
 async function getModule(): Promise<PlStressWasmModule | null> {
+  if (moduleUnavailable) return null;
   if (!modulePromise) {
+    stressPolishLog.debug('module init: dynamic import @tilitronic/polish-stress-wasm');
     modulePromise = import('@tilitronic/polish-stress-wasm')
       .then((module) => {
         if (typeof module.stressInfo !== 'function') {
           throw new Error('Invalid @tilitronic/polish-stress-wasm export shape');
         }
+        stressPolishLog.info('module init: success');
         return { stressInfo: module.stressInfo };
       })
       .catch((error) => {
-        console.warn('[pl-stress] module init failed:', error);
-        modulePromise = null;
+        stressPolishLog.warn('module init failed', error);
+        if (!moduleFailureLogged) {
+          moduleFailureLogged = true;
+          stressPolishLog.warn(
+            'package runtime unavailable in current browser build; using local fallback only',
+          );
+        }
+        moduleUnavailable = true;
         return null;
       });
   }
@@ -115,14 +129,27 @@ export async function getPolishStressInfo(
   signal?: AbortSignal,
 ): Promise<PolishStressInfo | null> {
   const normalized = normalizeWord(word);
+  stressPolishLog.debug('resolve requested', { word, normalized, aborted: !!signal?.aborted });
   if (!normalized) return null;
   if (signal?.aborted) return null;
 
   const cached = cache.get(normalized);
-  if (cached) return cached;
+  if (cached) {
+    stressPolishLog.debug('cache hit', {
+      word: normalized,
+      syllables: cached.syllables,
+      syllableIndex: cached.syllableIndex,
+      stressFromEnd: cached.stressFromEnd,
+      confidence: cached.confidence,
+    });
+    return cached;
+  }
 
   const pending = inflight.get(normalized);
-  if (pending) return pending;
+  if (pending) {
+    stressPolishLog.debug('inflight hit', { word: normalized });
+    return pending;
+  }
 
   const req = (async () => {
     try {
@@ -132,6 +159,7 @@ export async function getPolishStressInfo(
       if (!module) {
         const fallback = buildFallbackInfo(normalized);
         if (fallback) cache.set(normalized, fallback);
+        stressPolishLog.warn('module unavailable -> fallback', { word: normalized, fallback });
         return fallback;
       }
 
@@ -139,13 +167,25 @@ export async function getPolishStressInfo(
       if (!isPolishStressInfo(data)) {
         const fallback = buildFallbackInfo(normalized);
         if (fallback) cache.set(normalized, fallback);
+        stressPolishLog.warn('invalid package payload -> fallback', {
+          word: normalized,
+          payload: data,
+          fallback,
+        });
         return fallback;
       }
       cache.set(normalized, data);
+      stressPolishLog.info('resolve success', {
+        word: normalized,
+        syllables: data.syllables,
+        syllableIndex: data.syllableIndex,
+        stressFromEnd: data.stressFromEnd,
+        confidence: data.confidence,
+      });
       return data;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return null;
-      console.warn('[pl-stress] request failed:', error);
+      stressPolishLog.warn('resolve failed -> fallback', { word: normalized, error });
       const fallback = buildFallbackInfo(normalized);
       if (fallback) cache.set(normalized, fallback);
       return fallback;

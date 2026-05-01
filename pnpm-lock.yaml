@@ -27,8 +27,8 @@ importers:
         specifier: ^1.16.4
         version: 1.17.0
       '@tilitronic/polish-stress-wasm':
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: file:../../../pl-stress-engie/pl-stress-engine/crates/wasm/pkg-bundler
+        version: file:../../../pl-stress-engie/pl-stress-engine/crates/wasm/pkg-bundler
       axios:
         specifier: ^1.2.1
         version: 1.13.2
@@ -795,8 +795,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tilitronic/polish-stress-wasm@0.1.2':
-    resolution: {integrity: sha512-r7GlZTkWAsg6YxDKAMcVL7I+rqZ3fzTwsBTvJhkTbSp6JSeD0tvAi0dNMquT5E+zn+5VHrqa40IL0M3UtMFSqg==}
+  '@tilitronic/polish-stress-wasm@file:../../../pl-stress-engie/pl-stress-engine/crates/wasm/pkg-bundler':
+    resolution: {directory: ../../../pl-stress-engie/pl-stress-engine/crates/wasm/pkg-bundler, type: directory}
     engines: {node: '>=16.0.0'}
 
   '@types/body-parser@1.19.6':
@@ -3630,7 +3630,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tilitronic/polish-stress-wasm@0.1.2': {}
+  '@tilitronic/polish-stress-wasm@file:../../../pl-stress-engie/pl-stress-engine/crates/wasm/pkg-bundler': {}
 
   '@types/body-parser@1.19.6':
     dependencies:

@@ -87,6 +87,12 @@
             <q-chip color="blue-grey-7" text-color="white" icon="edit_note" label="CodeMirror 6" />
             <q-chip color="orange-9" text-color="white" icon="memory" label="ONNX Runtime Web" />
             <q-chip color="green-9" text-color="white" icon="book" label="ua-word-stress" />
+            <q-chip
+              color="pink-8"
+              text-color="white"
+              icon="graphic_eq"
+              label="@tilitronic/polish-stress-wasm"
+            />
             <q-chip color="blue-9" text-color="white" icon="psychology" label="Luscinia ML" />
             <q-chip color="indigo-8" text-color="white" icon="translate" label="vue-i18n" />
             <q-chip color="teal-8" text-color="white" icon="cloud" label="Netlify" />
@@ -108,6 +114,29 @@
             icon="open_in_new"
             :label="$t('about.stressLink')"
             href="https://github.com/Tilitronic/ua-stress-engine"
+            target="_blank"
+            rel="noopener noreferrer"
+            type="a"
+          />
+        </q-card-section>
+      </q-card>
+
+      <!-- ── Polish stress + IPA package ─────────────────────────── -->
+      <q-card class="about-card about-card--accent q-mb-lg" flat bordered>
+        <q-card-section>
+          <div class="text-h6 q-mb-sm">Polish Stress & IPA</div>
+          <p class="text-body2 about-source-text">
+            Polish stress and IPA transcription are powered by
+            <strong>@tilitronic/polish-stress-wasm</strong>. The app uses package-provided
+            syllables, stress positions, and IPA output for Polish words.
+          </p>
+          <q-btn
+            flat
+            no-caps
+            color="pink-5"
+            icon="open_in_new"
+            label="Open package repository"
+            href="https://github.com/Tilitronic/pl-stress-engine"
             target="_blank"
             rel="noopener noreferrer"
             type="a"

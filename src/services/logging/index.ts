@@ -10,4 +10,11 @@ export {
 } from './registry';
 
 // Pre-built named loggers
-export { trieLog, mlLog, stressAsyncLog, stressSyncLog, phoneticLog } from './loggers';
+export {
+  trieLog,
+  mlLog,
+  stressAsyncLog,
+  stressSyncLog,
+  phoneticLog,
+  stressPolishLog,
+} from './loggers';

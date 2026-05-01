@@ -1,11 +1,13 @@
 /**
  * plTranscription.ts
  *
- * Polish grapheme-to-IPA syllabification.
- * Polish orthography is highly phonemic (~90% predictable), making rule-based
- * transcription reliable for poetry analysis.
+ * Polish syllabification/transcription adapter.
  *
- * Stress: always falls on the PENULTIMATE syllable (with very rare exceptions).
+ * Primary source of IPA is @tilitronic/polish-stress-wasm (via cached
+ * stress info from plStressService). Local grapheme rules are retained only
+ * as a fallback when package IPA is unavailable.
+ *
+ * Stress position comes from the stress service unless explicitly overridden.
  */
 
 import { peekPolishStressInfo } from 'src/services/stress/plStressService';
@@ -153,8 +155,16 @@ function buildFromService(word: string, stressIndex: number): PlSyllable[] | nul
       ? stressIndex
       : Math.max(0, Math.min(info.syllableIndex, info.syllables.length - 1));
 
+  const ipaFromPackage = (info.ipa ?? '').replace(/[ˈˌ]/g, '').trim();
+  const packageIpaSyllables =
+    Array.isArray(info.ipaSyllables) && info.ipaSyllables.length > 0
+      ? info.ipaSyllables
+      : ipaFromPackage
+        ? splitIpaToSyllables(ipaFromPackage)
+        : [];
+
   return info.syllables.map((part, idx) => {
-    const ipa = graphemesToIPA(part) || part;
+    const ipa = packageIpaSyllables[idx] ?? graphemesToIPA(part) ?? part;
     return {
       ipa,
       text: part,
