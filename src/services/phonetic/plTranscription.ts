@@ -82,7 +82,7 @@ const LETTER_IPA: Record<string, string> = {
 };
 
 // IPA vowel characters used in the output
-const IPA_VOWELS = new Set(['a', 'ɛ', 'i', 'ɔ', 'u', 'ɨ', 'ɛ̃', 'ɔ̃']);
+const IPA_VOWELS = new Set(['a', 'ɛ', 'i', 'ɔ', 'u', 'ɨ', 'ɛ̃', 'ɔ̃', 'ä', 'ë', 'ï', 'ö', 'ü']);
 
 function graphemesToIPA(word: string): string {
   let s = word.toLowerCase();
@@ -101,7 +101,8 @@ function isIPAVowelStart(ch: string): boolean {
 }
 
 function endsWithIpaVowel(ipa: string): boolean {
-  return /(?:a|ɛ|i|ɔ|u|ɨ|ɛ̃|ɔ̃)$/.test(ipa);
+  // Match simple vowels or vowels with diacritics, or nasal vowels
+  return /[aɛioɔuɨäëïöü]$/.test(ipa) || /ɛ̃$/.test(ipa) || /ɔ̃$/.test(ipa);
 }
 
 function splitIpaToSyllables(ipa: string): string[] {
@@ -161,12 +162,19 @@ function buildFromService(word: string, stressIndex: number): PlSyllable[] | nul
       : Math.max(0, Math.min(info.syllableIndex, info.syllables.length - 1));
 
   const ipaFromPackage = (info.ipaTranscribed ?? info.ipa ?? '').replace(/[ˈˌ]/g, '').trim();
-  const packageIpaSyllables =
+  let packageIpaSyllables =
     Array.isArray(info.ipaSyllables) && info.ipaSyllables.length > 0
       ? info.ipaSyllables
       : ipaFromPackage
         ? splitIpaToSyllables(ipaFromPackage)
         : [];
+
+  // If service returned unsplit IPA (array with one string) but we have multiple grapheme syllables,
+  // split the IPA to match grapheme count
+  if (packageIpaSyllables.length === 1 && info.syllables.length > 1) {
+    const singleIpa = packageIpaSyllables[0]!;
+    packageIpaSyllables = splitIpaToSyllables(singleIpa);
+  }
 
   stressPolishLog.debug(
     `buildFromService(${word}): ipaSyllables=${packageIpaSyllables.join('|')} graphemes=${info.syllables.join('|')}`,
