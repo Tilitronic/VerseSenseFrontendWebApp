@@ -615,7 +615,21 @@ export const usePoetryStore = defineStore('poetry', () => {
 
         const finalId = reusedWordIds.get(tok.id) ?? tok.id;
         if (snap) {
-          preservedTokenLang.set(finalId, snap.language);
+          // Validate script consistency: if the preserved language is incompatible
+          // with the word's script (e.g. "co" preserved as 'ua'), mark it dirty
+          // so the scoped sync re-detects it instead of propagating stale state.
+          const scriptInfo = getWordScriptInfo(tok.text);
+          const preservedLangIsValid =
+            scriptInfo.lockedLanguage !== null
+              ? snap.language === scriptInfo.lockedLanguage
+              : scriptInfo.allowedLanguages.length === 0 ||
+                scriptInfo.allowedLanguages.includes(snap.language);
+          if (preservedLangIsValid) {
+            preservedTokenLang.set(finalId, snap.language);
+          } else {
+            // Script mismatch — force re-detection via scoped sync
+            dirtyWordIds.add(finalId);
+          }
           if (snap.stressIndex !== null) stressPatches.set(finalId, snap.stressIndex);
           if (snap.lang !== undefined) newLangMap.set(finalId, snap.lang);
           if (snap.confirmed) newConfirmed.add(finalId);
@@ -767,7 +781,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     lines.forEach((line, lineIdx) => {
       for (const t of line.tokens) {
         if (t.kind !== 'WORD') continue;
-        if (targetWordIds && targetWordIds.size > 0 && !targetWordIds.has(t.id)) continue;
+        // NOTE: intentionally NOT filtering by targetWordIds here — we need full-line
+        // context to correctly detect language for short/ambiguous words like "co", "to".
         if (wordLanguages.value.has(t.id)) continue;
         const info = getWordScriptInfo(t.text);
         if (info.lockedLanguage !== null) continue; // locked — no hint needed
