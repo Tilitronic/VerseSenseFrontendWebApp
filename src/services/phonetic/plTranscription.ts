@@ -21,17 +21,21 @@ export interface PlSyllable {
 
 // ── Digraph / trigraph rules (longest match first) ────────────────────────────
 const GRAPHEME_RULES: [RegExp, string][] = [
-  // Trigraphs
-  [/dzi/g, 'dʑ'],
-  [/dzi/gi, 'dʑ'],
-  [/dżi/gi, 'dʐ'],
+  // Trigraphs: only apply when i is a softening marker (before another vowel).
+  // When i is the syllable nucleus (e.g. dzi at end of syllable), it is preserved.
+  [/dzi(?=[aeouąę])/gi, 'dʑ'],
+  [/dżi(?=[aeouąę])/gi, 'dʐ'],
+  // dzi/dżi where i IS the nucleus: palatalize dz but keep i
+  [/dzi/gi, 'dʑi'],
+  [/dżi/gi, 'dʐi'],
+  // dź always maps to dʑ (it is its own letter, no following i)
+  [/dź/gi, 'dʑ'],
   // Digraphs — affricates and special clusters
   [/cz/gi, 'tʂ'],
   [/sz/gi, 'ʂ'],
   [/ch/gi, 'x'],
   [/dz/gi, 'dz'],
   [/dż/gi, 'dʐ'],
-  [/dź/gi, 'dʑ'],
   [/rz/gi, 'ʐ'],
   // Single special Polish letters
   [/ą/g, 'ɔ̃'], // nasal o (before fricatives) or on+C
@@ -155,7 +159,7 @@ function buildFromService(word: string, stressIndex: number): PlSyllable[] | nul
       ? stressIndex
       : Math.max(0, Math.min(info.syllableIndex, info.syllables.length - 1));
 
-  const ipaFromPackage = (info.ipa ?? '').replace(/[ˈˌ]/g, '').trim();
+  const ipaFromPackage = (info.ipaTranscribed ?? info.ipa ?? '').replace(/[ˈˌ]/g, '').trim();
   const packageIpaSyllables =
     Array.isArray(info.ipaSyllables) && info.ipaSyllables.length > 0
       ? info.ipaSyllables

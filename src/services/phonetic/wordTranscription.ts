@@ -83,8 +83,21 @@ function plTranscribe(text: string, stressIndex: number): TranscribedSyllable[] 
 export function transcribeWord(token: IWordToken): TranscribedWord {
   const { text, language, stressIndex } = token;
 
-  // Zero-vowel words (prepositions, etc.) — just show the surface form
+  // Zero-vowel words (prepositions, particles, clitics)
+  // UA still gets IPA from the new pipeline (e.g. "в" -> "u̯"/"w" by context).
+  // Other languages fall back to surface form.
   if (countVowels(text, language) === 0) {
+    if (language === 'ua') {
+      const syllables = uaTranscribe(text, 0);
+      if (syllables.length > 0) {
+        return {
+          surface: text,
+          language,
+          syllables,
+        };
+      }
+    }
+
     return {
       surface: text,
       language,

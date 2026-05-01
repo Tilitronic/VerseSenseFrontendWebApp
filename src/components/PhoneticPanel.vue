@@ -66,50 +66,56 @@
               <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
               <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
               <div class="pp-cells">
-                <template v-for="tok in line.tokens" :key="tok.id">
-                  <div v-if="tok.kind === 'TAB' && !alignRight" class="pp-cell pp-cell--tab" />
-                  <template v-else-if="tok.kind === 'WORD'">
-                    <template v-for="(syl, si) in transcribedWord(tok).syllables" :key="si">
-                      <div
-                        class="pp-cell"
-                        :class="{
-                          'pp-cell--stressed': syl.stressed,
-                          'pp-cell--word-last': si === transcribedWord(tok).syllables.length - 1,
-                        }"
+                <template
+                  v-for="(item, itemIdx) in visualizationItems(line)"
+                  :key="`${line.id}:${itemIdx}`"
+                >
+                  <div v-if="item.type === 'tab' && !alignRight" class="pp-cell pp-cell--tab" />
+                  <div
+                    v-else-if="item.type === 'cell'"
+                    class="pp-cell"
+                    :class="{
+                      'pp-cell--stressed': item.stressed,
+                      'pp-cell--word-last': item.wordLast,
+                    }"
+                  >
+                    <div class="pp-cell__tokens">
+                      <span
+                        v-for="(token, ti) in item.ipaTokens"
+                        :key="ti"
+                        :ref="
+                          (el) =>
+                            setTokenRef(item.renderKeys?.[ti] ?? `${line.id}:${itemIdx}:${ti}`, el)
+                        "
+                        class="pp-cell__token"
+                        :class="
+                          isVowelToken(token)
+                            ? 'pp-cell__token--vowel'
+                            : 'pp-cell__token--consonant'
+                        "
+                        :style="
+                          showSounds
+                            ? (tokenStyleMap.get(item.renderKeys?.[ti] ?? '') ?? undefined)
+                            : undefined
+                        "
+                        >{{ token }}</span
                       >
-                        <div class="pp-cell__tokens">
-                          <span
-                            v-for="(token, ti) in syl.ipaTokens"
-                            :key="ti"
-                            :ref="(el) => setTokenRef(`${tok.id}:${si}:${ti}`, el)"
-                            class="pp-cell__token"
-                            :class="
-                              isVowelToken(token)
-                                ? 'pp-cell__token--vowel'
-                                : 'pp-cell__token--consonant'
-                            "
-                            :style="
-                              showSounds
-                                ? (tokenStyleMap.get(`${tok.id}:${si}:${ti}`) ?? undefined)
-                                : undefined
-                            "
-                            >{{ token }}</span
-                          >
-                        </div>
-                        <!-- Rhyme bars: one per motif matching this syllable -->
-                        <template v-if="showRhymes">
-                          <div
-                            v-for="(motif, mi) in sylMotifs(tok.id, si, syl.ipaTokens.length)"
-                            :key="motif.id"
-                            class="pp-cell__rhyme-bar"
-                            :class="`pp-cell__rhyme-bar--${motif.tier}`"
-                            :style="rhymeBarStyle(motif, mi)"
-                            :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
-                          />
-                        </template>
-                      </div>
+                    </div>
+                    <template v-if="showRhymes && item.motifWordId && item.ipaTokens">
+                      <div
+                        v-for="(motif, mi) in sylMotifs(
+                          item.motifWordId,
+                          item.motifSyllableIndex ?? -1,
+                          item.ipaTokens.length,
+                        )"
+                        :key="motif.id"
+                        class="pp-cell__rhyme-bar"
+                        :class="`pp-cell__rhyme-bar--${motif.tier}`"
+                        :style="rhymeBarStyle(motif, mi)"
+                        :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
+                      />
                     </template>
-                  </template>
+                  </div>
                 </template>
               </div>
             </div>
@@ -135,13 +141,13 @@
 <script setup lang="ts">
 import { watch, computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { usePoetryStore } from 'src/stores/poetry';
-import type { ILine, IToken, IWordToken } from 'src/model/Token';
-import { transcribeWord, type TranscribedWord } from 'src/services/phonetic/wordTranscription';
+import type { ILine, IWordToken } from 'src/model/Token';
 import { analyzeSoundPatterns } from 'src/services/phonetic/soundPatternAnalyzer';
 import { ipaTokenColor, ipaTokenStyle, type TokenVisual } from 'src/services/phonetic/ipaColorMap';
 import { analyzeRhymes } from 'src/services/phonetic/rhyme/rhymeAnalyzer';
 import type { PhonemeMotif, RhymeAnalysis } from 'src/services/phonetic/rhyme/types';
 import { generateVisualizationSvg, downloadSvg, textHash } from 'src/composables/useSvgExport';
+import { buildVisualizationLineItems } from 'src/services/phonetic/visualizationLine';
 
 const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
@@ -174,21 +180,18 @@ function wordTokensInLine(line: ILine): IWordToken[] {
 }
 
 function lineSyllableCount(line: ILine): number {
-  return wordTokensInLine(line).reduce(
-    (sum, tok) => sum + transcribedWord(tok).syllables.length,
-    0,
-  );
+  return visualizationItems(line).filter((item) => item.type === 'cell' && item.countsAsSyllable)
+    .length;
 }
 
 function lineCvRatio(line: ILine): string {
   let vowels = 0;
   let consonants = 0;
-  for (const tok of wordTokensInLine(line)) {
-    for (const syl of transcribedWord(tok).syllables) {
-      for (const t of syl.ipaTokens) {
-        if (isVowelToken(t)) vowels++;
-        else consonants++;
-      }
+  for (const item of visualizationItems(line)) {
+    if (item.type !== 'cell') continue;
+    for (const token of item.ipaTokens ?? []) {
+      if (isVowelToken(token)) vowels++;
+      else consonants++;
     }
   }
   if (vowels === 0) return consonants > 0 ? '∞' : '–';
@@ -196,9 +199,8 @@ function lineCvRatio(line: ILine): string {
   return r % 1 === 0 ? String(r) : r.toFixed(1);
 }
 
-function transcribedWord(tok: IToken): TranscribedWord {
-  if (tok.kind !== 'WORD') return { surface: '', language: 'ua', syllables: [] };
-  return transcribeWord(tok);
+function visualizationItems(line: ILine) {
+  return buildVisualizationLineItems(line);
 }
 
 const IPA_VOWEL_CHARS = new Set([
@@ -256,19 +258,17 @@ const indexedTokens = computed<IndexedToken[]>(() => {
   let flatIdx = 0;
   for (const line of store.document.lines) {
     if (!store.isLineConfirmed(line.id)) continue;
-    for (const tok of line.tokens) {
-      if (tok.kind !== 'WORD') continue;
-      const tw = transcribeWord(tok as IWordToken);
-      for (let si = 0; si < tw.syllables.length; si++) {
-        const syl = tw.syllables[si]!;
-        for (let ti = 0; ti < syl.ipaTokens.length; ti++) {
-          result.push({
-            token: syl.ipaTokens[ti]!,
-            flatIdx,
-            renderKey: `${tok.id}:${si}:${ti}`,
-          });
-          flatIdx++;
-        }
+    for (const item of visualizationItems(line)) {
+      if (item.type !== 'cell') continue;
+      const ipaTokens = item.ipaTokens ?? [];
+      const renderKeys = item.renderKeys ?? [];
+      for (let ti = 0; ti < ipaTokens.length; ti++) {
+        result.push({
+          token: ipaTokens[ti]!,
+          flatIdx,
+          renderKey: renderKeys[ti] ?? `${line.id}:${flatIdx}:${ti}`,
+        });
+        flatIdx++;
       }
     }
   }

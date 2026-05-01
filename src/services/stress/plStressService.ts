@@ -4,6 +4,8 @@ export interface PolishStressInfo {
   syllableIndex: number;
   stressFromEnd: number;
   ipa: string | null;
+  /** G2P-computed IPA, always present for WASM results (uses dictionary IPA when available). */
+  ipaTranscribed?: string;
   ipaSyllables?: string[];
   confidence: 'exact' | 'rule' | 'default';
 }

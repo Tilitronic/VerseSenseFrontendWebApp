@@ -321,10 +321,15 @@ export const usePoetryStore = defineStore('poetry', () => {
    * @param lang   - Language chosen by the user
    */
   function setWordLanguage(wordId: string, lang: Language) {
+    const currentTok = document.value.tokenIndex.get(wordId);
+    const shouldResetStress = currentTok?.kind === 'WORD' && currentTok.language !== lang;
     wordLanguages.value = new Map(wordLanguages.value).set(wordId, lang);
     // Picking a language explicitly = user confirmation
     confirmedWords.value = new Set(confirmedWords.value).add(wordId);
-    document.value = replaceTokenField(document.value, wordId, { language: lang });
+    document.value = replaceTokenField(document.value, wordId, {
+      language: lang,
+      ...(shouldResetStress ? { stressIndex: null } : {}),
+    });
     const sc = new Map(syllableCache.value);
     sc.delete(wordId);
     syllableCache.value = sc;
@@ -332,8 +337,11 @@ export const usePoetryStore = defineStore('poetry', () => {
     // Manual language override should immediately re-run stress pipelines.
     // This ensures EN -> PL switch triggers Polish async resolver even when
     // the word had no stress before override.
-    autoDetectAndStressWords();
-    void resolveAllStressAsync();
+    autoDetectAndStressWords({
+      targetWordIds: new Set([wordId]),
+      reason: 'action:setWordLanguage',
+    });
+    void resolveAllStressAsync({ reason: 'action:setWordLanguage' });
   }
 
   /**
@@ -520,7 +528,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     // which words actually changed vs. which lines just shifted (e.g. an empty
     // line was inserted above).
     interface WordSnapshot {
+      id: string;
       text: string;
+      language: Language;
       stressIndex: number | null;
       lang: Language | undefined;
       confirmed: boolean;
@@ -537,7 +547,9 @@ export const usePoetryStore = defineStore('poetry', () => {
         const { lockedLanguage } = getWordScriptInfo(tok.text);
         const pendingSrc = pendingStressIds.value.get(tok.id);
         const snap: WordSnapshot = {
+          id: tok.id,
           text: tok.text,
+          language: tok.language,
           stressIndex: tok.stressIndex,
           lang: wordLanguages.value.get(tok.id),
           confirmed: lockedLanguage !== null || confirmedWords.value.has(tok.id),
@@ -559,8 +571,12 @@ export const usePoetryStore = defineStore('poetry', () => {
     //            but only when the word text appears exactly once in old doc.
     const newConfirmed = new Set<string>();
     const newLangMap = new Map<string, Language>();
+    const preservedTokenLang = new Map<string, Language>();
     const newPendingIds = new Map<string, 'ml' | 'heteronym' | 'variative'>();
     const stressPatches = new Map<string, number | null>(); // newId → stressIndex
+    const dirtyWordIds = new Set<string>();
+    const dirtyPolishIds = new Set<string>();
+    const reusedWordIds = new Map<string, string>(); // newId -> previous stable id
 
     // Track which text-based snaps were already consumed by a positional match
     // so we don't double-apply them when the same word appears multiple times.
@@ -589,6 +605,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         if (posSnap && posSnap.text === tok.text) {
           // Exact positional + text match — best case
           snap = posSnap;
+          reusedWordIds.set(tok.id, posSnap.id);
         } else if (!posMatchedTexts.has(tok.text)) {
           // No positional match for this text: try text-based fallback
           // (safe only when the word doesn't appear at its expected position,
@@ -596,11 +613,20 @@ export const usePoetryStore = defineStore('poetry', () => {
           snap = prevByText.get(tok.text);
         }
 
+        const finalId = reusedWordIds.get(tok.id) ?? tok.id;
         if (snap) {
-          if (snap.stressIndex !== null) stressPatches.set(tok.id, snap.stressIndex);
-          if (snap.lang !== undefined) newLangMap.set(tok.id, snap.lang);
-          if (snap.confirmed) newConfirmed.add(tok.id);
-          if (snap.pendingSource) newPendingIds.set(tok.id, snap.pendingSource);
+          preservedTokenLang.set(finalId, snap.language);
+          if (snap.stressIndex !== null) stressPatches.set(finalId, snap.stressIndex);
+          if (snap.lang !== undefined) newLangMap.set(finalId, snap.lang);
+          if (snap.confirmed) newConfirmed.add(finalId);
+          if (snap.pendingSource) newPendingIds.set(finalId, snap.pendingSource);
+        } else {
+          // New or changed word text — run scoped sync pass for this token.
+          dirtyWordIds.add(finalId);
+          if (tok.language === 'pl') {
+            // New or changed Polish word text — must be re-resolved.
+            dirtyPolishIds.add(finalId);
+          }
         }
         // No matching snap → annotations cleared (word is new or changed)
         wi++;
@@ -613,15 +639,26 @@ export const usePoetryStore = defineStore('poetry', () => {
       let lineChanged = false;
       const newTokens = line.tokens.map((tok) => {
         if (tok.kind !== 'WORD') return tok;
-        const newStress = stressPatches.get(tok.id);
-        const newLang = newLangMap.get(tok.id);
-        if (newStress === undefined && newLang === undefined) return tok;
+        const reusedId = reusedWordIds.get(tok.id);
+        const finalId = reusedId ?? tok.id;
+        const newStress = stressPatches.get(finalId);
+        const newLang = newLangMap.get(finalId);
+        const preservedLang = preservedTokenLang.get(finalId);
+        if (
+          newStress === undefined &&
+          newLang === undefined &&
+          preservedLang === undefined &&
+          !reusedId
+        )
+          return tok;
         const newTok: IWordToken = {
           ...tok,
+          id: finalId,
           stressIndex: newStress !== undefined ? newStress : tok.stressIndex,
-          language: newLang !== undefined ? newLang : tok.language,
+          language: newLang !== undefined ? newLang : (preservedLang ?? tok.language),
         };
-        newTokenIndex.set(tok.id, newTok);
+        if (reusedId) newTokenIndex.delete(tok.id);
+        newTokenIndex.set(finalId, newTok);
         lineChanged = true;
         return newTok;
       });
@@ -635,12 +672,34 @@ export const usePoetryStore = defineStore('poetry', () => {
     // pendingStressAlts is derived from live resolution, not migrated — reset it
     pendingStressAlts.value = new Map();
 
+    stressAsyncLog.debug(
+      `rebuildDocument dirtyPolishIds=${dirtyPolishIds.size} [${[...dirtyPolishIds]
+        .slice(0, 10)
+        .map((id) => {
+          const t = doc.tokenIndex.get(id);
+          return t?.kind === 'WORD' ? t.text : id;
+        })
+        .join(', ')}${dirtyPolishIds.size > 10 ? ', ...' : ''}]`,
+    );
+
     // Debounce stress resolution — don't run while the user is still typing
     if (stressDebounceTimer) clearTimeout(stressDebounceTimer);
+    const dirtyTargets = new Set(dirtyWordIds);
+    const polishTargets = new Set(dirtyPolishIds);
     stressDebounceTimer = setTimeout(() => {
       stressSyncLog.debug('debounce fired — running sync + async resolve');
-      autoDetectAndStressWords();
-      void resolveAllStressAsync();
+      if (dirtyTargets.size > 0) {
+        autoDetectAndStressWords({
+          targetWordIds: dirtyTargets,
+          reason: 'rebuildDocument:debounced',
+        });
+      } else {
+        stressSyncLog.debug('[rebuildDocument:debounced] no dirty words — sync pass skipped');
+      }
+      void resolveAllStressAsync({
+        polishWordIds: polishTargets,
+        reason: 'rebuildDocument:debounced',
+      });
     }, STRESS_DEBOUNCE_MS);
   }
 
@@ -654,7 +713,8 @@ export const usePoetryStore = defineStore('poetry', () => {
    *      auto-set stressIndex = 0 (monosyllabic — always stressed).
    * Words that already have a stressIndex set by the user are NOT touched.
    */
-  function autoDetectAndStressWords() {
+  function autoDetectAndStressWords(options?: { targetWordIds?: Set<string>; reason?: string }) {
+    const targetWordIds = options?.targetWordIds;
     const docLang = documentLanguage.value;
 
     // ── Pre-compute script-aware language hints (two-pass) ───────────────────
@@ -707,6 +767,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     lines.forEach((line, lineIdx) => {
       for (const t of line.tokens) {
         if (t.kind !== 'WORD') continue;
+        if (targetWordIds && targetWordIds.size > 0 && !targetWordIds.has(t.id)) continue;
         if (wordLanguages.value.has(t.id)) continue;
         const info = getWordScriptInfo(t.text);
         if (info.lockedLanguage !== null) continue; // locked — no hint needed
@@ -757,6 +818,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     lines.forEach((line, lineIdx) => {
       for (const tok of line.tokens) {
         if (tok.kind !== 'WORD') continue;
+        if (targetWordIds && targetWordIds.size > 0 && !targetWordIds.has(tok.id)) continue;
 
         // ── 1. Language detection (skip manual overrides) ─────────────────────
         if (!wordLanguages.value.has(tok.id)) {
@@ -927,7 +989,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     if (newResolver) {
       autoDetectAndStressWords();
       // After the sync trie pass, run the async ML pass for any remaining OOV words.
-      void resolveAllStressAsync();
+      void resolveAllStressAsync({ reason: 'watch:stressResolver-ready' });
     }
   });
 
@@ -936,7 +998,7 @@ export const usePoetryStore = defineStore('poetry', () => {
   watch(
     () => appStore.useDbStress,
     (enabled) => {
-      if (enabled) void resolveAllStressAsync();
+      if (enabled) void resolveAllStressAsync({ forcePolish: true, reason: 'watch:useDbStress' });
     },
   );
 
@@ -981,6 +1043,7 @@ export const usePoetryStore = defineStore('poetry', () => {
   // Replaced each time resolveAllStressAsync() is called so an in-flight
   // ML call for a word the user has already edited is silently discarded.
   let _asyncStressAbort: AbortController | null = null;
+  let _asyncStressPassSeq = 0;
 
   // ── Expose ─────────────────────────────────────────────────────────────────
 
@@ -990,7 +1053,7 @@ export const usePoetryStore = defineStore('poetry', () => {
   if (_savedAnnotations) applyAnnotations(_savedAnnotations);
   autoDetectAndStressWords();
   // Ensure persisted Polish stresses are reconciled with the resolver on load.
-  void resolveAllStressAsync();
+  void resolveAllStressAsync({ forcePolish: true, reason: 'init' });
   // Trigger one immediate save so fresh annotations are in sync
   saveAnnotations();
 
@@ -1002,7 +1065,12 @@ export const usePoetryStore = defineStore('poetry', () => {
    * Each new call aborts the previous pass so stale results for edited words
    * are never applied.
    */
-  async function resolveAllStressAsync(): Promise<void> {
+  async function resolveAllStressAsync(options?: {
+    forcePolish?: boolean;
+    polishWordIds?: Set<string>;
+    reason?: string;
+  }): Promise<void> {
+    const passId = ++_asyncStressPassSeq;
     // Abort any previous in-progress async pass.
     _asyncStressAbort?.abort();
     const ctl = new AbortController();
@@ -1016,11 +1084,40 @@ export const usePoetryStore = defineStore('poetry', () => {
       return;
     }
     const resolver = hasUaAsync ? stressResolver.value : null;
-    const candidateTokens = allWordTokens.value.filter(
-      (t) => (t.language === 'ua' && t.stressIndex === null) || t.language === 'pl',
+    const forcePolish = options?.forcePolish === true;
+    const polishWordIds = options?.polishWordIds;
+    const reason = options?.reason ?? 'unspecified';
+    const allWords = allWordTokens.value;
+    const totalPlWords = allWords.filter((t) => t.language === 'pl').length;
+    const totalUaWords = allWords.filter((t) => t.language === 'ua').length;
+
+    if (polishWordIds && polishWordIds.size > 0) {
+      const requested = [...polishWordIds]
+        .slice(0, 12)
+        .map((id) => {
+          const t = document.value.tokenIndex.get(id);
+          return t?.kind === 'WORD' ? t.text : id;
+        })
+        .join(', ');
+      stressAsyncLog.debug(
+        `[pass ${passId}] trigger=${reason} requested polishWordIds=${polishWordIds.size} [${requested}${polishWordIds.size > 12 ? ', ...' : ''}]`,
+      );
+    }
+
+    const candidateTokens = allWordTokens.value.filter((t) => {
+      if (t.language === 'ua') return t.stressIndex === null;
+      if (t.language !== 'pl') return false;
+      if (forcePolish) return true;
+      if (polishWordIds && polishWordIds.size > 0) return polishWordIds.has(t.id);
+      return t.stressIndex === null;
+    });
+    const plCandidates = candidateTokens.filter((t) => t.language === 'pl');
+    const uaCandidates = candidateTokens.filter((t) => t.language === 'ua');
+    stressAsyncLog.debug(
+      `[pass ${passId}] trigger=${reason} forcePolish=${forcePolish} totals(pl=${totalPlWords}, ua=${totalUaWords}) candidates(pl=${plCandidates.length}, ua=${uaCandidates.length}, all=${candidateTokens.length})`,
     );
     stressAsyncLog.info(
-      `resolving ${candidateTokens.length} word${candidateTokens.length === 1 ? '' : 's'} via async stress services…`,
+      `[pass ${passId}] resolving ${candidateTokens.length} word${candidateTokens.length === 1 ? '' : 's'} via async stress services…`,
     );
 
     const patches = new Map<
@@ -1035,7 +1132,7 @@ export const usePoetryStore = defineStore('poetry', () => {
 
     for (const tok of candidateTokens) {
       if (signal.aborted) {
-        stressAsyncLog.debug('aborted — stopping');
+        stressAsyncLog.debug(`[pass ${passId}] aborted — stopping`);
         return;
       }
 
@@ -1045,7 +1142,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         const info = await getPolishStressInfo(tok.text, signal);
 
         if (signal.aborted) {
-          stressAsyncLog.debug('aborted while awaiting Polish service — stopping');
+          stressAsyncLog.debug(`[pass ${passId}] aborted while awaiting Polish service — stopping`);
           return;
         }
 

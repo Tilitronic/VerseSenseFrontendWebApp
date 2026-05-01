@@ -10,13 +10,13 @@
  */
 
 import type { ILine, IWordToken } from 'src/model/Token';
-import { transcribeWord } from 'src/services/phonetic/wordTranscription';
 import {
   ipaTokenStyle,
   PSYCHO_GROUP_INFO,
   VOWEL_GROUP_INFO,
 } from 'src/services/phonetic/ipaColorMap';
 import type { TokenVisual } from 'src/services/phonetic/ipaColorMap';
+import { buildVisualizationLineItems } from 'src/services/phonetic/visualizationLine';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -103,24 +103,18 @@ function buildRows(lines: ILine[], isLineConfirmed: (id: string) => boolean): Gr
     }
 
     const cells: Cell[] = [];
-    for (const tok of line.tokens) {
-      if (tok.kind === 'TAB') {
+    for (const item of buildVisualizationLineItems(line)) {
+      if (item.type === 'tab') {
         cells.push({ type: 'tab' });
         continue;
       }
-      if (tok.kind !== 'WORD') continue;
-
-      const tw = transcribeWord(tok);
-      for (let si = 0; si < tw.syllables.length; si++) {
-        const syl = tw.syllables[si]!;
-        cells.push({
-          type: 'syl',
-          stressed: syl.stressed,
-          wordLast: si === tw.syllables.length - 1,
-          ipaTokens: syl.ipaTokens,
-          tokenKeys: syl.ipaTokens.map((_, ti) => `${tok.id}:${si}:${ti}`),
-        });
-      }
+      cells.push({
+        type: 'syl',
+        stressed: item.stressed ?? false,
+        wordLast: item.wordLast ?? false,
+        ipaTokens: item.ipaTokens ?? [],
+        tokenKeys: item.renderKeys ?? [],
+      });
     }
     rows.push({ lineIdx: li, kind: 'content', cells });
   }
