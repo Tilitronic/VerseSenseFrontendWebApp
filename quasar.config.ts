@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import type { Plugin } from 'vite';
+import wasmPlugin from 'vite-plugin-wasm';
 
 // Absolute path to the pre-compressed ONNX model — sourced from the linked ua-stress-ml package.
 const LUSCINIA_MODEL_PATH = resolve(
@@ -205,6 +206,7 @@ export default defineConfig((ctx) => {
           'ua-stress-ml',
           'ua-word-stress',
           'onnxruntime-web',
+          '@tilitronic/polish-stress-wasm',
           // cmu-pronouncing-dictionary is served as JSON via cmuDictPlugin — not imported as a module.
           'cmu-pronouncing-dictionary',
         );
@@ -212,6 +214,7 @@ export default defineConfig((ctx) => {
       // viteVuePluginOptions: {},
 
       vitePlugins: [
+        wasmPlugin(),
         cmuDictPlugin(),
         lusciniaModelPlugin(),
         [

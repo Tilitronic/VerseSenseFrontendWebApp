@@ -8,8 +8,11 @@
  * Stress: always falls on the PENULTIMATE syllable (with very rare exceptions).
  */
 
+import { peekPolishStressInfo } from 'src/services/stress/plStressService';
+
 export interface PlSyllable {
   ipa: string;
+  text: string;
   stressed: boolean;
   isOpen: boolean;
 }
@@ -90,16 +93,24 @@ function isIPAVowelStart(ch: string): boolean {
   return IPA_VOWELS.has(ch);
 }
 
+function endsWithIpaVowel(ipa: string): boolean {
+  return /(?:a|ɛ|i|ɔ|u|ɨ|ɛ̃|ɔ̃)$/.test(ipa);
+}
+
 function splitIpaToSyllables(ipa: string): string[] {
   if (!ipa) return [];
 
-  // Collect vowel nucleus positions (single-char vowels for simplicity)
+  // Collect vowel nucleus positions
   const nuclei: number[] = [];
   for (let i = 0; i < ipa.length; i++) {
     if (isIPAVowelStart(ipa[i]!)) nuclei.push(i);
   }
 
   if (nuclei.length === 0) return [ipa];
+  if (nuclei.length === 1) {
+    // Single vowel — return the whole word as one syllable
+    return [ipa];
+  }
 
   const syllables: string[] = [];
   let prev = 0;
@@ -107,21 +118,50 @@ function splitIpaToSyllables(ipa: string): string[] {
   for (let ni = 0; ni < nuclei.length; ni++) {
     const nucStart = nuclei[ni]!;
     const nucEnd = nucStart + 1;
-    const nextNuc = nuclei[ni + 1] ?? ipa.length;
-    const between = ipa.slice(nucEnd, nextNuc);
+    const isLastVowel = ni === nuclei.length - 1;
 
-    let codaEnd: number;
-    if (ni < nuclei.length - 1) {
-      codaEnd = between.length > 1 ? nucEnd + 1 : nucEnd;
+    if (isLastVowel) {
+      // Last vowel nucleus — take everything from prev to the end
+      syllables.push(ipa.slice(prev));
     } else {
-      codaEnd = ipa.length;
-    }
+      const nextNuc = nuclei[ni + 1]!;
+      const between = ipa.slice(nucEnd, nextNuc);
 
-    syllables.push(ipa.slice(prev, codaEnd));
-    prev = codaEnd;
+      // Consonant cluster handling: first consonant after vowel goes to coda,
+      // rest go to next syllable's onset. Single consonant goes to next syllable.
+      let codaEnd = nucEnd;
+      if (between.length > 1) {
+        // Multiple consonants: keep one in coda
+        codaEnd = nucEnd + 1;
+      }
+      // else: single or no consonant → onset of next syllable
+
+      syllables.push(ipa.slice(prev, codaEnd));
+      prev = codaEnd;
+    }
   }
 
   return syllables.filter((s) => s.length > 0);
+}
+
+function buildFromService(word: string, stressIndex: number): PlSyllable[] | null {
+  const info = peekPolishStressInfo(word);
+  if (!info || info.syllables.length === 0) return null;
+
+  const effectiveStress =
+    stressIndex >= 0 && stressIndex < info.syllables.length
+      ? stressIndex
+      : Math.max(0, Math.min(info.syllableIndex, info.syllables.length - 1));
+
+  return info.syllables.map((part, idx) => {
+    const ipa = graphemesToIPA(part) || part;
+    return {
+      ipa,
+      text: part,
+      stressed: idx === effectiveStress,
+      isOpen: endsWithIpaVowel(ipa),
+    };
+  });
 }
 
 /**
@@ -132,11 +172,18 @@ function splitIpaToSyllables(ipa: string): string[] {
  * @param stressIndex - 0-based index; pass -1 to use penultimate rule
  */
 export function transcribePolish(word: string, stressIndex: number): PlSyllable[] {
+  const serviceSyllables = buildFromService(word, stressIndex);
+  if (serviceSyllables) return serviceSyllables;
+
   const ipa = graphemesToIPA(word);
+  if (!ipa || ipa.length === 0) {
+    return [{ ipa: word, text: word, stressed: true, isOpen: false }];
+  }
+
   const parts = splitIpaToSyllables(ipa);
 
   if (parts.length === 0) {
-    return [{ ipa: ipa || word, stressed: true, isOpen: false }];
+    return [{ ipa: ipa || word, text: word, stressed: true, isOpen: false }];
   }
 
   // Default: penultimate stress
@@ -145,7 +192,8 @@ export function transcribePolish(word: string, stressIndex: number): PlSyllable[
 
   return parts.map((part, idx) => ({
     ipa: part,
+    text: part,
     stressed: idx === effectiveStress,
-    isOpen: isIPAVowelStart(part[part.length - 1] ?? ''),
+    isOpen: endsWithIpaVowel(part),
   }));
 }

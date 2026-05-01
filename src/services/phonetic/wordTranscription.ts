@@ -68,7 +68,7 @@ function plTranscribe(text: string, stressIndex: number): TranscribedSyllable[] 
   return transcribePolish(text, stressIndex).map((s) => ({
     ipa: s.ipa,
     ipaTokens: tokenizeIPA(s.ipa),
-    text: s.ipa,
+    text: s.text,
     stressed: s.stressed,
     isOpen: s.isOpen,
   }));

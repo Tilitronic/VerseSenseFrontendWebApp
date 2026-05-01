@@ -166,8 +166,54 @@ function getCharSlots(tok: IWordToken): CharSlot[] {
   return getWordCharSlots(wordDisplayText(tok), tok.language);
 }
 
+function polishSyllableRanges(tok: IWordToken): Array<{ start: number; end: number }> {
+  if (tok.language !== 'pl') return [];
+  const text = wordDisplayText(tok);
+  const syllables = store.getSyllables(tok.id);
+  if (syllables.length === 0) return [];
+
+  const ranges: Array<{ start: number; end: number }> = [];
+  let cursor = 0;
+  for (const syl of syllables) {
+    const len = syl.phonetic.length;
+    ranges.push({ start: cursor, end: cursor + len });
+    cursor += len;
+  }
+
+  // If lengths drift for any reason, fall back to legacy vowel-ordinal mapping.
+  if (cursor !== text.length) return [];
+  return ranges;
+}
+
+function stressedPolishVowelIndex(tok: IWordToken): number | null {
+  if (tok.language !== 'pl' || tok.stressIndex === null) return null;
+
+  const ranges = polishSyllableRanges(tok);
+  const range = ranges[tok.stressIndex];
+  if (!range) return null;
+
+  const slots = getCharSlots(tok);
+  const nucleus = slots.find((s) => s.isVowel && s.index >= range.start && s.index < range.end);
+  return nucleus?.index ?? null;
+}
+
+function polishSyllableIndexFromChar(tok: IWordToken, charIndex: number): number | null {
+  if (tok.language !== 'pl') return null;
+  const ranges = polishSyllableRanges(tok);
+  if (ranges.length === 0) return null;
+
+  for (let i = 0; i < ranges.length; i++) {
+    const r = ranges[i]!;
+    if (charIndex >= r.start && charIndex < r.end) return i;
+  }
+  return null;
+}
+
 function isStressedVowel(tok: IWordToken, slot: CharSlot): boolean {
   if (!slot.isVowel || tok.stressIndex === null) return false;
+  if (tok.language === 'pl') {
+    return stressedPolishVowelIndex(tok) === slot.index;
+  }
   return vowelCharIndex(tok.text, tok.language, tok.stressIndex) === slot.index;
 }
 
@@ -212,6 +258,15 @@ function stressTitle(tok: IWordToken, slot: CharSlot): string {
 
 function setStress(tok: IWordToken, slot: CharSlot) {
   if (!slot.isVowel) return;
+
+  if (tok.language === 'pl') {
+    const syllableIdx = polishSyllableIndexFromChar(tok, slot.index);
+    if (syllableIdx !== null) {
+      store.setWordStress(tok.id, syllableIdx);
+      return;
+    }
+  }
+
   let ord = 0;
   for (const s of getCharSlots(tok)) {
     if (!s.isVowel) continue;

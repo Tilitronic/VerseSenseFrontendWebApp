@@ -5,3 +5,11 @@ declare namespace NodeJS {
     VUE_ROUTER_BASE: string | undefined;
   }
 }
+
+interface ImportMetaEnv {
+  readonly VITE_POLISH_STRESS_API_BASE?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

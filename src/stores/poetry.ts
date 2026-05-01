@@ -25,6 +25,7 @@ import { Sylabizer, type Syllable } from 'src/services/poetryEngines/ua/Sylabize
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
 import { useStressTrie } from 'src/composables/useStressTrie';
+import { getPolishStressInfo, peekPolishStressInfo } from 'src/services/stress/plStressService';
 import { useAppStore } from 'src/stores/app';
 import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
 
@@ -465,11 +466,25 @@ export const usePoetryStore = defineStore('poetry', () => {
     if (!tok || tok.kind !== 'WORD') return [];
     const wt = tok as IWordToken;
     let syllables: Syllable[] = [];
-    try {
-      const phonemes = getPhoneme(wt.text.toLowerCase());
-      syllables = Sylabizer.createSyllables(phonemes, wt.stressIndex ?? 0);
-    } catch {
-      // Non-UA word or parse error — return empty
+    if (wt.language === 'pl') {
+      const info = peekPolishStressInfo(wt.text);
+      if (info?.syllables.length) {
+        const stressIndex = wt.stressIndex ?? Math.max(0, info.syllableIndex);
+        syllables = info.syllables.map((part, index) => ({
+          phonemes: [],
+          index,
+          isOpen: /[aeiouyąęó]$/i.test(part),
+          stress: index === stressIndex,
+          phonetic: part,
+        }));
+      }
+    } else {
+      try {
+        const phonemes = getPhoneme(wt.text.toLowerCase());
+        syllables = Sylabizer.createSyllables(phonemes, wt.stressIndex ?? 0);
+      } catch {
+        // Non-UA word or parse error — return empty
+      }
     }
     const next = new Map(syllableCache.value);
     next.set(wordId, syllables);
@@ -963,13 +978,12 @@ export const usePoetryStore = defineStore('poetry', () => {
   let _asyncStressAbort: AbortController | null = null;
 
   /**
-   * Async pass: resolve stress for Ukrainian words that are still unresolved
-   * (stressIndex === null) using the full resolver (sync trie + optional ML).
-   * Only words that didn't get a sync result (OOV) are passed through the
-   * async ML path. Results still needing confirmation are NOT auto-confirmed.
+   * Async pass:
+   * - Ukrainian unresolved words → full resolver (sync trie + optional ML)
+   * - Polish words            → local HTTP service for stress/syllable/IPA cache
    *
-   * Each new call aborts the previous pass so stale ML results for edited
-   * words are never applied.
+   * Each new call aborts the previous pass so stale results for edited words
+   * are never applied.
    */
   async function resolveAllStressAsync(): Promise<void> {
     // Abort any previous in-progress async pass.
@@ -978,20 +992,20 @@ export const usePoetryStore = defineStore('poetry', () => {
     _asyncStressAbort = ctl;
     const signal = ctl.signal;
 
-    if (!stressResolver.value) {
-      stressAsyncLog.debug('resolver not ready — skipping');
+    const hasUaAsync = !!stressResolver.value && appStore.useMlStress;
+    const hasPlAsync = appStore.useDbStress;
+    if (!hasUaAsync && !hasPlAsync) {
+      stressAsyncLog.debug('all async resolvers disabled — skipping');
       return;
     }
-    if (!appStore.useMlStress) {
-      stressAsyncLog.debug('ML disabled — skipping');
-      return;
-    }
-    const resolver = stressResolver.value;
-    const unresolvedTokens = allWordTokens.value.filter(
-      (t) => t.stressIndex === null && t.language === 'ua',
+    const resolver = hasUaAsync ? stressResolver.value : null;
+    const candidateTokens = allWordTokens.value.filter(
+      (t) =>
+        (t.language === 'ua' && t.stressIndex === null) ||
+        (t.language === 'pl' && t.stressIndex === null),
     );
     stressAsyncLog.info(
-      `accenting ${unresolvedTokens.length} word${unresolvedTokens.length === 1 ? '' : 's'} via neural model…`,
+      `resolving ${candidateTokens.length} word${candidateTokens.length === 1 ? '' : 's'} via async stress services…`,
     );
 
     const patches = new Map<
@@ -1009,6 +1023,46 @@ export const usePoetryStore = defineStore('poetry', () => {
         stressAsyncLog.debug('aborted — stopping');
         return;
       }
+
+      const textAtDispatch = tok.text;
+
+      if (tok.language === 'pl') {
+        if (!appStore.useDbStress) {
+          stressAsyncLog.debug(`"${tok.text}" Polish service disabled — skip`);
+          continue;
+        }
+
+        const info = await getPolishStressInfo(tok.text, signal);
+
+        if (signal.aborted) {
+          stressAsyncLog.debug('aborted while awaiting Polish service — stopping');
+          return;
+        }
+
+        const currentTok = document.value.tokenIndex.get(tok.id);
+        const currentWord = currentTok?.kind === 'WORD' ? currentTok : null;
+        if (!currentWord || currentWord.text !== textAtDispatch) {
+          stressAsyncLog.debug(`"${tok.id}" changed — discarding Polish result`);
+          continue;
+        }
+
+        if (!info) {
+          stressAsyncLog.debug(`Polish service returned no data for “${tok.text}”`);
+          continue;
+        }
+
+        const syllableIndex = Math.max(0, Math.min(info.syllableIndex, info.syllables.length - 1));
+        syllableCache.value.delete(tok.id);
+        patches.set(tok.id, {
+          syllableIndex,
+          confirmed: true,
+          source: 'db',
+          stresses: [syllableIndex],
+        });
+        stressAsyncLog.debug(`"${tok.text}" → syllable ${syllableIndex} via Polish service`);
+        continue;
+      }
+
       if (tok.stressIndex !== null) {
         stressAsyncLog.debug(`"${tok.text}" already resolved (${tok.stressIndex}) — skip`);
         continue;
@@ -1017,7 +1071,10 @@ export const usePoetryStore = defineStore('poetry', () => {
         stressAsyncLog.debug(`"${tok.text}" lang=${tok.language} — skip`);
         continue;
       }
-      const textAtDispatch = tok.text;
+      if (!resolver) {
+        stressAsyncLog.debug('UA async resolver not ready — skip');
+        continue;
+      }
       stressAsyncLog.info(`accenting “${tok.text}”…`);
       const resolution = await resolver.resolve(tok.text, signal);
 

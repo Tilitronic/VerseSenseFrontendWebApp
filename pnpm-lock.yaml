@@ -26,6 +26,9 @@ importers:
       '@quasar/extras':
         specifier: ^1.16.4
         version: 1.17.0
+      '@tilitronic/polish-stress-wasm':
+        specifier: ^0.1.2
+        version: 0.1.2
       axios:
         specifier: ^1.2.1
         version: 1.13.2
@@ -108,6 +111,9 @@ importers:
       vite-plugin-checker:
         specifier: ^0.11.0
         version: 0.11.0(eslint@9.39.2)(optionator@0.9.4)(typescript@5.9.3)(vite@7.2.7(@types/node@20.19.26)(sass-embedded@1.96.0)(sass@1.96.0)(terser@5.44.1)(yaml@2.8.2))(vue-tsc@3.1.8(typescript@5.9.3))
+      vite-plugin-wasm:
+        specifier: ^3.6.0
+        version: 3.6.0(vite@7.2.7(@types/node@20.19.26)(sass-embedded@1.96.0)(sass@1.96.0)(terser@5.44.1)(yaml@2.8.2))
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@20.19.26)(sass-embedded@1.96.0)(sass@1.96.0)(terser@5.44.1)(yaml@2.8.2)
@@ -788,6 +794,10 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@tilitronic/polish-stress-wasm@0.1.2':
+    resolution: {integrity: sha512-r7GlZTkWAsg6YxDKAMcVL7I+rqZ3fzTwsBTvJhkTbSp6JSeD0tvAi0dNMquT5E+zn+5VHrqa40IL0M3UtMFSqg==}
+    engines: {node: '>=16.0.0'}
 
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
@@ -2852,6 +2862,11 @@ packages:
       vue-tsc:
         optional: true
 
+  vite-plugin-wasm@3.6.0:
+    resolution: {integrity: sha512-mL/QPziiIA4RAA6DkaZZzOstdwbW5jO4Vz7Zenj0wieKWBlNvIvX5L5ljum9lcUX0ShNfBgCNLKTjNkRVVqcsw==}
+    peerDependencies:
+      vite: ^2 || ^3 || ^4 || ^5 || ^6 || ^7 || ^8
+
   vite@7.2.7:
     resolution: {integrity: sha512-ITcnkFeR3+fI8P1wMgItjGrR10170d8auB4EpMLPqmx6uxElH3a/hHGQabSHKdqd4FXWO1nFIp9rRn7JQ34ACQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -3614,6 +3629,8 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@tilitronic/polish-stress-wasm@0.1.2': {}
 
   '@types/body-parser@1.19.6':
     dependencies:
@@ -5764,6 +5781,10 @@ snapshots:
       optionator: 0.9.4
       typescript: 5.9.3
       vue-tsc: 3.1.8(typescript@5.9.3)
+
+  vite-plugin-wasm@3.6.0(vite@7.2.7(@types/node@20.19.26)(sass-embedded@1.96.0)(sass@1.96.0)(terser@5.44.1)(yaml@2.8.2)):
+    dependencies:
+      vite: 7.2.7(@types/node@20.19.26)(sass-embedded@1.96.0)(sass@1.96.0)(terser@5.44.1)(yaml@2.8.2)
 
   vite@7.2.7(@types/node@20.19.26)(sass-embedded@1.96.0)(sass@1.96.0)(terser@5.44.1)(yaml@2.8.2):
     dependencies:
