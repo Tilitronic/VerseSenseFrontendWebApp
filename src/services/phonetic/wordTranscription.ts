@@ -12,6 +12,7 @@ import { transcribeUkrainian } from './uaTranscription';
 import { transcribeEnglish } from './enTranscription';
 import { transcribePolish } from './plTranscription';
 import { tokenizeIPA } from './ipaTokenizer';
+import { stressPolishLog } from 'src/services/logging';
 
 // ── Shared output type ────────────────────────────────────────────────────────
 
@@ -118,6 +119,9 @@ export function transcribeWord(token: IWordToken): TranscribedWord {
       break;
     case 'pl':
       syllables = plTranscribe(text, idx);
+      stressPolishLog.debug(
+        `transcribeWord("${text}", pl, stress=${idx}): ${syllables.length} syllables [${syllables.map((s) => s.ipa).join(' | ')}]`,
+      );
       break;
     default:
       syllables = [

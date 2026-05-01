@@ -11,6 +11,7 @@
  */
 
 import { peekPolishStressInfo } from 'src/services/stress/plStressService';
+import { stressPolishLog } from 'src/services/logging';
 
 export interface PlSyllable {
   ipa: string;
@@ -167,8 +168,12 @@ function buildFromService(word: string, stressIndex: number): PlSyllable[] | nul
         ? splitIpaToSyllables(ipaFromPackage)
         : [];
 
+  stressPolishLog.debug(
+    `buildFromService(${word}): ipaSyllables=${packageIpaSyllables.join('|')} graphemes=${info.syllables.join('|')}`,
+  );
   return info.syllables.map((part, idx) => {
     const ipa = packageIpaSyllables[idx] ?? graphemesToIPA(part) ?? part;
+    stressPolishLog.debug(`  [${idx}] grapheme="${part}" ipa="${ipa}"`);
     return {
       ipa,
       text: part,
@@ -187,6 +192,9 @@ function buildFromService(word: string, stressIndex: number): PlSyllable[] | nul
  */
 export function transcribePolish(word: string, stressIndex: number): PlSyllable[] {
   const serviceSyllables = buildFromService(word, stressIndex);
+  stressPolishLog.debug(
+    `transcribePolish("${word}", stress=${stressIndex}): serviceSyllables=${serviceSyllables ? `${serviceSyllables.length} items` : 'null (fallback)'}`,
+  );
   if (serviceSyllables) return serviceSyllables;
 
   const ipa = graphemesToIPA(word);
@@ -194,7 +202,10 @@ export function transcribePolish(word: string, stressIndex: number): PlSyllable[
     return [{ ipa: word, text: word, stressed: true, isOpen: false }];
   }
 
+  stressPolishLog.debug(`  graphemesToIPA("${word}") = "${ipa}"`);
+
   const parts = splitIpaToSyllables(ipa);
+  stressPolishLog.debug(`  splitIpaToSyllables("${ipa}") = [${parts.join(', ')}]`);
 
   if (parts.length === 0) {
     return [{ ipa: ipa || word, text: word, stressed: true, isOpen: false }];
@@ -204,10 +215,14 @@ export function transcribePolish(word: string, stressIndex: number): PlSyllable[
   const effectiveStress =
     stressIndex >= 0 && stressIndex < parts.length ? stressIndex : Math.max(0, parts.length - 2);
 
-  return parts.map((part, idx) => ({
+  const result = parts.map((part, idx) => ({
     ipa: part,
     text: part,
     stressed: idx === effectiveStress,
     isOpen: endsWithIpaVowel(part),
   }));
+  stressPolishLog.debug(
+    `  returning ${result.length} syllables: ${result.map((s) => s.ipa).join(' | ')}`,
+  );
+  return result;
 }

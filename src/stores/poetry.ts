@@ -300,7 +300,11 @@ export const usePoetryStore = defineStore('poetry', () => {
           // For Polish, always re-resolve stress from the package on startup.
           // This prevents stale persisted values from masking dictionary exceptions.
           stressIndex: tok.language === 'pl' ? tok.stressIndex : (ann.stress ?? tok.stressIndex),
-          language: preferEnabledLanguage(ann.lang ?? tok.language, undefined, documentLanguage.value),
+          language: preferEnabledLanguage(
+            ann.lang ?? tok.language,
+            undefined,
+            documentLanguage.value,
+          ),
         };
         if (ann.lang && appStore.isLanguageEnabled(ann.lang)) newLangMap.set(tok.id, ann.lang);
         if (ann.confirmed) newConfirmed.add(tok.id);
@@ -392,7 +396,11 @@ export const usePoetryStore = defineStore('poetry', () => {
     const next = new Map(wordLanguages.value);
     next.delete(wordId);
     wordLanguages.value = next;
-    const nextLang = preferEnabledLanguage(documentLanguage.value, undefined, firstEnabledLanguage());
+    const nextLang = preferEnabledLanguage(
+      documentLanguage.value,
+      undefined,
+      firstEnabledLanguage(),
+    );
     document.value = replaceTokenField(document.value, wordId, {
       language: nextLang,
     });
@@ -773,7 +781,11 @@ export const usePoetryStore = defineStore('poetry', () => {
   function autoDetectAndStressWords(options?: { targetWordIds?: Set<string>; reason?: string }) {
     const targetWordIds = options?.targetWordIds;
     const enabled = enabledLanguagesSet();
-    const docLang = preferEnabledLanguage(documentLanguage.value, undefined, firstEnabledLanguage());
+    const docLang = preferEnabledLanguage(
+      documentLanguage.value,
+      undefined,
+      firstEnabledLanguage(),
+    );
 
     // ── Pre-compute script-aware language hints (two-pass) ───────────────────
     //
@@ -1087,7 +1099,11 @@ export const usePoetryStore = defineStore('poetry', () => {
           if (tok.kind !== 'WORD') return tok;
           if (enabled.has(tok.language)) return tok;
           const scriptInfo = getWordScriptInfo(tok.text);
-          const nextLang = preferEnabledLanguage(tok.language, scriptInfo.allowedLanguages, fallback);
+          const nextLang = preferEnabledLanguage(
+            tok.language,
+            scriptInfo.allowedLanguages,
+            fallback,
+          );
           const newTok: IWordToken = { ...tok, language: nextLang, stressIndex: null };
           newTokenIndex.set(tok.id, newTok);
           lineChanged = true;
