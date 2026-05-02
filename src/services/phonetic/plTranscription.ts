@@ -180,7 +180,12 @@ function buildFromService(word: string, stressIndex: number): PlSyllable[] | nul
     `buildFromService(${word}): ipaSyllables=${packageIpaSyllables.join('|')} graphemes=${info.syllables.join('|')}`,
   );
   return info.syllables.map((part, idx) => {
-    const ipa = packageIpaSyllables[idx] ?? graphemesToIPA(part) ?? part;
+    // Strip leading tie-bar (U+0361) — can appear when package splits a tie-bar affricate across syllables
+    const rawIpa = (packageIpaSyllables[idx] ?? graphemesToIPA(part) ?? part).replace(
+      /^\u0361/,
+      '',
+    );
+    const ipa = rawIpa || graphemesToIPA(part) || part;
     stressPolishLog.debug(`  [${idx}] grapheme="${part}" ipa="${ipa}"`);
     return {
       ipa,

@@ -213,6 +213,21 @@ function buildLookup(): Map<string, ColorEntry> {
 
 const LOOKUP = buildLookup();
 
+// Aliases for diacritic vowel variants returned by external packages
+// (e.g. @tilitronic/polish-stress-wasm uses ä for an a-like vowel)
+const VOWEL_ALIASES: [string, string][] = [
+  ['ä', 'a'],
+  ['ë', 'ɛ'],
+  ['ï', 'i'],
+  ['ö', 'ɔ'],
+  ['ü', 'u'],
+];
+
+for (const [alias, base] of VOWEL_ALIASES) {
+  const entry = LOOKUP.get(base);
+  if (entry) LOOKUP.set(alias, entry);
+}
+
 /**
  * Returns an `hsla(h, s%, l%, alpha)` CSS color for the given IPA token,
  * or null if the token is not in the IPA database.

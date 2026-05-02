@@ -16,7 +16,16 @@
  * Ordered longest-first so the greedy scan picks the right one.
  */
 const DIGRAPHS: string[] = [
-  // Affricates (must precede their component chars)
+  // Tie-bar affricates (3-char, from @tilitronic/polish-stress-wasm package output)
+  't͡ʂ',
+  'd͡ʐ',
+  't͡ɕ',
+  'd͡ʑ',
+  'd͡ʒ',
+  't͡ʃ',
+  'd͡z',
+  't͡s',
+  // Affricates without tie-bar (must precede their component chars)
   'tʃ',
   'dʒ',
   'tɕ',
@@ -57,6 +66,15 @@ const DIGRAPHS: string[] = [
   'zʲ',
   'tʲ',
   'dʲ',
+  'kʲ',
+  'gʲ',
+  'bʲ',
+  'pʲ',
+  'mʲ',
+  'fʲ',
+  'vʲ',
+  'xʲ',
+  'wʲ',
   // English r-colored vowels
   'ɚ',
   'ɝ',
@@ -69,9 +87,13 @@ const DIGRAPH_SET = new Set(DIGRAPHS);
  * Split an IPA string into an array of sound tokens.
  * Each element is one phoneme / sound unit (may be 1–3 chars).
  */
+// Tie-bar character (U+0361) used by the Polish stress package as affricate marker
+const TIE_BAR = '\u0361';
+
 export function tokenizeIPA(ipa: string): string[] {
   const tokens: string[] = [];
-  let i = 0;
+  // Strip leading tie-bar (can appear when a package syllable starts mid-affricate)
+  let i = ipa.startsWith(TIE_BAR) ? 1 : 0;
 
   while (i < ipa.length) {
     let matched = false;
