@@ -3,6 +3,28 @@ import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
 import { tokenizeIPA } from './ipaTokenizer';
 import { transcribeWord } from './wordTranscription';
 
+// ── Memoization ───────────────────────────────────────────────────────────────
+// Cache transcription results per line fingerprint.
+// The fingerprint is stable across document rebuilds for lines whose word
+// texts, languages, and stress indices have not changed — because
+// rebuildDocument reuses the previous token IDs for unchanged words.
+
+const _vizCache = new Map<string, VisualizationLineItem[]>();
+const _VIZ_CACHE_MAX = 400;
+
+function _lineFingerprint(line: ILine): string {
+  // Only word tokens affect transcription; other tokens affect layout (TAB → tab cell).
+  let fp = '';
+  for (const tok of line.tokens) {
+    if (tok.kind === 'WORD') {
+      fp += `W${tok.id}|${tok.language}|${tok.stressIndex ?? -1};`;
+    } else {
+      fp += `${tok.kind};`;
+    }
+  }
+  return fp;
+}
+
 export interface VisualizationLineItem {
   type: 'tab' | 'cell';
   stressed?: boolean;
@@ -47,6 +69,16 @@ function zeroVowelTokens(tok: IWordToken): VisualizationToken[] {
 }
 
 export function buildVisualizationLineItems(line: ILine): VisualizationLineItem[] {
+  const key = _lineFingerprint(line);
+  const hit = _vizCache.get(key);
+  if (hit) return hit;
+  if (_vizCache.size >= _VIZ_CACHE_MAX) _vizCache.clear();
+  const result = _computeVisualizationLineItems(line);
+  _vizCache.set(key, result);
+  return result;
+}
+
+function _computeVisualizationLineItems(line: ILine): VisualizationLineItem[] {
   const items: VisualizationLineItem[] = [];
   let pendingPrefix: VisualizationToken[] = [];
 
@@ -60,9 +92,20 @@ export function buildVisualizationLineItems(line: ILine): VisualizationLineItem[
     if (countVowels(tok.text, tok.language) === 0) {
       const orphanTokens = zeroVowelTokens(tok);
 
-      // Merge zero-vowel clitics only for Cyrillic-like words (UA behavior).
-      // For Latin words (e.g. "co", "to" accidentally tagged as UA), keep a
-      // standalone cell so words do not collapse into one visual syllable.
+      // Cross-language clitic rule:
+      // if the word is a single grapheme and resolves to a single phoneme,
+      // merge it with the NEXT syllable instead of creating its own cell.
+      // Example: pl "z chmur" should not add an extra standalone syllable cell for "z".
+      const graphemeCount = [...tok.text].length;
+      const shouldMergeWithNext = graphemeCount === 1 && orphanTokens.length === 1;
+      if (shouldMergeWithNext) {
+        pendingPrefix.push(...orphanTokens);
+        continue;
+      }
+
+      // For the remaining zero-vowel words (non 1-letter/1-phoneme),
+      // keep legacy behavior: Cyrillic-like clitics merge, Latin stays standalone.
+      // This avoids collapsing full Latin chunks into one visual syllable.
       if (isLatinWord(tok.text)) {
         items.push({
           type: 'cell',

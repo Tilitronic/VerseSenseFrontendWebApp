@@ -159,6 +159,25 @@ export const poetryDecorations = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
+// Keep caret on the current line start (not previous line end) when a
+// collapsed selection lands right after a newline with negative assoc.
+const poetryCursorAssocFix = EditorView.updateListener.of((update) => {
+  if (!update.selectionSet) return;
+
+  const sel = update.state.selection.main;
+  if (!sel.empty) return;
+  if (sel.assoc >= 0) return;
+  if (sel.head <= 0) return;
+
+  const prevChar = update.state.doc.sliceString(sel.head - 1, sel.head);
+  if (prevChar !== '\n') return;
+
+  update.view.dispatch({
+    selection: EditorSelection.cursor(sel.head, 1),
+    scrollIntoView: true,
+  });
+});
+
 // ─── Text normalizer ──────────────────────────────────────────────────────────
 
 /**
@@ -181,6 +200,32 @@ function normalizeText(raw: string): string {
  * own paste handler which does not normalize.
  */
 export const poetryClipboardHandlers = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    // If click is inside editor content but CM can't map it to a position,
+    // place caret at doc end (start of trailing empty line when doc ends with \n).
+    if (event.button !== 0) return false;
+
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.cm-gutters')) return false;
+
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos !== null) return false;
+
+    const rect = view.contentDOM.getBoundingClientRect();
+    const insideContentRect =
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom;
+    if (!insideContentRect) return false;
+
+    event.preventDefault();
+    const end = view.state.doc.length;
+    view.dispatch({ selection: EditorSelection.cursor(end), scrollIntoView: true });
+    view.focus();
+    return true;
+  },
+
   paste(event, view) {
     const raw = event.clipboardData?.getData('text/plain');
     if (raw === undefined) return false; // let browser handle it
@@ -415,6 +460,7 @@ export function poetryEditorExtension(): Extension[] {
     stressStatusField,
     stressGutter,
     poetryDecorations,
+    poetryCursorAssocFix,
     poetryClipboardHandlers,
     poetryTransactionFilter,
     poetryThemeBase,

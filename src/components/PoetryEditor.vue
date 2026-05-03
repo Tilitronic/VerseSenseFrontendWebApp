@@ -540,14 +540,30 @@ async function handlePaste() {
 
 function handleTransform(kind: 'capitalize' | 'lowercase' | 'uppercase') {
   const view = cmView.value;
-  const range = contextMenuWordRange.value;
-  const word = contextMenuWord.value;
-  if (!view || !range || !word) return;
+  if (!view) return;
+
+  // Prefer current selection: transforms should apply to all selected text.
+  const sel = view.state.selection.main;
+  const hasSelection = sel.from !== sel.to;
+  const from = hasSelection ? sel.from : contextMenuWordRange.value?.from;
+  const to = hasSelection ? sel.to : contextMenuWordRange.value?.to;
+  if (from === undefined || to === undefined) return;
+
+  const sourceText = hasSelection
+    ? view.state.sliceDoc(from, to)
+    : (contextMenuWord.value ?? view.state.sliceDoc(from, to));
+  if (!sourceText) return;
+
   let result: string;
-  if (kind === 'capitalize') result = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-  else if (kind === 'lowercase') result = word.toLowerCase();
-  else result = word.toUpperCase();
-  view.dispatch({ changes: { from: range.from, to: range.to, insert: result } });
+  if (kind === 'capitalize')
+    result = sourceText.charAt(0).toUpperCase() + sourceText.slice(1).toLowerCase();
+  else if (kind === 'lowercase') result = sourceText.toLowerCase();
+  else result = sourceText.toUpperCase();
+
+  view.dispatch({
+    changes: { from, to, insert: result },
+    selection: { anchor: from, head: from + result.length },
+  });
 }
 </script>
 

@@ -12,7 +12,7 @@
  */
 
 import { defineStore } from 'pinia';
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, markRaw, triggerRef } from 'vue';
 import {
   detectDocumentLanguage,
   detectLanguage,
@@ -63,7 +63,10 @@ interface AnnotationsBlob {
   words: Record<string, WordAnnotation>;
 }
 
-/** Strip leading spaces (not tabs) from every line of raw poem text */
+/**
+ * Legacy migration helper used only on initial load from localStorage.
+ * Runtime edits must preserve text exactly to avoid cursor jumps in the editor.
+ */
 function normalizeLeadingSpaces(text: string): string {
   return text
     .split('\n')
@@ -122,8 +125,10 @@ export const usePoetryStore = defineStore('poetry', () => {
   /** Parsed document — re-derived whenever rawText or documentLanguage changes */
   const document = ref<IPoetryDocument>(parseDocument(rawText.value));
 
-  /** Phonetized syllables cache: token id → Syllable[] */
-  const syllableCache = ref<Map<string, Syllable[]>>(new Map());
+  /** Phonetized syllables cache: token id → Syllable[]
+   * markRaw prevents Vue from deep-proxying the Map — mutations use triggerRef.
+   */
+  const syllableCache = ref(markRaw(new Map<string, Syllable[]>()));
 
   /**
    * Document-level language — auto-detected from rawText, overridable by user.
@@ -184,7 +189,9 @@ export const usePoetryStore = defineStore('poetry', () => {
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let stressDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let rebuildDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   const STRESS_DEBOUNCE_MS = 600;
+  const REBUILD_DEBOUNCE_MS = 120;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -329,12 +336,14 @@ export const usePoetryStore = defineStore('poetry', () => {
 
   /** Update raw text, persist, re-parse document */
   function setRawText(text: string) {
-    // Strip leading spaces (but not tabs) from every line — leading spaces were
-    // never intentional (artifact of old broken indentWithTab that inserted spaces).
-    const normalized = normalizeLeadingSpaces(text);
-    rawText.value = normalized;
-    localStorage.setItem(STORAGE_KEY_TEXT, normalized);
-    rebuildDocument(normalized);
+    // Preserve the exact editor content during typing; mutating text here can
+    // invalidate CodeMirror's selection mapping and jump the caret.
+    rawText.value = text;
+    localStorage.setItem(STORAGE_KEY_TEXT, text);
+    // Debounce the heavy annotation-migration pass so that the analysis panels
+    // do not re-render on every single keypress when editing large texts.
+    if (rebuildDebounceTimer) clearTimeout(rebuildDebounceTimer);
+    rebuildDebounceTimer = setTimeout(() => rebuildDocument(text), REBUILD_DEBOUNCE_MS);
   }
 
   /**
@@ -549,9 +558,8 @@ export const usePoetryStore = defineStore('poetry', () => {
         // Non-UA word or parse error — return empty
       }
     }
-    const next = new Map(syllableCache.value);
-    next.set(wordId, syllables);
-    syllableCache.value = next;
+    syllableCache.value.set(wordId, syllables);
+    triggerRef(syllableCache);
     return syllables;
   }
 
@@ -569,7 +577,8 @@ export const usePoetryStore = defineStore('poetry', () => {
   // ── Internal ───────────────────────────────────────────────────────────────
 
   function rebuildDocument(text: string) {
-    syllableCache.value = new Map();
+    // Note: syllableCache is pruned at the END (after reusedWordIds is known)
+    // so unchanged words keep their cached syllables across rebuilds.
 
     // ── Snapshot per-word annotations keyed by positional "L{li}:W{wi}" ─────
     // Using positional keys (not token IDs) means we survive re-parses that
@@ -736,6 +745,17 @@ export const usePoetryStore = defineStore('poetry', () => {
     pendingStressIds.value = newPendingIds;
     // pendingStressAlts is derived from live resolution, not migrated — reset it
     pendingStressAlts.value = new Map();
+
+    // ── Prune syllable cache ───────────────────────────────────────────────────
+    // Keep only entries whose token ID was reused (same word text at same
+    // position) — those syllables are still valid after the rebuild.
+    // Everything else (new or changed words) is evicted so stale data
+    // is never returned by getSyllables().
+    const reusedOldIds = new Set(reusedWordIds.values());
+    for (const id of Array.from(syllableCache.value.keys())) {
+      if (!reusedOldIds.has(id)) syllableCache.value.delete(id);
+    }
+    triggerRef(syllableCache);
 
     stressAsyncLog.debug(
       `rebuildDocument dirtyPolishIds=${dirtyPolishIds.size} [${[...dirtyPolishIds]
