@@ -65,58 +65,92 @@
               <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
               <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
               <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
-              <div class="pp-cells">
-                <template
-                  v-for="(item, itemIdx) in visualizationItems(line)"
-                  :key="`${line.id}:${itemIdx}`"
-                >
-                  <div v-if="item.type === 'tab' && !alignRight" class="pp-cell pp-cell--tab" />
-                  <div
-                    v-else-if="item.type === 'cell'"
-                    class="pp-cell"
-                    :class="{
-                      'pp-cell--stressed': item.stressed,
-                      'pp-cell--word-last': item.wordLast,
-                    }"
+              <div
+                class="pp-row__interactive"
+                :class="{
+                  'pp-row__interactive--guide-active': manualMode && hoveredLeftLineId === line.id,
+                }"
+              >
+                <button
+                  v-if="manualMode"
+                  class="pp-handle pp-handle--left"
+                  title="Drag: left/right = row shift, up/down = move words between rows"
+                  @mouseenter="hoveredLeftLineId = line.id"
+                  @mouseleave="hoveredLeftLineId = null"
+                  @pointerdown="onLeftHandlePointerDown($event, line, lineIdx)"
+                />
+
+                <div class="pp-cells" :style="cellsStyle(line)">
+                  <template
+                    v-for="(item, itemIdx) in visualizationItems(line)"
+                    :key="`${line.id}:${itemIdx}`"
                   >
-                    <div class="pp-cell__tokens">
-                      <span
-                        v-for="(token, ti) in item.ipaTokens"
-                        :key="ti"
-                        :ref="
-                          (el) =>
-                            setTokenRef(item.renderKeys?.[ti] ?? `${line.id}:${itemIdx}:${ti}`, el)
-                        "
-                        class="pp-cell__token"
-                        :class="
-                          isVowelToken(token)
-                            ? 'pp-cell__token--vowel'
-                            : 'pp-cell__token--consonant'
-                        "
-                        :style="
-                          showSounds
-                            ? (tokenStyleMap.get(item.renderKeys?.[ti] ?? '') ?? undefined)
-                            : undefined
-                        "
-                        >{{ token }}</span
-                      >
+                    <div
+                      v-if="item.type === 'tab' && !alignRight && bindTabs"
+                      class="pp-cell pp-cell--tab"
+                    />
+                    <div
+                      v-else-if="item.type === 'cell'"
+                      class="pp-cell"
+                      :class="{
+                        'pp-cell--stressed': item.stressed,
+                        'pp-cell--word-last': item.wordLast,
+                        'pp-cell--module-hot':
+                          manualMode &&
+                          hoveredLeftLineId === line.id &&
+                          isEdgeModuleCell(line, item.motifWordId),
+                        'pp-cell--guide-up':
+                          manualMode &&
+                          hoveredLeftLineId === line.id &&
+                          isFirstWordFirstCell(line, itemIdx, item.motifWordId),
+                        'pp-cell--guide-down':
+                          manualMode &&
+                          hoveredLeftLineId === line.id &&
+                          isLastWordLastCell(line, itemIdx, item.motifWordId),
+                      }"
+                    >
+                      <div class="pp-cell__tokens">
+                        <span
+                          v-for="(token, ti) in item.ipaTokens"
+                          :key="ti"
+                          :ref="
+                            (el) =>
+                              setTokenRef(
+                                item.renderKeys?.[ti] ?? `${line.id}:${itemIdx}:${ti}`,
+                                el,
+                              )
+                          "
+                          class="pp-cell__token"
+                          :class="
+                            isVowelToken(token)
+                              ? 'pp-cell__token--vowel'
+                              : 'pp-cell__token--consonant'
+                          "
+                          :style="
+                            showSounds
+                              ? (tokenStyleMap.get(item.renderKeys?.[ti] ?? '') ?? undefined)
+                              : undefined
+                          "
+                          >{{ token }}</span
+                        >
+                      </div>
+                      <template v-if="showRhymes && item.motifWordId && item.ipaTokens">
+                        <div
+                          v-for="(motif, mi) in sylMotifs(
+                            item.motifWordId,
+                            item.motifSyllableIndex ?? -1,
+                            item.ipaTokens.length,
+                          )"
+                          :key="motif.id"
+                          class="pp-cell__rhyme-bar"
+                          :class="`pp-cell__rhyme-bar--${motif.tier}`"
+                          :style="rhymeBarStyle(motif, mi)"
+                          :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
+                        />
+                      </template>
                     </div>
-                    <template v-if="showRhymes && item.motifWordId && item.ipaTokens">
-                      <div
-                        v-for="(motif, mi) in sylMotifs(
-                          item.motifWordId,
-                          item.motifSyllableIndex ?? -1,
-                          item.ipaTokens.length,
-                        )"
-                        :key="motif.id"
-                        class="pp-cell__rhyme-bar"
-                        :class="`pp-cell__rhyme-bar--${motif.tier}`"
-                        :style="rhymeBarStyle(motif, mi)"
-                        :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
-                      />
-                    </template>
-                  </div>
-                </template>
+                  </template>
+                </div>
               </div>
             </div>
           </template>
@@ -125,6 +159,14 @@
     </template>
 
     <!-- Demo badge — always-visible notice in the bottom-right corner -->
+    <button
+      v-if="manualMode"
+      class="pp-reset-dot"
+      :style="{ '--pp-reset-progress': String(resetGestureProgress) }"
+      title="Hold and draw a circle to reset manual shifts and re-enable tab binding"
+      @pointerdown="onResetDotPointerDown"
+    />
+
     <div class="pp-demo-badge">
       Demo
       <q-tooltip anchor="top right" self="bottom right" :offset="[0, 6]" class="pp-demo-tooltip">
@@ -151,6 +193,8 @@ import { buildVisualizationLineItems } from 'src/services/phonetic/visualization
 
 const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
+const bindTabs = defineModel<boolean>('bindTabs', { default: true });
+const manualMode = defineModel<boolean>('manualMode', { default: false });
 const showRhymes = defineModel<boolean>('showRhymes', { default: false });
 const showSounds = defineModel<boolean>('showSounds', { default: true });
 const showNumBadge = defineModel<boolean>('showNumBadge', { default: true });
@@ -178,6 +222,274 @@ watch(
 function wordTokensInLine(line: ILine): IWordToken[] {
   return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
 }
+
+// ── Manual grid mode ────────────────────────────────────────────────────────
+const CELL_STEP_PX = 52;
+const ROW_STEP_PX = 34;
+
+const rowManualShift = ref<Map<string, number>>(new Map());
+const hoveredLeftLineId = ref<string | null>(null);
+
+function wordEdgeIds(line: ILine): { first: string | null; last: string | null } {
+  const words = wordTokensInLine(line);
+  return {
+    first: words[0]?.id ?? null,
+    last: words[words.length - 1]?.id ?? null,
+  };
+}
+
+function isEdgeModuleCell(line: ILine, wordId: string | undefined): boolean {
+  if (!wordId) return false;
+  const edges = wordEdgeIds(line);
+  return wordId === edges.first || wordId === edges.last;
+}
+
+function isFirstWordFirstCell(line: ILine, itemIdx: number, wordId: string | undefined): boolean {
+  const firstId = wordEdgeIds(line).first;
+  if (!wordId || !firstId || wordId !== firstId) return false;
+  const items = visualizationItems(line);
+  for (let i = 0; i < itemIdx; i++) {
+    const prev = items[i];
+    if (prev?.type === 'cell' && prev.motifWordId === wordId) return false;
+  }
+  return true;
+}
+
+function isLastWordLastCell(line: ILine, itemIdx: number, wordId: string | undefined): boolean {
+  const lastId = wordEdgeIds(line).last;
+  if (!wordId || !lastId || wordId !== lastId) return false;
+  const items = visualizationItems(line);
+  for (let i = itemIdx + 1; i < items.length; i++) {
+    const next = items[i];
+    if (next?.type === 'cell' && next.motifWordId === wordId) return false;
+  }
+  return true;
+}
+
+function currentShift(lineId: string): number {
+  return rowManualShift.value.get(lineId) ?? 0;
+}
+
+function setShift(lineId: string, next: number) {
+  const map = new Map(rowManualShift.value);
+  if (next <= 0) map.delete(lineId);
+  else map.set(lineId, next);
+  rowManualShift.value = map;
+}
+
+function cellsStyle(line: ILine): Record<string, string> | undefined {
+  if (!manualMode.value) return undefined;
+  const steps = currentShift(line.id);
+  if (steps === 0) return undefined;
+  return {
+    transform: `translateX(${steps * CELL_STEP_PX}px)`,
+  };
+}
+
+let dragLineId: string | null = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragStartShift = 0;
+let dragLineIdx: number | null = null;
+let dragAxisLock: 'x' | 'y' | null = null;
+const AXIS_LOCK_THRESHOLD_PX = 6;
+
+const resetGestureProgress = ref(0);
+let resetCenterX = 0;
+let resetCenterY = 0;
+let resetActive = false;
+let resetAccumAbs = 0;
+let resetLastAngle: number | null = null;
+let resetDone = false;
+const RESET_MIN_RADIUS_PX = 10;
+const RESET_REQUIRED_ARC = Math.PI * 2.15;
+
+function onLeftHandlePointerDown(e: PointerEvent, line: ILine, lineIdx: number) {
+  if (!manualMode.value) return;
+  e.preventDefault();
+  // As soon as manual dragging starts, detach visual tab coupling.
+  bindTabs.value = false;
+  // Pressing the handle immediately activates highlight for this row.
+  hoveredLeftLineId.value = line.id;
+  dragLineId = line.id;
+  dragLineIdx = lineIdx;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragStartShift = currentShift(line.id);
+  dragAxisLock = null;
+  window.addEventListener('pointermove', onLeftHandlePointerMove);
+  window.addEventListener('pointerup', onLeftHandlePointerUp);
+  document.body.style.cursor = 'all-scroll';
+  document.body.style.userSelect = 'none';
+}
+
+function onLeftHandlePointerMove(e: PointerEvent) {
+  if (!dragLineId || dragLineIdx === null) return;
+
+  // First meaningful movement locks the whole interaction session to one axis.
+  const absDx = Math.abs(e.clientX - dragStartX);
+  const absDy = Math.abs(e.clientY - dragStartY);
+  if (!dragAxisLock && (absDx >= AXIS_LOCK_THRESHOLD_PX || absDy >= AXIS_LOCK_THRESHOLD_PX)) {
+    dragAxisLock = absDx >= absDy ? 'x' : 'y';
+    document.body.style.cursor = dragAxisLock === 'x' ? 'ew-resize' : 'ns-resize';
+  }
+
+  if (!dragAxisLock) return;
+
+  if (dragAxisLock === 'x') {
+    // Horizontal step movement of the full row block.
+    const delta = e.clientX - dragStartX;
+    const stepDelta = Math.round(delta / CELL_STEP_PX);
+    const next = Math.max(0, dragStartShift + stepDelta);
+    setShift(dragLineId, next);
+    return;
+  }
+
+  // Vertical movement: one boundary crossing => one-row move.
+  // This prevents accidental jumps across multiple rows.
+  const deltaY = e.clientY - dragStartY;
+
+  if (deltaY >= ROW_STEP_PX) {
+    moveLastWordDown(dragLineIdx);
+    dragLineIdx += 1;
+    hoveredLeftLineId.value = store.document.lines[dragLineIdx]?.id ?? null;
+    dragStartY += ROW_STEP_PX;
+  } else if (deltaY <= -ROW_STEP_PX) {
+    moveFirstWordUp(dragLineIdx);
+    dragLineIdx = Math.max(0, dragLineIdx - 1);
+    hoveredLeftLineId.value = store.document.lines[dragLineIdx]?.id ?? null;
+    dragStartY -= ROW_STEP_PX;
+  }
+}
+
+function onLeftHandlePointerUp() {
+  dragLineId = null;
+  dragLineIdx = null;
+  dragAxisLock = null;
+  window.removeEventListener('pointermove', onLeftHandlePointerMove);
+  window.removeEventListener('pointerup', onLeftHandlePointerUp);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+}
+
+function resetManualLayout() {
+  rowManualShift.value = new Map();
+  bindTabs.value = false;
+  manualMode.value = false;
+}
+
+function onResetDotPointerDown(e: PointerEvent) {
+  if (!manualMode.value) return;
+  const el = e.currentTarget as HTMLElement | null;
+  if (!el) return;
+
+  e.preventDefault();
+  const rect = el.getBoundingClientRect();
+  resetCenterX = rect.left + rect.width / 2;
+  resetCenterY = rect.top + rect.height / 2;
+  resetActive = true;
+  resetDone = false;
+  resetAccumAbs = 0;
+  resetLastAngle = null;
+  resetGestureProgress.value = 0;
+
+  window.addEventListener('pointermove', onResetDotPointerMove);
+  window.addEventListener('pointerup', onResetDotPointerUp);
+}
+
+function onResetDotPointerMove(e: PointerEvent) {
+  if (!resetActive) return;
+  const dx = e.clientX - resetCenterX;
+  const dy = e.clientY - resetCenterY;
+  const radius = Math.hypot(dx, dy);
+  if (radius < RESET_MIN_RADIUS_PX) return;
+
+  const angle = Math.atan2(dy, dx);
+  if (resetLastAngle === null) {
+    resetLastAngle = angle;
+    return;
+  }
+
+  let delta = angle - resetLastAngle;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  resetAccumAbs += Math.abs(delta);
+  resetLastAngle = angle;
+
+  const progress = Math.min(1, resetAccumAbs / RESET_REQUIRED_ARC);
+  resetGestureProgress.value = progress;
+
+  if (!resetDone && progress >= 1) {
+    resetDone = true;
+    resetManualLayout();
+  }
+}
+
+function onResetDotPointerUp() {
+  resetActive = false;
+  resetLastAngle = null;
+  window.removeEventListener('pointermove', onResetDotPointerMove);
+  window.removeEventListener('pointerup', onResetDotPointerUp);
+  // Fast visual rewind if circle wasn't completed.
+  if (!resetDone) resetGestureProgress.value = 0;
+}
+
+function splitWords(lineText: string): { prefix: string; words: string[] } {
+  const prefixMatch = lineText.match(/^[\t ]*/);
+  const prefix = prefixMatch?.[0] ?? '';
+  const body = lineText.slice(prefix.length).trim();
+  const words = body.length > 0 ? body.split(/\s+/) : [];
+  return { prefix, words };
+}
+
+function composeWords(prefix: string, words: string[]): string {
+  return words.length > 0 ? `${prefix}${words.join(' ')}` : prefix;
+}
+
+function moveFirstWordUp(lineIdx: number) {
+  if (lineIdx <= 0) return;
+  const lines = store.rawText.split('\n');
+  if (lineIdx >= lines.length) return;
+
+  const cur = splitWords(lines[lineIdx] ?? '');
+  if (cur.words.length === 0) return;
+  const prev = splitWords(lines[lineIdx - 1] ?? '');
+
+  const moved = cur.words.shift();
+  if (!moved) return;
+  prev.words.push(moved);
+
+  lines[lineIdx - 1] = composeWords(prev.prefix, prev.words);
+  lines[lineIdx] = composeWords(cur.prefix, cur.words);
+  store.setRawText(lines.join('\n'));
+}
+
+function moveLastWordDown(lineIdx: number) {
+  const lines = store.rawText.split('\n');
+  if (lineIdx < 0 || lineIdx >= lines.length) return;
+  if (lineIdx === lines.length - 1) lines.push('');
+
+  const cur = splitWords(lines[lineIdx] ?? '');
+  if (cur.words.length === 0) return;
+  const next = splitWords(lines[lineIdx + 1] ?? '');
+
+  const moved = cur.words.pop();
+  if (!moved) return;
+  next.words.unshift(moved);
+
+  lines[lineIdx] = composeWords(cur.prefix, cur.words);
+  lines[lineIdx + 1] = composeWords(next.prefix, next.words);
+  store.setRawText(lines.join('\n'));
+}
+
+watch(
+  () => manualMode.value,
+  (enabled) => {
+    if (enabled) return;
+    hoveredLeftLineId.value = null;
+    onLeftHandlePointerUp();
+  },
+);
 
 function lineSyllableCount(line: ILine): number {
   return visualizationItems(line).filter((item) => item.type === 'cell' && item.countsAsSyllable)
@@ -416,7 +728,11 @@ onMounted(() => {
   });
   if (gridContainer.value) ro.observe(gridContainer.value);
 });
-onBeforeUnmount(() => ro?.disconnect());
+onBeforeUnmount(() => {
+  ro?.disconnect();
+  onLeftHandlePointerUp();
+  onResetDotPointerUp();
+});
 
 // ── SVG Export ───────────────────────────────────────────────────────────────
 
@@ -484,6 +800,38 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   background: rgba(255, 255, 255, 0.85);
   z-index: 20;
   cursor: help;
+}
+
+.pp-reset-dot {
+  --pp-reset-progress: 0;
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(32, 126, 255, 0.75);
+  background: radial-gradient(circle at 35% 35%, #9fd0ff 0%, #2b8dff 50%, #1b64c8 100%);
+  box-shadow:
+    0 0 0 2px rgba(32, 126, 255, 0.2),
+    0 0 12px rgba(32, 126, 255, 0.45);
+  cursor: crosshair;
+  z-index: 24;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: conic-gradient(
+      rgba(32, 126, 255, 0.95) calc(var(--pp-reset-progress) * 360deg),
+      rgba(32, 126, 255, 0.12) 0
+    );
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
+    transition: background 0.08s linear;
+    pointer-events: none;
+  }
 }
 
 .pp-demo-tooltip {
@@ -615,12 +963,75 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   }
 }
 
+.pp-row__interactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &--guide-active .pp-cells {
+    box-shadow: 0 0 0 2px rgba(41, 121, 255, 0.25);
+    border-radius: 4px;
+  }
+
+  &--guide-active .pp-cells::before,
+  &--guide-active .pp-cells::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 0;
+    height: 0;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  &--guide-active .pp-cells::before {
+    left: -11px;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 8px solid rgba(41, 121, 255, 0.9);
+  }
+
+  &--guide-active .pp-cells::after {
+    right: -11px;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 8px solid rgba(41, 121, 255, 0.9);
+  }
+}
+
+.pp-handle {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(41, 121, 255, 0.65);
+  background: rgba(41, 121, 255, 0.8);
+  box-shadow:
+    0 0 0 2px rgba(41, 121, 255, 0.15),
+    0 0 10px rgba(41, 121, 255, 0.35);
+  opacity: 0.22;
+  transition:
+    opacity 0.12s,
+    transform 0.12s,
+    box-shadow 0.12s;
+
+  &:hover {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+
+  &--left {
+    cursor: all-scroll;
+  }
+}
+
 // ── cells strip ─────────────────────────────────────────────────────────────
 .pp-cells {
+  position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
+  transition: transform 0.08s steps(1, end);
   // collapse shared borders between adjacent syllable cells only;
   // tab cells keep their own dashed border so multiple tabs stay visible
   > .pp-cell:not(.pp-cell--tab) + .pp-cell:not(.pp-cell--tab) {
@@ -665,6 +1076,39 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   // ── stressed → 30% black dimming ─────────────────────────────────────────
   &--stressed {
     background: $stressed-bg;
+  }
+
+  &--module-hot {
+    box-shadow: inset 0 0 0 2px rgba(41, 121, 255, 0.55);
+    background: rgba(41, 121, 255, 0.08);
+  }
+
+  &--guide-up::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 8px solid rgba(41, 121, 255, 0.92);
+    pointer-events: none;
+  }
+
+  &--guide-down::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid rgba(41, 121, 255, 0.92);
+    pointer-events: none;
   }
 
   // ── token row ──────────────────────────────────────────────────────────────

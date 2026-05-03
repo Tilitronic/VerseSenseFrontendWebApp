@@ -329,6 +329,42 @@
               </svg>
               {{ $t('phonetic.alignRight') }}
             </button>
+            <!-- Tab indent coupling toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': bindTabIndent }"
+              title="Toggle tab-coupled indent cells"
+              @click="selectInteractionMode('tabs')"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M2 8h4M10 8h4M6 5l2 3-2 3M10 5l-2 3 2 3"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              Tab Bind
+            </button>
+            <!-- Manual grid mode toggle -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': manualGridMode }"
+              title="Manual row/word movement mode"
+              @click="selectInteractionMode('manual')"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="2" fill="currentColor" />
+                <path
+                  d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Manual
+            </button>
             <!-- Rhyme motif detection toggle -->
             <button
               class="panel__web-btn"
@@ -599,6 +635,8 @@
           class="panel__split-main"
           v-model:showWeb="showSoundWeb"
           v-model:alignRight="showAlignRight"
+          v-model:bindTabs="bindTabIndent"
+          v-model:manualMode="manualGridMode"
           v-model:showRhymes="showRhymes"
           v-model:showSounds="showSounds"
           v-model:showNumBadge="showNumBadge"
@@ -637,6 +675,8 @@ const hasConfirmedLines = computed(() =>
 );
 const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
+const bindTabIndent = ref(true);
+const manualGridMode = ref(false);
 const showRhymes = ref(false);
 const showSounds = ref(true);
 const showRhymesPanel = ref(false);
@@ -648,6 +688,30 @@ const showCvBadge = ref(true);
 const enabledLanguageCount = computed(
   () => LANGUAGES.filter((lang) => appStore.enabledLanguages[lang]).length,
 );
+
+type InteractionMode = 'tabs' | 'manual';
+
+function selectInteractionMode(mode: InteractionMode) {
+  if (mode === 'tabs') {
+    // Radio-like exclusivity, but allow toggling active mode OFF -> none.
+    if (bindTabIndent.value) {
+      bindTabIndent.value = false;
+      manualGridMode.value = false;
+      return;
+    }
+    bindTabIndent.value = true;
+    manualGridMode.value = false;
+    return;
+  }
+
+  if (manualGridMode.value) {
+    bindTabIndent.value = false;
+    manualGridMode.value = false;
+    return;
+  }
+  bindTabIndent.value = false;
+  manualGridMode.value = true;
+}
 
 function onLanguageToggle(lang: Language, checked: boolean | null) {
   appStore.setLanguageEnabled(lang, checked === true);
