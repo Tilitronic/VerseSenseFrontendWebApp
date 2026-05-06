@@ -96,6 +96,13 @@
             <q-chip color="blue-9" text-color="white" icon="psychology" label="Luscinia ML" />
             <q-chip color="indigo-8" text-color="white" icon="translate" label="vue-i18n" />
             <q-chip color="teal-8" text-color="white" icon="cloud" label="Netlify" />
+            <q-chip
+              color="deep-orange-9"
+              text-color="white"
+              icon="record_voice_over"
+              label="CMU Pronouncing Dictionary"
+            />
+            <q-chip color="cyan-8" text-color="white" icon="language" label="FreeDictionary API" />
           </div>
         </q-card-section>
       </q-card>
@@ -141,6 +148,43 @@
             rel="noopener noreferrer"
             type="a"
           />
+        </q-card-section>
+      </q-card>
+
+      <!-- ── English stress + IPA pipeline ──────────────────────────── -->
+      <q-card class="about-card about-card--accent q-mb-lg" flat bordered>
+        <q-card-section>
+          <div class="text-h6 q-mb-sm">English Stress &amp; IPA</div>
+          <p class="text-body2 about-source-text">
+            English stress and IPA are resolved offline via the
+            <strong>CMU Pronouncing Dictionary</strong> (134&thinsp;000 entries with embedded stress
+            positions). For proper nouns and other words not covered by CMU, the app falls back to
+            the free <strong>FreeDictionary API</strong> with session-level caching.
+          </p>
+          <div class="q-gutter-sm">
+            <q-btn
+              flat
+              no-caps
+              color="deep-orange-4"
+              icon="open_in_new"
+              label="CMU Pronouncing Dictionary"
+              href="http://www.speech.cs.cmu.edu/cgi-bin/cmudict"
+              target="_blank"
+              rel="noopener noreferrer"
+              type="a"
+            />
+            <q-btn
+              flat
+              no-caps
+              color="cyan-5"
+              icon="open_in_new"
+              label="FreeDictionary API"
+              href="https://dictionaryapi.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              type="a"
+            />
+          </div>
         </q-card-section>
       </q-card>
 

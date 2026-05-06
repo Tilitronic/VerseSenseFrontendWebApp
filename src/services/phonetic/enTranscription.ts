@@ -22,14 +22,27 @@ import { tokenizeIPA } from './ipaTokenizer';
 // back to the rule-based path transparently.
 let _cmu: Record<string, string> | null = null;
 
+let _cmuResolve: (() => void) | null = null;
+
+/**
+ * Resolves when the CMU dictionary has finished loading (or failed to load).
+ * Callers that need to perform CMU lookups should await this before proceeding.
+ */
+export const cmuDictReady: Promise<void> = new Promise<void>((resolve) => {
+  _cmuResolve = resolve;
+});
+
 void fetch('/data/cmu-dict.json')
   .then((r) => r.json())
   .then((dict) => {
     _cmu = dict as Record<string, string>;
+    _cmuResolve?.();
   })
   .catch(() => {
     // Failed to load CMU dict (e.g. offline, dev server not running plugin).
     // Rule-based fallback will be used for all English words.
+    // Resolve so callers don't hang indefinitely.
+    _cmuResolve?.();
   });
 
 export interface EnSyllable {
@@ -331,6 +344,26 @@ function splitIpaToSyllables(ipa: string): string[] {
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Return the 0-based syllable index of primary stress for an English word,
+ * using the CMU Pronouncing Dictionary.
+ *
+ * Returns `null` when the word is not found in the dictionary (CMU must be
+ * loaded — await `cmuDictReady` before calling).
+ *
+ * Used by the async stress-resolution pass to write `stressIndex` back onto
+ * word tokens without going through the full IPA transcription pipeline.
+ */
+export function getEnStressIndex(word: string): number | null {
+  const cmu = transcribeFromCmu(word);
+  if (!cmu) return null;
+  const syllables = syllabifyFromCmu(cmu);
+  if (syllables.length === 0) return null;
+  const idx = syllables.findIndex((s) => s.stressed);
+  // Monosyllables or function words may have no explicit primary-stress vowel.
+  return idx === -1 ? 0 : idx;
+}
 
 /**
  * Transcribe an English word into IPA syllables.

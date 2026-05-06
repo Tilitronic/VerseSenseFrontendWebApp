@@ -36,6 +36,7 @@ import {
   normalizeUaWord,
   type UaMorphEntry,
 } from 'src/services/stress/uaWasmService';
+import { cmuDictReady, resolveEnStress } from 'src/services/stress/enStressService';
 import { useAppStore } from 'src/stores/app';
 import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
 
@@ -1224,7 +1225,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     const hasUaWasm = uaWasmReady() && appStore.useDbStress && appStore.isLanguageEnabled('ua');
     const hasUaMl = !!stressResolver.value && appStore.useMlStress;
     const hasPlAsync = appStore.isLanguageEnabled('pl');
-    if (!hasUaWasm && !hasUaMl && !hasPlAsync) {
+    const hasEnAsync = appStore.isLanguageEnabled('en-us') || appStore.isLanguageEnabled('en-gb');
+    if (!hasUaWasm && !hasUaMl && !hasPlAsync && !hasEnAsync) {
       stressAsyncLog.debug('all async resolvers disabled — skipping');
       return;
     }
@@ -1252,6 +1254,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     const candidateTokens = allWordTokens.value.filter((t) => {
       if (!appStore.isLanguageEnabled(t.language)) return false;
       if (t.language === 'ua') return t.stressIndex === null;
+      if (t.language === 'en-us' || t.language === 'en-gb') return t.stressIndex === null;
       if (t.language !== 'pl') return false;
       if (forcePolish) return true;
       if (polishWordIds && polishWordIds.size > 0) return polishWordIds.has(t.id);
@@ -1259,12 +1262,65 @@ export const usePoetryStore = defineStore('poetry', () => {
     });
     const plCandidates = candidateTokens.filter((t) => t.language === 'pl');
     const uaCandidates = candidateTokens.filter((t) => t.language === 'ua');
+    const enCandidates = candidateTokens.filter(
+      (t) => t.language === 'en-us' || t.language === 'en-gb',
+    );
     stressAsyncLog.debug(
-      `[pass ${passId}] trigger=${reason} forcePolish=${forcePolish} totals(pl=${totalPlWords}, ua=${totalUaWords}) candidates(pl=${plCandidates.length}, ua=${uaCandidates.length}, all=${candidateTokens.length})`,
+      `[pass ${passId}] trigger=${reason} forcePolish=${forcePolish} totals(pl=${totalPlWords}, ua=${totalUaWords}) candidates(pl=${plCandidates.length}, ua=${uaCandidates.length}, en=${enCandidates.length}, all=${candidateTokens.length})`,
     );
     stressAsyncLog.info(
       `[pass ${passId}] resolving ${candidateTokens.length} word${candidateTokens.length === 1 ? '' : 's'} via async stress services…`,
     );
+
+    const patches = new Map<
+      string,
+      {
+        syllableIndex: number;
+        confirmed: boolean;
+        source: 'ml' | 'heteronym' | 'variative' | 'db';
+        stresses?: number[];
+        readings?: Array<{ stressedForm: string; ipa: string }>;
+      }
+    >();
+
+    // ── English stress lookup (CMU → FreeDictionary API fallback) ──────────
+    // await cmuDictReady so the synchronous CMU path inside resolveEnStress
+    // is always available.  OOV words transparently hit the FreeDictionary API
+    // (one parallel fetch per word, results cached for the session).
+    if (enCandidates.length > 0) {
+      await cmuDictReady;
+      if (signal.aborted) {
+        stressAsyncLog.debug(`[pass ${passId}] aborted waiting for CMU dict — stopping`);
+        return;
+      }
+      const enResults = await Promise.allSettled(
+        enCandidates.map((tok) => resolveEnStress(tok.text, signal)),
+      );
+      if (signal.aborted) {
+        stressAsyncLog.debug(`[pass ${passId}] aborted during English resolution — stopping`);
+        return;
+      }
+      let enResolved = 0;
+      enResults.forEach((result, i) => {
+        const tok = enCandidates[i]!;
+        if (result.status !== 'fulfilled' || result.value === null) {
+          stressAsyncLog.debug(`[en] no result for "${tok.text}"`);
+          return;
+        }
+        const idx = result.value;
+        patches.set(tok.id, {
+          syllableIndex: idx,
+          confirmed: true,
+          source: 'db',
+          stresses: [idx],
+        });
+        stressAsyncLog.debug(`[en] "${tok.text}" → syllableIndex=${idx}`);
+        enResolved++;
+      });
+      stressAsyncLog.debug(
+        `[pass ${passId}] English: resolved ${enResolved}/${enCandidates.length} candidates`,
+      );
+    }
 
     // ── Batch Polish WASM lookup ────────────────────────────────────────────
     // Always use batch regardless of count — even a single-word batch is more
@@ -1287,17 +1343,6 @@ export const usePoetryStore = defineStore('poetry', () => {
         `[pass ${passId}] Polish batch resolved ${plCandidates.length} candidate words`,
       );
     }
-
-    const patches = new Map<
-      string,
-      {
-        syllableIndex: number;
-        confirmed: boolean;
-        source: 'ml' | 'heteronym' | 'variative' | 'db';
-        stresses?: number[];
-        readings?: Array<{ stressedForm: string; ipa: string }>;
-      }
-    >();
 
     // ── Batch UA WASM lookup ────────────────────────────────────────────────
     // Resolves all unresolved Ukrainian words in one synchronous WASM call.
