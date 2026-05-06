@@ -20,8 +20,8 @@ const LUSCINIA_ROUTE = '/models/luscinia.onnx.gz';
  * The model is gzip-compressed; the browser decompresses it via DecompressionStream
  * in LusciniaPredictor before passing the raw ONNX bytes to onnxruntime-web.
  *
- * The stress trie (ua-word-stress) is handled via a `?url` import in useStressTrie.ts;
- * Vite copies the file to the dist/assets folder automatically during build.
+ * The ua-word-stress-wasm WASM binary is handled as an ESM import by vite-plugin-wasm;
+ * no separate asset file is needed.
  */
 /**
  * Vite plugin: serve the CMU Pronouncing Dictionary as a plain JSON asset.
@@ -137,7 +137,7 @@ export default defineConfig((ctx) => {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ['i18n', 'axios', 'localStoreBoot', 'codemirror', 'stressTrie'],
+    boot: ['i18n', 'axios', 'localStoreBoot', 'codemirror', 'uaWasm'],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: ['app.scss'],
@@ -196,11 +196,11 @@ export default defineConfig((ctx) => {
             ? viteConf.assetsInclude
             : [viteConf.assetsInclude]
           : [];
-        viteConf.assetsInclude = [...existing, '**/*.ctrie.gz', '**/*.onnx.gz', '**/*.onnx'];
+        viteConf.assetsInclude = [...existing, '**/*.onnx.gz', '**/*.onnx'];
 
         // Exclude heavy packages with binary data files or WASM backends from Vite's
         // dep pre-bundler. Pre-bundling breaks their internal dynamic imports:
-        // - ua-stress-ml / ua-word-stress: ?url asset imports for data files
+        // - ua-stress-ml / ua-word-stress-wasm: WASM modules and ONNX data files
         // - onnxruntime-web: dynamic imports of Emscripten .mjs glue files —
         //   when pre-bundled, Vite transforms the absolute glue URLs with ?import
         //   and corrupts the Emscripten output (NS_ERROR_CORRUPTED_CONTENT).
@@ -208,7 +208,7 @@ export default defineConfig((ctx) => {
         viteConf.optimizeDeps.exclude ??= [];
         viteConf.optimizeDeps.exclude.push(
           'ua-stress-ml',
-          'ua-word-stress',
+          'ua-word-stress-wasm',
           'onnxruntime-web',
           '@tilitronic/polish-stress-wasm',
           // cmu-pronouncing-dictionary is served as JSON via cmuDictPlugin — not imported as a module.

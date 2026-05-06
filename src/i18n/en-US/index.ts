@@ -42,7 +42,7 @@ export default {
   stressInfo: {
     dbTitle: 'Stress Dictionary (DB)',
     dbDesc:
-      'Lookup via ua-word-stress — 2.9 M word forms. Heteronyms and free stress variants highlighted in yellow.',
+      'Lookup via ua-word-stress-wasm — 3 M word forms embedded in WASM. Includes IPA transcription and syllabification. Heteronyms and free stress variants highlighted in yellow.',
     dbLink: 'ua-stress-engine on GitHub',
     mlTitle: 'ML Predictor — Luscinia',
     mlDesc:
@@ -83,7 +83,7 @@ export default {
       'VerseSense is a browser-based open-source tool for deep analysis of Ukrainian verse. Paste a poem — the engine resolves word stress, generates IPA transcription, and then goes further: it detects and visualises recurring sound patterns across the whole text, measures syllabic metre per line, finds rhyme groups, and gives you a C:V density map. The goal is to make the sonic architecture of a poem visible.',
     featuresTitle: 'Features',
     feat1:
-      'Automatic word-stress resolution — 2.9 M word-form dictionary (ua-word-stress) with Luscinia ML fallback for unknown words',
+      'Automatic word-stress resolution — ua-word-stress-wasm, 3 M word forms with full IPA transcription and syllabification; Luscinia ML fallback for unknown words',
     feat2: 'IPA phonetic transcription for each word',
     feat3: 'Syllabic-accentual metre visualisation per line',
     feat4:
@@ -95,7 +95,7 @@ export default {
     techTitle: 'Built with',
     stressTitle: 'ua-stress-engine — a standalone open-source project',
     stressText:
-      'Word-stress resolution lives in a separate open-source project. It includes two packages: ua-word-stress — a dictionary lookup over 2.9 M word forms (browser and Node compatible); ua-stress-ml — the {mlModel} ML predictor for words outside the dictionary, including neologisms (runs via ONNX Runtime Web in a Web Worker).',
+      'Word-stress resolution lives in a separate open-source project. It includes two packages: ua-word-stress-wasm — a WASM binary with 3 M word forms, full IPA transcription, syllabification, and morphology (no data files to serve); ua-stress-ml — the {mlModel} ML predictor for words outside the dictionary, including neologisms (runs via ONNX Runtime Web in a Web Worker).',
     stressLink: 'ua-stress-engine on GitHub',
     demoTitle: 'This is a prototype',
     demoText:

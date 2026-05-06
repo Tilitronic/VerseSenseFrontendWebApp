@@ -1,12 +1,15 @@
 /**
- * useStressTrie — Vue composable
+ * useUaStress — Vue composable
  *
- * Manages singleton UaStressResolver state backed by ua-word-stress-wasm.
- * The WASM binary embeds the full Ukrainian stress dictionary (~3M word forms)
- * so no separate data file needs to be fetched or served.
+ * Manages the Luscinia ML resolver singleton for Ukrainian OOV words.
+ * WASM init is also triggered here so the ua-word-stress-wasm dictionary is
+ * ready as early as possible.
+ *
+ * The WASM binary resolves stress, IPA, and syllabification for the vast
+ * majority of words upfront in a single batch call; Luscinia handles OOV.
  *
  * Usage:
- *   const { resolver, loading, error } = useStressTrie();
+ *   const { resolver, loading, error } = useUaStress();
  */
 
 import { ref, shallowRef, readonly, markRaw } from 'vue';
@@ -26,7 +29,7 @@ let _initPromise: Promise<void> | null = null;
  * Kick off WASM initialisation. Called by the boot file so it starts early.
  * Subsequent calls return the same promise.
  */
-export async function initStressTrie(ml: IMlStressPredictor | null = null): Promise<void> {
+export async function initUaStress(ml: IMlStressPredictor | null = null): Promise<void> {
   if (_resolver.value !== null || _initPromise !== null) return _initPromise ?? Promise.resolve();
 
   _loading.value = true;
@@ -50,17 +53,17 @@ export async function initStressTrie(ml: IMlStressPredictor | null = null): Prom
 }
 
 /**
- * Returns reactive state for the shared stress resolver.
+ * Returns reactive state for the shared ML stress resolver.
  */
-export function useStressTrie() {
+export function useUaStress() {
   return {
-    /** The resolver; null while loading or on error. */
+    /** The ML resolver; null while loading or on error. */
     resolver: readonly(_resolver),
     /** True while the WASM module is initialising. */
     loading: readonly(_loading),
     /** Set if initialisation failed. */
     error: readonly(_error),
     /** Trigger initialisation (idempotent). */
-    init: initStressTrie,
+    init: initUaStress,
   };
 }

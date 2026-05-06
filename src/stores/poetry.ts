@@ -25,8 +25,12 @@ import { Sylabizer, type Syllable } from 'src/services/poetryEngines/ua/Sylabize
 import { transcribePolish } from 'src/services/phonetic/plTranscription';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
-import { useStressTrie } from 'src/composables/useStressTrie';
-import { getPolishStressInfo } from 'src/services/stress/plStressService';
+import { useUaStress } from 'src/composables/useUaStress';
+import {
+  type PolishStressInfo,
+  getPolishStressInfoBatch,
+} from 'src/services/stress/plStressService';
+import { uaWasmLookupBatch, uaWasmReady, normalizeUaWord } from 'src/services/stress/uaWasmService';
 import { useAppStore } from 'src/stores/app';
 import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
 
@@ -75,8 +79,8 @@ function normalizeLeadingSpaces(text: string): string {
 }
 
 export const usePoetryStore = defineStore('poetry', () => {
-  // ── Stress trie resolver ───────────────────────────────────────────────────
-  const { resolver: stressResolver } = useStressTrie();
+  // ── UA stress resolver (ML fallback) ────────────────────────────────────────
+  const { resolver: stressResolver } = useUaStress();
   const appStore = useAppStore();
 
   function enabledLanguagesSet(): Set<Language> {
@@ -172,12 +176,20 @@ export const usePoetryStore = defineStore('poetry', () => {
   /**
    * Map from word token ID to the source of auto-resolved stress.
    *   'ml'        → ML prediction (displayed in blue)
-   *   'heteronym' → Trie heteronym — multiple valid forms (displayed in yellow)
+   *   'heteronym' → WASM heteronym — multiple valid forms (displayed in yellow)
    * Absent from map → stress was confirmed (by user or from DB).
    */
   const pendingStressIds = ref<Map<string, 'ml' | 'heteronym' | 'variative'>>(new Map());
   /** Alternative stress positions for heteronym/variative words, used by tooltips. Not persisted. */
   const pendingStressAlts = ref<Map<string, number[]>>(new Map());
+  /**
+   * Richer per-reading data from ua-word-stress-wasm for heteronym/variative words.
+   * Each entry holds the marked form and IPA transcription for every valid reading.
+   * Used by LinePanel to show informative tooltips. Not persisted.
+   */
+  const pendingStressReadings = ref<Map<string, Array<{ stressedForm: string; ipa: string }>>>(
+    new Map(),
+  );
 
   /**
    * Confidence of the last auto-detection (0.0–1.0).
@@ -743,8 +755,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     wordLanguages.value = newLangMap;
     confirmedWords.value = newConfirmed;
     pendingStressIds.value = newPendingIds;
-    // pendingStressAlts is derived from live resolution, not migrated — reset it
+    // pendingStressAlts / pendingStressReadings are derived from live resolution — reset them
     pendingStressAlts.value = new Map();
+    pendingStressReadings.value = new Map();
 
     // ── Prune syllable cache ───────────────────────────────────────────────────
     // Keep only entries whose token ID was reused (same word text at same
@@ -961,29 +974,10 @@ export const usePoetryStore = defineStore('poetry', () => {
               stresses: [],
             });
             stressSyncLog.debug('monosyllable — auto-stressed');
-          } else if (
-            vowelCount > 1 &&
-            effectiveLang === 'ua' &&
-            stressResolver.value &&
-            appStore.useDbStress
-          ) {
-            // Multi-syllable Ukrainian word — synchronous trie lookup.
-            const resolution = stressResolver.value.resolveSync(tok.text);
+          } else if (vowelCount > 1) {
             stressSyncLog.debug(
-              `resolveSync result: syllable ${resolution.syllableIndex} (${resolution.source})`,
+              `skipped (multi-syllable ${effectiveLang} — will batch-resolve async)`,
             );
-            if (resolution.syllableIndex !== null) {
-              stressChanges.set(tok.id, {
-                syllableIndex: resolution.syllableIndex,
-                confirmed: resolution.confirmed,
-                source: resolution.source === 'unresolved' ? 'ml' : resolution.source,
-                stresses: resolution.stresses ?? [],
-              });
-            }
-          } else if (vowelCount > 1 && effectiveLang !== 'ua') {
-            stressSyncLog.debug(`skipped (non-UA lang: ${effectiveLang})`);
-          } else if (vowelCount > 1 && !stressResolver.value) {
-            stressSyncLog.debug('skipped (resolver not ready yet)');
           }
         } else {
           stressSyncLog.debug(
@@ -1001,6 +995,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     const newConfirmedAfterStress = new Set(confirmedWords.value);
     const newPendingAfterStress = new Map(pendingStressIds.value);
     const newPendingAltsAfterStress = new Map(pendingStressAlts.value);
+    const newPendingReadingsAfterStress = new Map(pendingStressReadings.value);
     const newLines = document.value.lines.map((line) => {
       let lineChanged = false;
       const newTokens = line.tokens.map((tok) => {
@@ -1020,6 +1015,7 @@ export const usePoetryStore = defineStore('poetry', () => {
             newConfirmedAfterStress.add(tok.id);
             newPendingAfterStress.delete(tok.id);
             newPendingAltsAfterStress.delete(tok.id);
+            newPendingReadingsAfterStress.delete(tok.id);
           } else {
             const pSrc =
               sc.source === 'ml' ? 'ml' : sc.source === 'variative' ? 'variative' : 'heteronym';
@@ -1038,6 +1034,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     confirmedWords.value = newConfirmedAfterStress;
     pendingStressIds.value = newPendingAfterStress;
     pendingStressAlts.value = newPendingAltsAfterStress;
+    pendingStressReadings.value = newPendingReadingsAfterStress;
 
     // Auto-confirm lines where every word has unambiguous language
     for (const line of document.value.lines) {
@@ -1219,13 +1216,14 @@ export const usePoetryStore = defineStore('poetry', () => {
     _asyncStressAbort = ctl;
     const signal = ctl.signal;
 
-    const hasUaAsync = !!stressResolver.value && appStore.useMlStress;
+    const hasUaWasm = uaWasmReady() && appStore.useDbStress && appStore.isLanguageEnabled('ua');
+    const hasUaMl = !!stressResolver.value && appStore.useMlStress;
     const hasPlAsync = appStore.isLanguageEnabled('pl');
-    if (!hasUaAsync && !hasPlAsync) {
+    if (!hasUaWasm && !hasUaMl && !hasPlAsync) {
       stressAsyncLog.debug('all async resolvers disabled — skipping');
       return;
     }
-    const resolver = hasUaAsync ? stressResolver.value : null;
+    const resolver = hasUaMl ? stressResolver.value : null;
     const forcePolish = options?.forcePolish === true;
     const polishWordIds = options?.polishWordIds;
     const reason = options?.reason ?? 'unspecified';
@@ -1263,6 +1261,28 @@ export const usePoetryStore = defineStore('poetry', () => {
       `[pass ${passId}] resolving ${candidateTokens.length} word${candidateTokens.length === 1 ? '' : 's'} via async stress services…`,
     );
 
+    // ── Batch Polish WASM lookup ────────────────────────────────────────────
+    // Always use batch regardless of count — even a single-word batch is more
+    // efficient than a per-token sequential await and avoids the inflight-map
+    // overhead of getPolishStressInfo.
+    const polishInfoByWordId = new Map<string, PolishStressInfo | null>();
+    if (plCandidates.length > 0) {
+      const batch = await getPolishStressInfoBatch(
+        plCandidates.map((tok) => tok.text),
+        signal,
+      );
+      if (signal.aborted) {
+        stressAsyncLog.debug(`[pass ${passId}] aborted during Polish lookupBatch — stopping`);
+        return;
+      }
+      plCandidates.forEach((tok, idx) => {
+        polishInfoByWordId.set(tok.id, batch[idx] ?? null);
+      });
+      stressAsyncLog.debug(
+        `[pass ${passId}] Polish batch resolved ${plCandidates.length} candidate words`,
+      );
+    }
+
     const patches = new Map<
       string,
       {
@@ -1270,8 +1290,47 @@ export const usePoetryStore = defineStore('poetry', () => {
         confirmed: boolean;
         source: 'ml' | 'heteronym' | 'variative' | 'db';
         stresses?: number[];
+        readings?: Array<{ stressedForm: string; ipa: string }>;
       }
     >();
+
+    // ── Batch UA WASM lookup ────────────────────────────────────────────────
+    // Resolves all unresolved Ukrainian words in one synchronous WASM call.
+    // This is always faster and more correct than resolving one-at-a-time.
+    const wasmPatchedIds = new Set<string>();
+    if (uaCandidates.length > 0 && hasUaWasm) {
+      const batchResults = uaWasmLookupBatch(uaCandidates.map((t) => normalizeUaWord(t.text)));
+      uaCandidates.forEach((tok, i) => {
+        const result = batchResults[i] ?? null;
+        if (result !== null && result.readings.length > 0) {
+          const stresses = result.readings.map((r) => r.syllableIndex);
+          const confirmed = stresses.length === 1;
+          const patch: {
+            syllableIndex: number;
+            confirmed: boolean;
+            source: 'db' | 'heteronym';
+            stresses: number[];
+            readings?: Array<{ stressedForm: string; ipa: string }>;
+          } = {
+            syllableIndex: stresses[0]!,
+            confirmed,
+            source: confirmed ? 'db' : 'heteronym',
+            stresses,
+          };
+          if (!confirmed) {
+            patch.readings = result.readings.map((r) => ({
+              stressedForm: r.stressedForm,
+              ipa: r.ipa,
+            }));
+          }
+          patches.set(tok.id, patch);
+          wasmPatchedIds.add(tok.id);
+        }
+      });
+      stressAsyncLog.debug(
+        `[pass ${passId}] UA WASM batch: ${wasmPatchedIds.size}/${uaCandidates.length} resolved`,
+      );
+    }
 
     for (const tok of candidateTokens) {
       if (signal.aborted) {
@@ -1282,12 +1341,7 @@ export const usePoetryStore = defineStore('poetry', () => {
       const textAtDispatch = tok.text;
 
       if (tok.language === 'pl') {
-        const info = await getPolishStressInfo(tok.text, signal);
-
-        if (signal.aborted) {
-          stressAsyncLog.debug(`[pass ${passId}] aborted while awaiting Polish service — stopping`);
-          return;
-        }
+        const info = polishInfoByWordId.get(tok.id) ?? null;
 
         const currentTok = document.value.tokenIndex.get(tok.id);
         const currentWord = currentTok?.kind === 'WORD' ? currentTok : null;
@@ -1329,8 +1383,12 @@ export const usePoetryStore = defineStore('poetry', () => {
         stressAsyncLog.debug(`"${tok.text}" lang=${tok.language} — skip`);
         continue;
       }
+      if (wasmPatchedIds.has(tok.id)) {
+        stressAsyncLog.debug(`"${tok.text}" resolved by WASM batch — skip ML`);
+        continue;
+      }
       if (!resolver) {
-        stressAsyncLog.debug('UA async resolver not ready — skip');
+        stressAsyncLog.debug('UA ML resolver not ready — skip OOV');
         continue;
       }
       stressAsyncLog.info(`accenting “${tok.text}”…`);
@@ -1369,6 +1427,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     const newConfirmed = new Set(confirmedWords.value);
     const newPending = new Map(pendingStressIds.value);
     const newAlts = new Map(pendingStressAlts.value);
+    const newReadings = new Map(pendingStressReadings.value);
     const newLines = document.value.lines.map((line) => {
       let lineChanged = false;
       const newTokens = line.tokens.map((tok) => {
@@ -1382,11 +1441,13 @@ export const usePoetryStore = defineStore('poetry', () => {
           newConfirmed.add(tok.id);
           newPending.delete(tok.id);
           newAlts.delete(tok.id);
+          newReadings.delete(tok.id);
         } else {
           const pSrc =
             patch.source === 'ml' ? 'ml' : patch.source === 'variative' ? 'variative' : 'heteronym';
           newPending.set(tok.id, pSrc);
           if (patch.stresses && patch.stresses.length > 1) newAlts.set(tok.id, patch.stresses);
+          if (patch.readings && patch.readings.length > 1) newReadings.set(tok.id, patch.readings);
         }
         lineChanged = true;
         return newTok;
@@ -1398,6 +1459,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     confirmedWords.value = newConfirmed;
     pendingStressIds.value = newPending;
     pendingStressAlts.value = newAlts;
+    pendingStressReadings.value = newReadings;
     for (const line of document.value.lines) tryAutoConfirmLine(line.id);
   }
 
@@ -1411,6 +1473,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     confirmedWords,
     pendingStressIds,
     pendingStressAlts,
+    pendingStressReadings,
     detectionConfidence,
     syllableCache,
     allWordTokens,

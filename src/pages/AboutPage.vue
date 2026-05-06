@@ -86,7 +86,7 @@
             <q-chip color="amber-8" text-color="white" icon="store" label="Pinia" />
             <q-chip color="blue-grey-7" text-color="white" icon="edit_note" label="CodeMirror 6" />
             <q-chip color="orange-9" text-color="white" icon="memory" label="ONNX Runtime Web" />
-            <q-chip color="green-9" text-color="white" icon="book" label="ua-word-stress" />
+            <q-chip color="green-9" text-color="white" icon="memory" label="ua-word-stress-wasm" />
             <q-chip
               color="pink-8"
               text-color="white"

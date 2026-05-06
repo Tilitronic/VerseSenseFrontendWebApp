@@ -42,7 +42,7 @@ export default {
   stressInfo: {
     dbTitle: 'Słownik akcentów (DB)',
     dbDesc:
-      'Wyszukiwanie w ua-word-stress — 2.9 mln form wyrazowych. Homografy i warianty akcentowe zaznaczone na żółto.',
+      'Wyszukiwanie w ua-word-stress-wasm — 3 mln form wyrazowych osadzonych w binarnym pliku WASM. Zawiera transkrypcję IPA i podział na sylaby. Homografy i warianty akcentowe zaznaczone na żółto.',
     dbLink: 'ua-stress-engine na GitHub',
     mlTitle: 'Prediktor ML — Luscinia',
     mlDesc:
@@ -83,7 +83,7 @@ export default {
       'VerseSense to otwarte, przeglądarkowe narzędzie do głębokiej analizy ukraińskiego wiersza. Wklej utwór — silnik rozpozna akcenty, wygeneruje transkrypcję IPA, a następnie pójdzie dalej: wykryje i zwizualizuje powtarzające się wzorce dźwiękowe w całym tekście, zmierzy metrum sylabotonicze każdej linii, znajdzie grupy rymów i zbuduje mapę gęstości spółgłosek do samogłosek. Celem jest uwidocznienie dźwiękowej architektury wiersza.',
     featuresTitle: 'Funkcje',
     feat1:
-      'Automatyczne rozpoznawanie akcentów — słownik 2.9 mln form wyrazowych (ua-word-stress) z predyktorem ML Luscinia dla nieznanych słów',
+      'Automatyczne rozpoznawanie akcentów — ua-word-stress-wasm, 3 mln form wyrazowych z pełną transkrypcją IPA i podziałem na sylaby; predyktor ML Luscinia dla nieznanych słów',
     feat2: 'Transkrypcja fonetyczna IPA dla każdego słowa',
     feat3: 'Wizualizacja metrum sylabotoniczne dla każdej linii',
     feat4:
@@ -96,7 +96,7 @@ export default {
     techTitle: 'Technologie',
     stressTitle: 'ua-stress-engine — odrębny projekt open-source',
     stressText:
-      'Rozpoznawanie akcentów jest wyodrębnione do osobnego projektu open-source. Składa się z dwóch pakietów: ua-word-stress — słownikowe wyszukiwanie po 2.9 mln formach wyrazowych (działa w przeglądarce i Node); ua-stress-ml — prediktor ML {mlModel} dla słów spoza słownika, w tym neologizmów (działa przez ONNX Runtime Web w Web Worker).',
+      'Rozpoznawanie akcentów jest wyodrębnione do osobnego projektu open-source. Składa się z dwóch pakietów: ua-word-stress-wasm — plik binarny WASM z 3 mln formami wyrazowymi, pełną transkrypcją IPA, podziałem na sylaby i morfologią (bez zewnętrznych plików danych); ua-stress-ml — prediktor ML {mlModel} dla słów spoza słownika, w tym neologizmów (działa przez ONNX Runtime Web w Web Worker).',
     stressLink: 'ua-stress-engine na GitHub',
     demoTitle: 'To jest prototyp',
     demoText:

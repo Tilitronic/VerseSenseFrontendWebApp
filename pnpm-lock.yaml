@@ -27,8 +27,8 @@ importers:
         specifier: ^1.16.4
         version: 1.17.0
       '@tilitronic/polish-stress-wasm':
-        specifier: ^0.2.5
-        version: 0.2.5
+        specifier: ^0.3.1
+        version: 0.3.1
       axios:
         specifier: ^1.2.1
         version: 1.13.2
@@ -56,9 +56,9 @@ importers:
       ua-stress-ml:
         specifier: ^1.0.1
         version: 1.0.1(onnxruntime-web@1.24.3)
-      ua-word-stress:
-        specifier: ^1.0.2
-        version: 1.0.2
+      ua-word-stress-wasm:
+        specifier: ^0.4.0
+        version: 0.4.0
       vue:
         specifier: ^3.5.22
         version: 3.5.25(typescript@5.9.3)
@@ -795,8 +795,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tilitronic/polish-stress-wasm@0.2.5':
-    resolution: {integrity: sha512-kE2Q6P/aR+GdPeC5/huaF3uNE9lEGgjutoh1jldS6NsRT6GLXLJaZIACVFXaWKThtHG2sP9k8BgcX0Bms0aRlg==}
+  '@tilitronic/polish-stress-wasm@0.3.1':
+    resolution: {integrity: sha512-fmOKjodLQZqs6xg1ZREh5FvH5bNTfhCP1Cfgq4het753w+SEyzhgRdxxHIIigA4ZUbUnqeZKqyLIeiOgLZqpZA==}
 
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
@@ -2776,8 +2776,8 @@ packages:
     peerDependencies:
       onnxruntime-web: '>=1.18.0'
 
-  ua-word-stress@1.0.2:
-    resolution: {integrity: sha512-jU+ftWsZ/0Bi6FLr4sIJcs+Qnak37CPyg4m3G5Sj46hHwfqNN53l9Lw3Bg0JATnBs+1MddfE7u/ycnbG+TuMjQ==}
+  ua-word-stress-wasm@0.4.0:
+    resolution: {integrity: sha512-uWqkW2ffSRLUwXgjTXF/PxR9WcuOFRGQkKclL7wnwFLBxBLDlmv3naGI5bIPE7U1lHn/nXhuwGhruubme9WBDg==}
 
   ufo@1.6.1:
     resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
@@ -3629,7 +3629,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tilitronic/polish-stress-wasm@0.2.5': {}
+  '@tilitronic/polish-stress-wasm@0.3.1': {}
 
   '@types/body-parser@1.19.6':
     dependencies:
@@ -5729,7 +5729,7 @@ snapshots:
     dependencies:
       onnxruntime-web: 1.24.3
 
-  ua-word-stress@1.0.2: {}
+  ua-word-stress-wasm@0.4.0: {}
 
   ufo@1.6.1: {}
 

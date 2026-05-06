@@ -10,11 +10,30 @@ export interface PolishStressInfo {
   confidence: 'exact' | 'rule' | 'default';
 }
 
-import type { stressInfo as StressInfoFn } from '@tilitronic/polish-stress-wasm';
 import { stressPolishLog } from 'src/services/logging';
 
+type PolishConfidence = PolishStressInfo['confidence'];
+
+interface PlLookupReading {
+  syllableIndex: number;
+  stressFromEnd: number;
+  syllableCount: number;
+  form: string;
+  stressedForm: string;
+  wordSyllables: string[];
+  ipa: string;
+  ipaSyllables: string[];
+  confidence: string;
+}
+
+interface PlLookupResult {
+  form: string;
+  readings: PlLookupReading[];
+}
+
 interface PlStressWasmModule {
-  stressInfo: typeof StressInfoFn;
+  lookup: (word: string) => unknown;
+  lookupBatch: (words: string[]) => unknown;
 }
 
 const cache = new Map<string, PolishStressInfo>();
@@ -22,6 +41,14 @@ const inflight = new Map<string, Promise<PolishStressInfo | null>>();
 let modulePromise: Promise<PlStressWasmModule | null> | null = null;
 let moduleUnavailable = false;
 let moduleFailureLogged = false;
+
+function isPolishConfidence(value: unknown): value is PolishConfidence {
+  return value === 'exact' || value === 'rule' || value === 'default';
+}
+
+function stripIpaStress(ipa: string): string {
+  return ipa.replace(/[ˈˌ]/g, '');
+}
 
 function normalizeWord(word: string): string {
   return word
@@ -127,18 +154,51 @@ function buildFallbackInfo(word: string): PolishStressInfo | null {
   };
 }
 
-function isPolishStressInfo(value: unknown): value is PolishStressInfo {
+function isLookupReading(value: unknown): value is PlLookupReading {
   if (!value || typeof value !== 'object') return false;
-  const info = value as Partial<PolishStressInfo>;
+  const reading = value as Partial<PlLookupReading>;
   return (
-    typeof info.word === 'string' &&
-    Array.isArray(info.syllables) &&
-    typeof info.syllableIndex === 'number' &&
-    typeof info.stressFromEnd === 'number' &&
-    (typeof info.ipa === 'string' || info.ipa === null) &&
-    (info.ipaSyllables === undefined || Array.isArray(info.ipaSyllables)) &&
-    (info.confidence === 'exact' || info.confidence === 'rule' || info.confidence === 'default')
+    typeof reading.syllableIndex === 'number' &&
+    typeof reading.stressFromEnd === 'number' &&
+    typeof reading.syllableCount === 'number' &&
+    typeof reading.form === 'string' &&
+    Array.isArray(reading.wordSyllables) &&
+    typeof reading.ipa === 'string' &&
+    Array.isArray(reading.ipaSyllables) &&
+    typeof reading.confidence === 'string'
   );
+}
+
+function isLookupResult(value: unknown): value is PlLookupResult {
+  if (!value || typeof value !== 'object') return false;
+  const result = value as Partial<PlLookupResult>;
+  return typeof result.form === 'string' && Array.isArray(result.readings);
+}
+
+function mapLookupToInfo(normalized: string, value: unknown): PolishStressInfo | null {
+  if (!isLookupResult(value) || value.readings.length === 0) return null;
+
+  const reading = value.readings[0];
+  if (!isLookupReading(reading)) return null;
+
+  const syllables =
+    reading.wordSyllables.length > 0
+      ? reading.wordSyllables
+      : splitPolishWordToSyllables(normalized);
+  if (syllables.length === 0) return null;
+
+  const syllableIndex = Math.max(0, Math.min(reading.syllableIndex, syllables.length - 1));
+  const stressFromEnd = Math.max(1, syllables.length - syllableIndex);
+
+  return {
+    word: normalized,
+    syllables,
+    syllableIndex,
+    stressFromEnd,
+    ipa: reading.ipa ? stripIpaStress(reading.ipa) : null,
+    ipaSyllables: reading.ipaSyllables.map((part) => stripIpaStress(part)),
+    confidence: isPolishConfidence(reading.confidence) ? reading.confidence : 'default',
+  };
 }
 
 export function peekPolishStressInfo(word: string): PolishStressInfo | null {
@@ -151,11 +211,17 @@ async function getModule(): Promise<PlStressWasmModule | null> {
     stressPolishLog.debug('module init: dynamic import @tilitronic/polish-stress-wasm');
     modulePromise = import('@tilitronic/polish-stress-wasm')
       .then((module) => {
-        if (typeof module.stressInfo !== 'function') {
+        if (typeof module.lookup !== 'function') {
           throw new Error('Invalid @tilitronic/polish-stress-wasm export shape');
         }
+
+        const lookupBatch =
+          typeof module.lookupBatch === 'function'
+            ? module.lookupBatch
+            : (words: string[]) => words.map((w) => module.lookup(w));
+
         stressPolishLog.info('module init: success');
-        return { stressInfo: module.stressInfo };
+        return { lookup: module.lookup, lookupBatch };
       })
       .catch((error) => {
         stressPolishLog.warn('module init failed', error);
@@ -211,26 +277,25 @@ export async function getPolishStressInfo(
         return fallback;
       }
 
-      const data = module.stressInfo(normalized) as unknown;
-      if (!isPolishStressInfo(data)) {
+      const info = mapLookupToInfo(normalized, module.lookup(normalized));
+      if (!info) {
         const fallback = buildFallbackInfo(normalized);
         if (fallback) cache.set(normalized, fallback);
         stressPolishLog.warn('invalid package payload -> fallback', {
           word: normalized,
-          payload: data,
           fallback,
         });
         return fallback;
       }
-      cache.set(normalized, data);
+      cache.set(normalized, info);
       stressPolishLog.info('resolve success', {
         word: normalized,
-        syllables: data.syllables,
-        syllableIndex: data.syllableIndex,
-        stressFromEnd: data.stressFromEnd,
-        confidence: data.confidence,
+        syllables: info.syllables,
+        syllableIndex: info.syllableIndex,
+        stressFromEnd: info.stressFromEnd,
+        confidence: info.confidence,
       });
-      return data;
+      return info;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return null;
       stressPolishLog.warn('resolve failed -> fallback', { word: normalized, error });
@@ -244,4 +309,65 @@ export async function getPolishStressInfo(
 
   inflight.set(normalized, req);
   return req;
+}
+
+export async function getPolishStressInfoBatch(
+  words: string[],
+  signal?: AbortSignal,
+): Promise<Array<PolishStressInfo | null>> {
+  const normalizedWords = words.map((word) => normalizeWord(word));
+  const out: Array<PolishStressInfo | null> = new Array(words.length).fill(null);
+  if (signal?.aborted) return out;
+
+  const missingIndexesByWord = new Map<string, number[]>();
+
+  normalizedWords.forEach((normalized, index) => {
+    if (!normalized) return;
+    const cached = cache.get(normalized);
+    if (cached) {
+      out[index] = cached;
+      return;
+    }
+    const list = missingIndexesByWord.get(normalized);
+    if (list) list.push(index);
+    else missingIndexesByWord.set(normalized, [index]);
+  });
+
+  if (missingIndexesByWord.size === 0) return out;
+
+  const module = await getModule();
+  if (signal?.aborted) return out;
+
+  const missingWords = [...missingIndexesByWord.keys()];
+
+  if (!module) {
+    for (const missing of missingWords) {
+      const fallback = buildFallbackInfo(missing);
+      if (fallback) cache.set(missing, fallback);
+      for (const idx of missingIndexesByWord.get(missing) ?? []) out[idx] = fallback;
+    }
+    return out;
+  }
+
+  let results: unknown;
+  try {
+    results = module.lookupBatch(missingWords);
+  } catch (error) {
+    stressPolishLog.warn('lookupBatch failed -> fallback', { error });
+    results = null;
+  }
+
+  const payload =
+    Array.isArray(results) && results.length === missingWords.length
+      ? results
+      : new Array<unknown>(missingWords.length).fill(null);
+
+  missingWords.forEach((normalized, idx) => {
+    const parsed = mapLookupToInfo(normalized, payload[idx]);
+    const resolved = parsed ?? buildFallbackInfo(normalized);
+    if (resolved) cache.set(normalized, resolved);
+    for (const outIdx of missingIndexesByWord.get(normalized) ?? []) out[outIdx] = resolved;
+  });
+
+  return out;
 }

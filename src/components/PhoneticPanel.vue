@@ -81,6 +81,16 @@
                 />
 
                 <div class="pp-cells" :style="cellsStyle(line)">
+                  <!-- Horizontal triangles (left/right) — move with cells -->
+                  <div
+                    v-if="manualMode && hoveredLeftLineId === line.id && canShiftLeft(line)"
+                    class="pp-triangle pp-triangle--left"
+                  />
+                  <div
+                    v-if="manualMode && hoveredLeftLineId === line.id && canShiftRight()"
+                    class="pp-triangle pp-triangle--right"
+                  />
+
                   <template
                     v-for="(item, itemIdx) in visualizationItems(line)"
                     :key="`${line.id}:${itemIdx}`"
@@ -150,6 +160,24 @@
                       </template>
                     </div>
                   </template>
+                </div>
+
+                <!-- Vertical triangle for moving up (top, positioned on first word center) -->
+                <div
+                  v-if="manualMode && hoveredLeftLineId === line.id && canMoveUp(lineIdx)"
+                  class="pp-row__vertical-triangle pp-row__vertical-triangle--top"
+                  :style="{ left: topTriangleLeftOffset(line) }"
+                >
+                  <div class="pp-triangle pp-triangle--top" />
+                </div>
+
+                <!-- Vertical triangle for moving down (bottom, positioned on last word center) -->
+                <div
+                  v-if="manualMode && hoveredLeftLineId === line.id && canMoveDown(lineIdx)"
+                  class="pp-row__vertical-triangle pp-row__vertical-triangle--bottom"
+                  :style="{ left: bottomTriangleLeftOffset(line) }"
+                >
+                  <div class="pp-triangle pp-triangle--bottom" />
                 </div>
               </div>
             </div>
@@ -284,6 +312,91 @@ function cellsStyle(line: ILine): Record<string, string> | undefined {
   return {
     transform: `translateX(${steps * CELL_STEP_PX}px)`,
   };
+}
+
+// ── Movement predicates ────────────────────────────────────────────────────────
+
+function canShiftLeft(line: ILine): boolean {
+  return currentShift(line.id) > 0;
+}
+
+function canShiftRight(): boolean {
+  // Right shift is always possible (no hard limit)
+  return true;
+}
+
+function canMoveUp(lineIdx: number): boolean {
+  return lineIdx > 0;
+}
+
+function canMoveDown(lineIdx: number): boolean {
+  return lineIdx < store.document.lines.length - 1;
+}
+
+/**
+ * Get center position (in cells) of first word module.
+ * For 2 syllables: return 0.5 (between them).
+ * For 3+ syllables: return middle index.
+ */
+function getFirstWordModuleCenter(line: ILine): number | null {
+  const items = visualizationItems(line);
+  const firstWordId = wordEdgeIds(line).first;
+  if (!firstWordId) return null;
+
+  const cellIndices: number[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item?.type === 'cell' && item.motifWordId === firstWordId) {
+      cellIndices.push(i);
+    }
+  }
+
+  if (cellIndices.length === 0) return null;
+  return cellIndices.length === 2 
+    ? cellIndices[0]! + 0.5
+    : cellIndices[Math.floor(cellIndices.length / 2)]!;
+}
+
+/**
+ * Get center position (in cells) of last word module.
+ */
+function getLastWordModuleCenter(line: ILine): number | null {
+  const items = visualizationItems(line);
+  const lastWordId = wordEdgeIds(line).last;
+  if (!lastWordId) return null;
+
+  const cellIndices: number[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item?.type === 'cell' && item.motifWordId === lastWordId) {
+      cellIndices.push(i);
+    }
+  }
+
+  if (cellIndices.length === 0) return null;
+  return cellIndices.length === 2 
+    ? cellIndices[0]! + 0.5
+    : cellIndices[Math.floor(cellIndices.length / 2)]!;
+}
+
+/**
+ * Calculate left offset (px) for top vertical triangle (positioned on first word center).
+ */
+function topTriangleLeftOffset(line: ILine): string {
+  const center = getFirstWordModuleCenter(line);
+  if (center === null) return '50%';
+  const offsetPx = center * CELL_STEP_PX + CELL_STEP_PX / 2;
+  return `${offsetPx}px`;
+}
+
+/**
+ * Calculate left offset (px) for bottom vertical triangle (positioned on last word center).
+ */
+function bottomTriangleLeftOffset(line: ILine): string {
+  const center = getLastWordModuleCenter(line);
+  if (center === null) return '50%';
+  const offsetPx = center * CELL_STEP_PX + CELL_STEP_PX / 2;
+  return `${offsetPx}px`;
 }
 
 let dragLineId: string | null = null;
@@ -967,35 +1080,64 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  position: relative;
 
   &--guide-active .pp-cells {
     box-shadow: 0 0 0 2px rgba(41, 121, 255, 0.25);
     border-radius: 4px;
   }
+}
 
-  &--guide-active .pp-cells::before,
-  &--guide-active .pp-cells::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    width: 0;
-    height: 0;
-    transform: translateY(-50%);
-    pointer-events: none;
+.pp-row__vertical-triangle {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+
+  &--top {
+    top: -12px;
   }
 
-  &--guide-active .pp-cells::before {
+  &--bottom {
+    bottom: -12px;
+  }
+}
+
+.pp-triangle {
+  width: 0;
+  height: 0;
+  pointer-events: none;
+
+  &--left {
+    position: absolute;
+    top: 50%;
     left: -11px;
+    transform: translateY(-50%);
     border-top: 6px solid transparent;
     border-bottom: 6px solid transparent;
     border-right: 8px solid rgba(41, 121, 255, 0.9);
   }
 
-  &--guide-active .pp-cells::after {
+  &--right {
+    position: absolute;
+    top: 50%;
     right: -11px;
+    transform: translateY(-50%);
     border-top: 6px solid transparent;
     border-bottom: 6px solid transparent;
     border-left: 8px solid rgba(41, 121, 255, 0.9);
+  }
+
+  &--top {
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 8px solid rgba(41, 121, 255, 0.92);
+  }
+
+  &--bottom {
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid rgba(41, 121, 255, 0.92);
   }
 }
 

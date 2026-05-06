@@ -121,7 +121,20 @@ import {
 } from 'src/services/poetryEngines/shared/wordVowels';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { LUSCINIA_MODEL_DISPLAY } from 'src/services/stress/lusciniaPredictor';
-import { applyStressMark } from 'ua-word-stress';
+/** Apply a combining acute U+0301 after the nth Ukrainian vowel (0-based). */
+function applyStressMark(word: string, vowelIdx: number): string {
+  const UA_VOWELS_SET = new Set('аеєиіїоуюяАЕЄИІЇОУЮЯ');
+  let count = 0;
+  let result = '';
+  for (const ch of word) {
+    result += ch;
+    if (UA_VOWELS_SET.has(ch)) {
+      if (count === vowelIdx) result += '\u0301';
+      count++;
+    }
+  }
+  return result;
+}
 
 const { t } = useI18n();
 
@@ -252,7 +265,16 @@ function stressTitle(tok: IWordToken, slot: CharSlot): string {
       : t('stressTooltip.mlOverride');
   }
 
-  // heteronym or variative — show both marked variants if available
+  // heteronym or variative — prefer richer WASM readings (stressedForm + IPA)
+  const readings = store.pendingStressReadings?.get(tok.id);
+  if (readings && readings.length >= 2) {
+    const variants = readings.map((r) => `${r.stressedForm} [${r.ipa}]`).join(' / ');
+    const kind = t(
+      pending === 'variative' ? 'stressTooltip.freeVariants' : 'stressTooltip.contextDependent',
+    );
+    return t('stressTooltip.variantsHint', { kind, variants });
+  }
+  // Fallback: plain stress-index variants (e.g. ML or non-WASM paths)
   const alts = store.pendingStressAlts.get(tok.id);
   if (alts && alts.length >= 2) {
     const variants = alts.map((idx) => markedVariant(tok.text, idx)).join(' / ');
