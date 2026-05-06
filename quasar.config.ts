@@ -52,8 +52,9 @@ function cmuDictPlugin(): Plugin {
       'node_modules/cmu-pronouncing-dictionary/index.js',
     );
     const src = readFileSync(pkgPath, 'utf8');
-    // Strip the ESM export prefix to get the bare object literal
-    const objSrc = src.replace(/^export const dictionary\s*=\s*/, '').replace(/;\s*$/, '');
+    // Strip the ESM export prefix to get the bare object literal.
+    // Note: the file may start with a JSDoc comment so we cannot use ^.
+    const objSrc = src.replace(/export const dictionary\s*=\s*/, '').replace(/;\s*$/, '');
     // Use Function() to evaluate the object literal in a controlled way
     // eslint-disable-next-line @typescript-eslint/no-implied-eval
     const dict = new Function(`return (${objSrc})`)() as Record<string, string>;

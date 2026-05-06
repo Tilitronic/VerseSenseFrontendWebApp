@@ -30,7 +30,12 @@ import {
   type PolishStressInfo,
   getPolishStressInfoBatch,
 } from 'src/services/stress/plStressService';
-import { uaWasmLookupBatch, uaWasmReady, normalizeUaWord } from 'src/services/stress/uaWasmService';
+import {
+  uaWasmLookupBatch,
+  uaWasmReady,
+  normalizeUaWord,
+  type UaMorphEntry,
+} from 'src/services/stress/uaWasmService';
 import { useAppStore } from 'src/stores/app';
 import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
 
@@ -1304,24 +1309,77 @@ export const usePoetryStore = defineStore('poetry', () => {
         const result = batchResults[i] ?? null;
         if (result !== null && result.readings.length > 0) {
           const stresses = result.readings.map((r) => r.syllableIndex);
-          const confirmed = stresses.length === 1;
+          // Treat as confirmed when all readings agree on the same syllable.
+          // Multiple readings with the same syllableIndex are grammatical
+          // variants of the same pronunciation, NOT heteronyms.
+          const uniqueStresses = [...new Set(stresses)];
+
+          // ── Variative vs heteronym classification ───────────────────────
+          // When WASM returns multiple unique stress positions we need to
+          // decide whether both are free variants (same word, both always
+          // valid — e.g. по́милка / поми́лка) or true heteronyms (different
+          // words / meanings selected by context — e.g. за́мок / замо́к).
+          //
+          // Heuristic using morph fingerprint (lemma + feats + definition):
+          //   • If every reading's morph fingerprint is identical AND at least
+          //     one morph entry carries non-empty feature data → 'variative'.
+          //     (Same grammatical form with two valid accents, e.g. по́милка/поми́лка.)
+          //   • Otherwise → conservative 'heteronym'.
+          //     This covers: different grammatical forms (бло́хи Gen.Sg vs блохи́ Nom.Pl),
+          //     different meanings (за́мок castle vs замо́к lock), and words with no feats.
+          let wasmSource: 'heteronym' | 'variative' = 'heteronym';
+          if (uniqueStresses.length > 1) {
+            const morphFingerprint = (r: { morph: UaMorphEntry[] }) =>
+              r.morph
+                .map((m) => `${m.lemma ?? ''}:${JSON.stringify(m.feats)}:${m.definition ?? ''}`)
+                .sort()
+                .join('|');
+            const fps = result.readings.map(morphFingerprint);
+            const allSame = fps.every((f) => f === fps[0]);
+            const anyHasFeats = result.readings.some((r) =>
+              r.morph.some((m) => Object.keys(m.feats).length > 0),
+            );
+            if (allSame && anyHasFeats) {
+              wasmSource = 'variative';
+              stressAsyncLog.debug(
+                `[ua-wasm] variative: "${tok.text}" → identical morph with non-empty feats on all readings`,
+              );
+            } else {
+              stressAsyncLog.debug(
+                `[ua-wasm] heteronym: "${tok.text}" → [${result.readings
+                  .map((r) => {
+                    const lemmas = r.morph?.map((m) => m.lemma).join('|') ?? '?';
+                    const feats = r.morph?.map((m) => JSON.stringify(m.feats)).join('|') ?? '?';
+                    const defs = r.morph?.map((m) => m.definition ?? '').join('|') ?? '?';
+                    return `${r.stressedForm}(si=${r.syllableIndex},lemma=${lemmas},feats=${feats},def=${defs})`;
+                  })
+                  .join(', ')}]`,
+              );
+            }
+          }
+          const confirmed = uniqueStresses.length === 1;
           const patch: {
             syllableIndex: number;
             confirmed: boolean;
-            source: 'db' | 'heteronym';
+            source: 'db' | 'heteronym' | 'variative';
             stresses: number[];
             readings?: Array<{ stressedForm: string; ipa: string }>;
           } = {
-            syllableIndex: stresses[0]!,
+            syllableIndex: uniqueStresses[0]!,
             confirmed,
-            source: confirmed ? 'db' : 'heteronym',
-            stresses,
+            source: confirmed ? 'db' : wasmSource,
+            stresses: uniqueStresses,
           };
           if (!confirmed) {
-            patch.readings = result.readings.map((r) => ({
-              stressedForm: r.stressedForm,
-              ipa: r.ipa,
-            }));
+            // One representative stressedForm/ipa per unique syllable position.
+            const seen = new Set<number>();
+            patch.readings = result.readings
+              .filter((r) => {
+                if (seen.has(r.syllableIndex)) return false;
+                seen.add(r.syllableIndex);
+                return true;
+              })
+              .map((r) => ({ stressedForm: r.stressedForm, ipa: r.ipa }));
           }
           patches.set(tok.id, patch);
           wasmPatchedIds.add(tok.id);

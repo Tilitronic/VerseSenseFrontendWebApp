@@ -14,6 +14,13 @@ import { trieLog } from 'src/services/logging';
 
 // ── Shared reading type ────────────────────────────────────────────────────────
 
+export interface UaMorphEntry {
+  pos: string[];
+  feats: Record<string, string[]>;
+  lemma: string | null;
+  definition: string | null;
+}
+
 export interface UaReading {
   /** 0-based syllable index of the stressed syllable */
   syllableIndex: number;
@@ -25,6 +32,8 @@ export interface UaReading {
   ipa: string;
   ipaSyllables: string[];
   confidence: string | null;
+  /** Morphological annotations from the dictionary. */
+  morph: UaMorphEntry[];
 }
 
 export interface UaLookupResult {
@@ -78,7 +87,16 @@ function isUaLookupResult(value: unknown): value is UaLookupResult {
 
 function parseResult(raw: unknown): UaLookupResult | null {
   if (!isUaLookupResult(raw)) return null;
-  const readings = raw.readings.filter(isUaReading);
+  // WASM returns getter-based objects (serde_wasm_bindgen) whose properties
+  // are non-enumerable. JSON round-trip converts them to plain objects so
+  // the type guard's typeof checks work correctly.
+  let plainReadings: unknown[];
+  try {
+    plainReadings = JSON.parse(JSON.stringify(raw.readings)) as unknown[];
+  } catch {
+    plainReadings = raw.readings;
+  }
+  const readings = plainReadings.filter(isUaReading);
   return readings.length > 0 ? { form: raw.form, readings } : null;
 }
 
@@ -86,8 +104,9 @@ function parseResult(raw: unknown): UaLookupResult | null {
 
 /**
  * Load the WASM module. Idempotent — safe to call multiple times.
- * The bundler auto-initialises the WASM binary on ESM import;
- * no explicit `init()` call is needed.
+ * The 0.5.1+ package self-initialises on ESM import (no explicit init call needed).
+ * We use dynamic import so the 15 MB WASM binary is compiled off the critical path,
+ * preventing a main-thread freeze before the first render.
  */
 export async function initUaWasm(): Promise<void> {
   if (_module) return;
@@ -135,5 +154,14 @@ export function uaWasmStressIndexBatch(words: string[]): Int32Array {
  */
 export function uaWasmLookupBatch(words: string[]): Array<UaLookupResult | null> {
   if (!_module) return words.map(() => null);
-  return _module.lookupBatch(words).map(parseResult);
+  // WASM may return getter-based objects (serde_wasm_bindgen) whose properties
+  // are non-enumerable. JSON round-trip converts them to plain objects.
+  const raw = _module.lookupBatch(words);
+  let plain: unknown[];
+  try {
+    plain = JSON.parse(JSON.stringify(raw)) as unknown[];
+  } catch {
+    plain = raw;
+  }
+  return plain.map(parseResult);
 }
