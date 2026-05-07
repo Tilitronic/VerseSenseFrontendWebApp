@@ -16,6 +16,8 @@ import { initUaStress } from 'src/composables/useUaStress';
 import { LusciniaPredictor } from 'src/services/stress/lusciniaPredictor';
 
 export default boot(() => {
-  // Fire-and-forget: loading errors are captured in the composable's `error` ref.
+  // Fire-and-forget: both WASM and CMU dict load concurrently in the
+  // background.  The poetry store reacts to their readiness via watches on
+  // stressResolver and the cmuDictReady promise — no splash blocking needed.
   void initUaStress(new LusciniaPredictor());
 });

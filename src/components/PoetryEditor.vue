@@ -30,7 +30,7 @@
       class="pe-pane pe-pane--settings"
       :style="settingsPaneStyle"
     >
-      <ActiveLineToolbar mode="all" :cm-scroll-top="cmScrollTop" />
+      <ActiveLineToolbar mode="all" />
     </div>
 
     <!-- ── Editor context menu ────────────────────────────────── -->
@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, watch, computed, onUnmounted } from 'vue';
+import { ref, shallowRef, watch, computed } from 'vue';
 import { Codemirror } from 'vue-codemirror';
 import {
   EditorView,
@@ -88,9 +88,6 @@ const text = ref(poetryStore.rawText);
 // CodeMirror EditorView instance — shallowRef prevents Vue from deep-proxying it
 const cmView = shallowRef<EditorView | null>(null);
 
-// CM scroller scroll position — mirrored to the toolbar in 'all' mode
-const cmScrollTop = ref(0);
-
 /** CM update listener extension that tracks cursor line */
 const activeLineTracker = EditorView.updateListener.of((update) => {
   if (update.selectionSet || update.docChanged) {
@@ -105,24 +102,10 @@ function onChange(val: string) {
   poetryStore.setRawText(val);
 }
 
-let _scrollCleanup: (() => void) | null = null;
-
 function onReady(payload: { view: EditorView; state: unknown; container: unknown }) {
   cmView.value = payload.view;
   pushStressStatus(payload.view);
-
-  // Mirror CM scroll position into cmScrollTop so the toolbar can sync
-  const scroller = payload.view.scrollDOM;
-  const onScroll = () => {
-    cmScrollTop.value = scroller.scrollTop;
-  };
-  scroller.addEventListener('scroll', onScroll, { passive: true });
-  _scrollCleanup = () => scroller.removeEventListener('scroll', onScroll);
 }
-
-onUnmounted(() => {
-  _scrollCleanup?.();
-});
 
 /** Compute per-line stress status from the store and push it into CM */
 function pushStressStatus(view: EditorView) {

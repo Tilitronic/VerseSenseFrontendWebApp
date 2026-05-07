@@ -36,8 +36,6 @@ import type { ToolbarMode } from 'src/stores/localConfig';
 const { mode } = defineProps<{
   /** 'active' = cursor line only; 'all' = every line that has words */
   mode: ToolbarMode;
-  /** CodeMirror scroller scrollTop — kept for API compat */
-  cmScrollTop?: number;
 }>();
 
 const store = usePoetryStore();

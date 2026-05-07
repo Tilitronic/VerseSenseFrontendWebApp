@@ -114,7 +114,7 @@ function navigateTo(path: string) {
 }
 
 function isActive(path: string): boolean {
-  return route.path === path;
+  return route?.path === path;
 }
 </script>
 

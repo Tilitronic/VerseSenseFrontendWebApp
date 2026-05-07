@@ -74,6 +74,7 @@ export default {
     exportSvgLegend: 'Export SVG with legend',
     exportLegend: '+Legend',
     exportLegendTitle: 'Include legend in exported SVG',
+    servicesLoading: 'Loading phonetic services…',
   },
   about: {
     pageTitle: 'About VerseSense',

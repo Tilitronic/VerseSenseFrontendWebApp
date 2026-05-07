@@ -116,28 +116,10 @@ function getPredictor(modelUrl: string): Promise<LusciniaPredictor> {
   return predictorPromise;
 }
 
-type WorkerInboundMessage =
-  | { type: 'warmup'; modelUrl: string }
-  | { type: 'infer'; id: string; word: string; modelUrl: string };
+type WorkerInboundMessage = { type: 'infer'; id: string; word: string; modelUrl: string };
 
 self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
   const msg = e.data;
-
-  if (msg.type === 'warmup') {
-    // Pre-load the model so it is compiled and cached before any predict() arrives.
-    // Runs outside the inference queue — sends ready/error back to main thread.
-    console.debug('[LusciniaWorker] warmup — pre-loading model from', msg.modelUrl);
-    void getPredictor(msg.modelUrl)
-      .then(() => {
-        console.debug('[LusciniaWorker] warmup complete — model ready');
-        self.postMessage({ type: 'ready' });
-      })
-      .catch((err) => {
-        console.error('[LusciniaWorker] warmup failed:', err);
-        self.postMessage({ type: 'error', error: String(err) });
-      });
-    return;
-  }
 
   const { id, word, modelUrl } = msg;
   console.debug(`[LusciniaWorker] infer id=${id} word="${word}"`);

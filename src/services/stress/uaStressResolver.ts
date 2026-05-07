@@ -7,11 +7,15 @@
  * `resolveAllStressAsync`. Any word that reaches this resolver is confirmed
  * OOV — so we go straight to the ML predictor.
  *
+ * As of ua-word-stress-wasm@0.5.2 the WASM dictionary always returns a
+ * prediction, even for unknown words, so monosyllables and OOV words are
+ * handled there. This resolver is the secondary fallback for any word the
+ * WASM batch still leaves unresolved.
+ *
  * Resolution rules
  * ─────────────────────────────────────────────────────────────────
- * 1. Monosyllable (≤ 1 vowel)  → handled by sync pass; never reaches here.
- * 2. OOV + ML available        → ML prediction, unconfirmed.
- * 3. OOV + no ML               → unresolved.
+ * 1. OOV + ML available  → ML prediction, unconfirmed.
+ * 2. OOV + no ML         → unresolved.
  */
 
 import { UA_VOWELS } from 'src/services/poetryEngines/ua/consts/ua-alphabet.const';

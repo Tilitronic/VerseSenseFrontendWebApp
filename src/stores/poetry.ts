@@ -86,8 +86,22 @@ function normalizeLeadingSpaces(text: string): string {
 
 export const usePoetryStore = defineStore('poetry', () => {
   // ── UA stress resolver (ML fallback) ────────────────────────────────────────
-  const { resolver: stressResolver } = useUaStress();
+  const { resolver: stressResolver, loading: uaWasmLoading } = useUaStress();
   const appStore = useAppStore();
+
+  // ── Services loading state ──────────────────────────────────────────────────
+  // Tracks whether heavy background services are still initialising.
+  // Drives the loading indicator in the phonetic panel header.
+  const _cmuDictLoaded = ref(false);
+  void cmuDictReady.then(() => {
+    _cmuDictLoaded.value = true;
+  });
+
+  /**
+   * True while UA WASM or the CMU pronunciation dictionary are still loading.
+   * Reactive — automatically becomes false once both are ready.
+   */
+  const servicesLoading = computed(() => uaWasmLoading.value || !_cmuDictLoaded.value);
 
   function enabledLanguagesSet(): Set<Language> {
     return new Set(LANGUAGES.filter((lang) => appStore.enabledLanguages[lang] !== false));
@@ -1570,6 +1584,7 @@ export const usePoetryStore = defineStore('poetry', () => {
     // State
     rawText,
     document,
+    servicesLoading,
     documentLanguage,
     documentLanguageManual,
     wordLanguages,

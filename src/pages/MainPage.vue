@@ -630,7 +630,7 @@
         </div>
       </div>
       <div class="panel__body panel__body--split" ref="splitBodyRef">
-        <PhoneticPanel
+        <AsyncPhoneticPanel
           ref="phoneticPanelRef"
           class="panel__split-main"
           v-model:showWeb="showSoundWeb"
@@ -646,7 +646,23 @@
         <Transition name="rp-slide">
           <div v-if="showRhymesPanel" class="panel__rp-wrap">
             <div class="panel__rp-divider" @pointerdown="onRpDividerPointerDown" />
-            <RhymesPanel class="panel__split-side" :style="rhymesPanelStyle" />
+            <AsyncRhymesPanel class="panel__split-side" :style="rhymesPanelStyle" />
+          </div>
+        </Transition>
+
+        <!-- Full-panel overlay while UA WASM / CMU dict are initialising -->
+        <Transition name="svc-fade">
+          <div v-if="visualizerLoading" class="svc-loading-overlay" aria-live="polite">
+            <div class="svc-loading-overlay__spiral" aria-hidden="true">
+              <span
+                v-for="(item, i) in SVC_SPIRAL_ITEMS"
+                :key="i"
+                class="svc-ipa-sym"
+                :style="item.style"
+                >{{ item.symbol }}</span
+              >
+            </div>
+            <p class="svc-loading-overlay__label">{{ $t('phonetic.servicesLoading') }}</p>
           </div>
         </Transition>
       </div>
@@ -655,19 +671,131 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, defineAsyncComponent, ref } from 'vue';
 import { useAppStore } from 'stores/app';
 import { usePoetryStore } from 'stores/poetry';
 import { LANGUAGES, LANGUAGE_META, type Language } from 'src/model/Language';
 import type { ToolbarMode } from 'stores/localConfig';
 import PoetryEditor from 'components/PoetryEditor.vue';
-import PhoneticPanel from 'components/PhoneticPanel.vue';
-import RhymesPanel from 'components/RhymesPanel.vue';
+
+const phoneticPanelChunkReady = ref(false);
+const AsyncPhoneticPanel = defineAsyncComponent(async () => {
+  const mod = await import('components/PhoneticPanel.vue');
+  phoneticPanelChunkReady.value = true;
+  return mod;
+});
+const AsyncRhymesPanel = defineAsyncComponent(() => import('components/RhymesPanel.vue'));
+
+const SVC_IPA_SYMBOLS = [
+  'ɪ',
+  'ɛ',
+  'æ',
+  'ɑ',
+  'ɔ',
+  'ʊ',
+  'ə',
+  'ʌ',
+  'ɜ',
+  'ɨ',
+  'ø',
+  'œ',
+  'ɯ',
+  'ɒ',
+  'ɐ',
+  'ɵ',
+  'ʉ',
+  'ʏ',
+  'ɤ',
+  'ɞ',
+  'ʒ',
+  'ʃ',
+  'θ',
+  'ð',
+  'ŋ',
+  'ɹ',
+  'ɾ',
+  'ɦ',
+  'ʎ',
+  'ɕ',
+  'ʑ',
+  'ɲ',
+  'ɫ',
+  'ʂ',
+  'ʐ',
+  'ɣ',
+  'χ',
+  'ʁ',
+  'β',
+  'ɸ',
+  'ʋ',
+  'ɬ',
+  'ɱ',
+  'ɴ',
+  'ɳ',
+  'ʈ',
+  'ɖ',
+  'ɡ',
+  'ʔ',
+  'ɻ',
+  'ˈ',
+  'ˌ',
+  'ː',
+  'ˑ',
+  'ʼ',
+  'ʦ',
+  'ʧ',
+  'ʤ',
+  'ʣ',
+  'ʥ',
+  'ɗ',
+  'ɓ',
+  'ʄ',
+  'ɠ',
+  'ʙ',
+  'ʀ',
+  'ɧ',
+  'ʍ',
+  'ɭ',
+  'ɽ',
+  'ɺ',
+  'ɮ',
+  'ħ',
+  'ʜ',
+  'ʛ',
+  'ʝ',
+  'ɰ',
+  'ʡ',
+  'ʢ',
+] as const;
+
+const SVC_GOLDEN = Math.PI * (3 - Math.sqrt(5));
+const SVC_SPIRAL_ITEMS = SVC_IPA_SYMBOLS.map((symbol, index) => {
+  const t = index / (SVC_IPA_SYMBOLS.length - 1);
+  const radius = Math.sqrt(t);
+  const angle = index * SVC_GOLDEN;
+  const x = 50 + Math.cos(angle) * radius * 41;
+  const y = 50 + Math.sin(angle) * radius * 34;
+  const sizeRem = 1.75 - t * 0.8;
+  const hue = Math.round(255 - t * 58);
+  const sat = Math.round(72 + t * 20);
+  const lig = Math.round(62 + t * 24);
+
+  return {
+    symbol,
+    style: {
+      left: `${x.toFixed(2)}%`,
+      top: `${y.toFixed(2)}%`,
+      fontSize: `${sizeRem.toFixed(2)}rem`,
+      color: `hsl(${hue} ${sat}% ${lig}%)`,
+      animationDelay: `${(t * 1.4).toFixed(2)}s`,
+    },
+  };
+});
 
 const appStore = useAppStore();
 const poetryStore = usePoetryStore();
 
-const phoneticPanelRef = ref<InstanceType<typeof PhoneticPanel> | null>(null);
+const phoneticPanelRef = ref<{ exportSvg: (withLegend: boolean) => void } | null>(null);
 
 const wordCount = computed(() => poetryStore.allWordTokens.length);
 const hasConfirmedLines = computed(() =>
@@ -687,6 +815,9 @@ const showSylBadge = ref(true);
 const showCvBadge = ref(true);
 const enabledLanguageCount = computed(
   () => LANGUAGES.filter((lang) => appStore.enabledLanguages[lang]).length,
+);
+const visualizerLoading = computed(
+  () => !phoneticPanelChunkReady.value || poetryStore.servicesLoading,
 );
 
 type InteractionMode = 'tabs' | 'manual';
@@ -1089,5 +1220,74 @@ async function copyAllText() {
 
 .stress-info-card {
   width: 280px;
+}
+
+/* ── Services loading overlay ─────────────────────────────────────────────── */
+.svc-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: #0d1117;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  pointer-events: none;
+}
+
+.svc-loading-overlay__spiral {
+  position: relative;
+  width: min(88%, 680px);
+  height: min(78%, 560px);
+  animation: svc-spiral-turn 36s linear infinite;
+}
+
+@keyframes svc-spiral-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes svc-sym-pulse {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.svc-ipa-sym {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: 'Noto Serif', 'Linux Libertine', Georgia, serif;
+  color: rgba(144, 202, 249, 0.8);
+  animation: svc-sym-pulse 2s ease-in-out infinite;
+  display: inline-block;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(100, 180, 255, 0.18);
+}
+
+.svc-loading-overlay__label {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: rgba(144, 202, 249, 0.4);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.svc-fade-enter-active {
+  transition: opacity 0.25s ease;
+}
+.svc-fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+.svc-fade-enter-from,
+.svc-fade-leave-to {
+  opacity: 0;
 }
 </style>

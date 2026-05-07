@@ -13,7 +13,7 @@ export const LUSCINIA_MODEL_DISPLAY = 'Luscinia LGBMv1';
 export const LUSCINIA_REPO_URL = 'https://github.com/Tilitronic/ua-stress-engine';
 
 type WorkerInferResult = { id: string; result: number | null; error?: string };
-type WorkerControlMessage = { type: 'ready' } | { type: 'error'; error: string };
+type WorkerControlMessage = { type: 'error'; error: string };
 type WorkerOutboundMessage = WorkerInferResult | WorkerControlMessage;
 
 function isControlMessage(m: WorkerOutboundMessage): m is WorkerControlMessage {
@@ -25,13 +25,7 @@ export class LusciniaPredictor implements IMlStressPredictor {
   private worker: Worker | null = null;
   private pending = new Map<string, { resolve: (v: number | null) => void }>();
   private nextId = 0;
-
-  /**
-   * Resolves when the ONNX model has been compiled and cached in the worker.
-   * Awaited by predict() so stale infer messages never accumulate during load.
-   */
-  readonly modelReady: Promise<void>;
-  private _modelReadyResolve!: () => void;
+  private mlDisabled = false;
 
   /**
    * @param modelUrl URL of the `.onnx.gz` model file.
@@ -39,12 +33,24 @@ export class LusciniaPredictor implements IMlStressPredictor {
    */
   constructor(modelUrl = '/models/luscinia.onnx.gz') {
     this.modelUrl = modelUrl;
-    this.modelReady = new Promise<void>((resolve) => {
-      this._modelReadyResolve = resolve;
-    });
-    mlLog.info('loading neural stress model…');
-    // Eagerly spawn the worker and start model loading immediately.
-    this.getWorker();
+    // Keep ML startup lazy so first paint is never blocked by ONNX init.
+    mlLog.info('neural stress model ready in lazy mode (loads on first OOV inference)');
+  }
+
+  private isFatalAllocError(errorText: string): boolean {
+    return /bad_alloc|error_code:\s*6/i.test(errorText);
+  }
+
+  private disableMl(reason: string): void {
+    if (this.mlDisabled) return;
+    this.mlDisabled = true;
+    mlLog.error(`[LusciniaPredictor] disabling ML for this session: ${reason}`);
+    for (const entry of this.pending.values()) entry.resolve(null);
+    this.pending.clear();
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
   }
 
   private getWorker(): Worker {
@@ -55,14 +61,8 @@ export class LusciniaPredictor implements IMlStressPredictor {
       this.worker.onmessage = (e: MessageEvent<WorkerOutboundMessage>) => {
         const msg = e.data;
         if (isControlMessage(msg)) {
-          if (msg.type === 'ready') {
-            console.debug('[LusciniaPredictor] model ready — inference queue open');
-            this._modelReadyResolve();
-          } else {
-            console.error('[LusciniaPredictor] worker warmup error:', msg.error);
-            // Resolve anyway so predict() callers aren’t stuck forever.
-            this._modelReadyResolve();
-          }
+          console.error('[LusciniaPredictor] worker error:', msg.error);
+          if (this.isFatalAllocError(msg.error)) this.disableMl(msg.error);
           return;
         }
         const { id, result, error } = msg;
@@ -72,11 +72,18 @@ export class LusciniaPredictor implements IMlStressPredictor {
         const entry = this.pending.get(id);
         if (!entry) return;
         this.pending.delete(id);
-        if (error) console.error('[LusciniaPredictor] worker reported error:', error);
+        if (error) {
+          console.error('[LusciniaPredictor] worker reported error:', error);
+          if (this.isFatalAllocError(error)) this.disableMl(error);
+        }
         entry.resolve(result);
       };
       this.worker.onerror = (e) => {
         console.error('[LusciniaPredictor] worker onerror:', e.message, e);
+        if (this.isFatalAllocError(String(e.message ?? ''))) {
+          this.disableMl(String(e.message));
+          return;
+        }
         for (const entry of this.pending.values()) entry.resolve(null);
         this.pending.clear();
         this.worker = null;
@@ -84,21 +91,12 @@ export class LusciniaPredictor implements IMlStressPredictor {
       this.worker.onmessageerror = (e) => {
         console.error('[LusciniaPredictor] worker message deserialization error:', e);
       };
-      // Send warmup immediately — worker will start loading the model right away.
-      this.worker.postMessage({ type: 'warmup', modelUrl: this.modelUrl });
-      console.debug('[LusciniaPredictor] warmup sent to worker');
     }
     return this.worker;
   }
 
   async predict(word: string, signal?: AbortSignal): Promise<number | null> {
-    if (signal?.aborted) return null;
-
-    // Wait for the model to finish loading before posting to the worker.
-    // This prevents stale infer messages from piling up in the serial queue
-    // while the model is being compiled — the primary cause of the abort loop.
-    await this.modelReady;
-
+    if (this.mlDisabled) return null;
     if (signal?.aborted) return null;
 
     const id = String(this.nextId++);

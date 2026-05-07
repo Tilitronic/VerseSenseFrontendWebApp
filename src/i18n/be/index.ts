@@ -74,6 +74,7 @@ export default {
     exportSvgLegend: 'Экспарт SVG з легендай',
     exportLegend: '+Легенда',
     exportLegendTitle: 'Уключыць легенду ў SVG',
+    servicesLoading: 'Загрузка фанетычных сэрвісаў…',
   },
   about: {
     pageTitle: 'Пра VerseSense',

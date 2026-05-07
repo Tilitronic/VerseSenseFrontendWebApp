@@ -92,6 +92,26 @@ async function fetchOovStress(word: string, signal?: AbortSignal): Promise<numbe
   }
 }
 
+// ── Technical token guard ─────────────────────────────────────────────────────
+
+const EN_VOWELS_RE = /[aeiouAEIOU]/;
+
+/**
+ * Returns true for tokens that look like technical identifiers, URLs, or
+ * abbreviations — things that are not natural English words and should not
+ * be sent to CMU or the FreeDictionary API.
+ *
+ * Heuristics (any one is sufficient to skip):
+ *   • No vowel at all (e.g. "https", "www", "src", "px")
+ *   • Contains a digit (e.g. "h1", "api2", "mp3", "b64")
+ *   • Contains a dot, slash, colon, or underscore (URL/path fragments)
+ */
+function isTechnicalToken(word: string): boolean {
+  if (!EN_VOWELS_RE.test(word)) return true;
+  if (/[\d./:\\@_]/.test(word)) return true;
+  return false;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -100,13 +120,16 @@ async function fetchOovStress(word: string, signal?: AbortSignal): Promise<numbe
  * Call **after** `await cmuDictReady` so that the CMU lookup is synchronous.
  *
  * Resolution order:
- *   1. CMU Pronouncing Dictionary — offline, instant.
- *   2. FreeDictionary API — network, cached for the session lifetime.
+ *   1. Technical token guard — returns null immediately for URL fragments,
+ *      abbreviations, and identifiers that contain no vowels or digits.
+ *   2. CMU Pronouncing Dictionary — offline, instant.
+ *   3. FreeDictionary API — network, cached for the session lifetime.
  *
  * Returns null when neither source has data (word stays unresolved; the user
  * can click to set stress manually).
  */
 export async function resolveEnStress(word: string, signal?: AbortSignal): Promise<number | null> {
+  if (isTechnicalToken(word)) return null;
   const cmuIdx = getEnStressIndex(word);
   if (cmuIdx !== null) return cmuIdx;
   return fetchOovStress(word, signal);
