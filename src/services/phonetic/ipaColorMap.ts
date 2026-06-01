@@ -240,6 +240,15 @@ export function ipaTokenColor(token: string, alpha = 1): string | null {
   return `hsla(${entry.h}, ${entry.s}%, ${entry.l}%, ${alpha.toFixed(3)})`;
 }
 
+/**
+ * Returns the raw HSL components `{h, s, l}` for the given IPA token,
+ * or null if the token is not in the database.
+ * Useful for computing color centroids (e.g. rhyme group coloring).
+ */
+export function ipaTokenHSL(token: string): { h: number; s: number; l: number } | null {
+  return LOOKUP.get(token) ?? LOOKUP.get(token[0] ?? '') ?? null;
+}
+
 // ── Shape / width descriptor ──────────────────────────────────────────────────
 
 /**

@@ -1,0 +1,31 @@
+// Re-export all analysis result types directly from the engine package.
+// This keeps consumers decoupled from the package name while providing
+// the full, canonical type definitions.
+export type {
+  StreamAnalysisResult,
+  WordAnnotation,
+  Cluster,
+  ClusterKind,
+  SyllableRef,
+  SyllableAnnotation,
+  DeviationType,
+  LineRhythm,
+  Clausula,
+  EchoAnnotation,
+  PhonemeRef,
+  PauseAnnotation,
+  PhonemeRecord,
+  PhonemeLayer,
+  PhonemeFeatureValue,
+  PhonemeFeatureSchemaItem,
+  PhonemeFeatureEncoding,
+  PhonemeNaturalProfile,
+  PhonemeComputedMetrics,
+  PhonemeClusterContribution,
+  StructuralityAnalysis,
+  StructuralityComponent,
+  StructuralityWeights,
+  MolstarTranscription,
+  AnalyzerInfo,
+  ResponseSchemaInfo,
+} from 'ipa-poetry-engine';

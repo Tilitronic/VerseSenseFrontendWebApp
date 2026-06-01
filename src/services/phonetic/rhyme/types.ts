@@ -40,6 +40,8 @@ export interface MotifSpan {
   wordId: string;
   /** Flat render-key prefix: `${wordId}:${sylIdx}:${tokIdx}` used by grid */
   renderKeys: string[];
+  /** 0-based index of this occurrence within the motif (shared by all spans of the same occurrence) */
+  occurrenceIdx: number;
 }
 
 // ── Motif ─────────────────────────────────────────────────────────────────────
@@ -66,9 +68,12 @@ export interface PhonemeMotif {
 
   /**
    * Display color for this motif group (HSL string).
-   * Assigned by rhymeAnalyzer to give each group a unique hue.
+   * Derived from the circular mean of the IPA phoneme vectors in the canonical tokens.
    */
   color: string;
+
+  /** Unique sequential group label: A–Z, then Ukrainian, then Polish extras, then digits. */
+  label: string;
 
   /**
    * Visual weight in [0, 1].

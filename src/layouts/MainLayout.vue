@@ -119,6 +119,14 @@ function isActive(path: string): boolean {
 </script>
 
 <style scoped lang="scss">
+.layout-header {
+  // 30% less height than Quasar default 50px → 35px
+  :deep(.q-toolbar) {
+    min-height: 35px;
+    padding: 0 6px;
+  }
+}
+
 .lang-btn {
   font-size: 0.72rem;
   font-weight: 600;

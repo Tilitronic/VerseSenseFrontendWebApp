@@ -185,7 +185,7 @@ function getCharSlots(tok: IWordToken): CharSlot[] {
 function polishSyllableRanges(tok: IWordToken): Array<{ start: number; end: number }> {
   if (tok.language !== 'pl') return [];
   const text = wordDisplayText(tok);
-  const syllables = store.getSyllables(tok.id);
+  const syllables = store.getWordSyllables(tok.id);
   if (syllables.length === 0) return [];
 
   const ranges: Array<{ start: number; end: number }> = [];
@@ -265,10 +265,15 @@ function stressTitle(tok: IWordToken, slot: CharSlot): string {
       : t('stressTooltip.mlOverride');
   }
 
-  // heteronym or variative — prefer richer WASM readings (stressedForm + IPA)
+  // heteronym or variative — prefer richer WASM readings (stressedForm + IPA + definition)
   const readings = store.pendingStressReadings?.get(tok.id);
   if (readings && readings.length >= 2) {
-    const variants = readings.map((r) => `${r.stressedForm} [${r.ipa}]`).join(' / ');
+    const variants = readings
+      .map((r) => {
+        const def = r.morph.length > 0 ? r.morph.map((m) => m.definition).filter(Boolean).join(', ') : null;
+        return def ? `${r.stressedForm} [${r.ipa}] — ${def}` : `${r.stressedForm} [${r.ipa}]`;
+      })
+      .join('\n');
     const kind = t(
       pending === 'variative' ? 'stressTooltip.freeVariants' : 'stressTooltip.contextDependent',
     );
@@ -346,8 +351,10 @@ function langCode(lang: Language): string {
   min-width: 0;
   display: flex;
   flex-direction: row;
-  align-items: flex-end; // bottom-align so taller word-boxes don't shift shorter ones
-  flex-wrap: nowrap;
+  align-items: flex-end; // keep per-row items baseline-aligned
+  align-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 
 .lp-tab {

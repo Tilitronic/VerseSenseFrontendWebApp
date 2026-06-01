@@ -173,7 +173,53 @@ export function parseDocument(
     return { id: lineId, tokens };
   });
 
-  return { lines, tokenIndex };
+  const doc: IPoetryDocument = { lines, tokenIndex };
+
+  // Dev-only tokenizer trace: useful for inspecting parsed tokens in browser console.
+  if (import.meta.env.DEV) {
+    const linesPayload = lines.map((line, lineIndex) => ({
+      lineIndex,
+      lineId: line.id,
+      tokens: line.tokens.map((tok) => {
+        if (tok.kind === 'WORD') {
+          return {
+            id: tok.id,
+            kind: tok.kind,
+            text: tok.text,
+            language: tok.language,
+            stressIndex: tok.stressIndex,
+          };
+        }
+        if (tok.kind === 'PUNCT') {
+          return {
+            id: tok.id,
+            kind: tok.kind,
+            text: tok.text,
+          };
+        }
+        return {
+          id: tok.id,
+          kind: tok.kind,
+        };
+      }),
+    }));
+
+    console.groupCollapsed(
+      `[tokenizer] parsed ${lines.length} lines, ${tokenIndex.size} tokens total`,
+    );
+    console.log('[tokenizer] source', rawText);
+    console.table(
+      linesPayload.map((row) => ({
+        lineIndex: row.lineIndex,
+        lineId: row.lineId,
+        tokenCount: row.tokens.length,
+      })),
+    );
+    console.log('[tokenizer] lines payload', linesPayload);
+    console.groupEnd();
+  }
+
+  return doc;
 }
 
 /**

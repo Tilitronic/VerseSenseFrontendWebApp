@@ -579,7 +579,7 @@ function handleTransform(kind: 'capitalize' | 'lowercase' | 'uppercase') {
 
   &--settings {
     flex-shrink: 0;
-    overflow-x: auto; // horizontal scroll if content is wider
+    overflow-x: hidden;
     overflow-y: hidden;
   }
 }

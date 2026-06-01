@@ -27,6 +27,7 @@
 
 import type { IPoetryDocument } from 'src/model/Token';
 import { transcribeWord } from 'src/services/phonetic/wordTranscription';
+import { ipaTokenHSL } from 'src/services/phonetic/ipaColorMap';
 import { encodeToken } from './phonemeEncoder';
 import { findMotifs, type FlatToken } from './motifFinder';
 import type { PhonemeMotif, MotifSpan, RhymeAnalysis, MotifTier } from './types';
@@ -134,20 +135,58 @@ function makeBoundary(wordId: string, lineIdx: number, code: number): FlatEntry 
 // ── Color assignment ──────────────────────────────────────────────────────────
 
 /**
- * Generate `count` hues spread evenly around the HSL wheel,
- * starting at `startHue` and stepping by golden-ratio offsets to avoid
- * perceptually similar adjacent colors.
+ * Sequential group labels: A–Z, then Ukrainian capitals, then Polish-specific
+ * letters, then digits. Provides ~78 unique labels before repeating.
  */
-function generateHues(count: number): number[] {
-  const hues: number[] = [];
-  // Golden-ratio hue stepping (≈ 137.5°) gives maximally distinct colors
-  const GOLDEN_ANGLE = 137.508;
-  let hue = 11; // start near red-orange
-  for (let i = 0; i < count; i++) {
-    hues.push(Math.round(hue) % 360);
-    hue += GOLDEN_ANGLE;
+const RHYME_LABELS =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+  'АБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯ' +
+  'ĄĆĘŁŃÓŚŹŻ' +
+  '1234567890';
+
+/**
+ * Compute the circular mean of a list of hue values (in degrees).
+ * Handles the wraparound at 360° correctly.
+ */
+function circularMeanHue(hues: number[]): number {
+  if (hues.length === 0) return 0;
+  let sinSum = 0;
+  let cosSum = 0;
+  for (const h of hues) {
+    const rad = (h * Math.PI) / 180;
+    sinSum += Math.sin(rad);
+    cosSum += Math.cos(rad);
   }
-  return hues;
+  const meanRad = Math.atan2(sinSum / hues.length, cosSum / hues.length);
+  return Math.round(((meanRad * 180) / Math.PI + 360) % 360);
+}
+
+/**
+ * Derive a display color for a motif group from the IPA phoneme content
+ * of its canonical tokens.  The hue is the circular mean of the hues of
+ * all tokens that exist in the IPA color database; saturation and lightness
+ * are taken from the tier constants so tiers stay visually distinct.
+ *
+ * Falls back to a hash-based hue when no token is in the database.
+ */
+function computeGroupColor(canonicalTokens: string[], tier: MotifTier): string {
+  const hslValues = canonicalTokens
+    .map((t) => ipaTokenHSL(t))
+    .filter((e): e is { h: number; s: number; l: number } => e !== null);
+
+  let hue: number;
+  if (hslValues.length === 0) {
+    // Fallback: deterministic hash of the token strings
+    let hash = 0;
+    for (const t of canonicalTokens) {
+      for (let i = 0; i < t.length; i++) hash = (hash * 31 + t.charCodeAt(i)) >>> 0;
+    }
+    hue = hash % 360;
+  } else {
+    hue = circularMeanHue(hslValues.map((v) => v.h));
+  }
+
+  return `hsl(${hue}, ${TIER_SATURATION[tier]}%, ${TIER_LIGHTNESS[tier]}%)`;
 }
 
 // ── Weight (opacity) computation ──────────────────────────────────────────
@@ -168,25 +207,38 @@ function generateHues(count: number): number[] {
  *   raw = length_score * 0.5 + proximity_score * 0.5
  *   opacity = clamp(raw, MIN_OPACITY, 1.0)
  */
-const LENGTH_TARGET = 5; // tokens at which length contribution maxes out
-const GAP_DECAY = 20; // exponential decay constant (flat token positions)
-const MIN_OPACITY = 0.25;
+const LENGTH_TARGET = 5;   // tokens at which length contribution maxes out
+// Proximity model:
+//   gap ≤ CLOSE_GAP (≈10 syllables × 3 tokens)  → nearly fully opaque
+//   gap > CLOSE_GAP                              → exponential decay
+//   floor at MIN_OPACITY regardless of distance
+const CLOSE_GAP = 30;      // flat-token threshold ≈ 10 syllables
+const GAP_DECAY = 55;      // decay constant beyond CLOSE_GAP (flat tokens)
+const MIN_OPACITY = 0.20;
+const PROX_MAX = 0.90;     // max proximity contribution (within CLOSE_GAP)
 
 function computeOpacity(length: number, occurrenceStarts: number[]): number {
   const lengthScore = Math.min(1, length / LENGTH_TARGET);
 
-  let proximityScore = 0.5; // default if only 1 pair
+  let proximityScore = PROX_MAX;
   if (occurrenceStarts.length >= 2) {
     const sorted = [...occurrenceStarts].sort((a, b) => a - b);
     let totalGap = 0;
     for (let i = 1; i < sorted.length; i++) {
-      totalGap += sorted[i]! - sorted[i - 1]! - length; // gap BETWEEN occurrences
+      totalGap += Math.max(0, sorted[i]! - sorted[i - 1]! - length);
     }
     const meanGap = totalGap / (sorted.length - 1);
-    proximityScore = Math.exp(-Math.max(0, meanGap) / GAP_DECAY);
+    if (meanGap <= CLOSE_GAP) {
+      proximityScore = PROX_MAX;
+    } else {
+      // Exponential decay beyond CLOSE_GAP, never below MIN_OPACITY
+      const decay = Math.exp(-(meanGap - CLOSE_GAP) / GAP_DECAY);
+      proximityScore = MIN_OPACITY + (PROX_MAX - MIN_OPACITY) * decay;
+    }
   }
 
-  const raw = lengthScore * 0.5 + proximityScore * 0.5;
+  // Length contributes 30%, proximity 70%
+  const raw = lengthScore * 0.30 + proximityScore * 0.70;
   return Math.max(MIN_OPACITY, Math.min(1.0, raw));
 }
 
@@ -227,8 +279,7 @@ export function analyzeRhymes(
     return b.occurrenceStarts.length - a.occurrenceStarts.length;
   });
 
-  // ── Assign colors ──────────────────────────────────────────────────────────
-  const hues = generateHues(rawMotifs.length);
+  // ── Assign colors and labels ───────────────────────────────────────────
 
   // ── Convert raw motifs → PhonemeMotif (with spans) ────────────────────────
   const motifs: PhonemeMotif[] = [];
@@ -237,14 +288,15 @@ export function analyzeRhymes(
   for (let mi = 0; mi < rawMotifs.length; mi++) {
     const raw = rawMotifs[mi]!;
     const tier = raw.tier;
-    const hue = hues[mi]!;
     const opacity = computeOpacity(raw.length, raw.occurrenceStarts);
-    const color = `hsla(${hue}, ${TIER_SATURATION[tier]}%, ${TIER_LIGHTNESS[tier]}%, ${opacity.toFixed(3)})`;
+    const color = computeGroupColor(raw.canonicalTokens, tier);
+    const label = RHYME_LABELS[mi % RHYME_LABELS.length] ?? String(mi);
     const id = motifId(raw.canonicalTokens, tier);
 
     // Build spans: group consecutive flat positions by wordId
     const spans: MotifSpan[] = [];
-    for (const start of raw.occurrenceStarts) {
+    for (let oi = 0; oi < raw.occurrenceStarts.length; oi++) {
+      const start = raw.occurrenceStarts[oi]!;
       // Group the slice into per-word spans
       const spanMap = new Map<string, { lineIdx: number; wordId: string; renderKeys: string[] }>();
       for (let offset = 0; offset < raw.length; offset++) {
@@ -257,7 +309,7 @@ export function analyzeRhymes(
         }
         span.renderKeys.push(entry.renderKey);
       }
-      for (const span of spanMap.values()) spans.push(span);
+      for (const span of spanMap.values()) spans.push({ ...span, occurrenceIdx: oi });
     }
 
     const motif: PhonemeMotif = {
@@ -266,6 +318,7 @@ export function analyzeRhymes(
       canonicalTokens: raw.canonicalTokens,
       spans,
       color,
+      label,
       opacity,
     };
     motifs.push(motif);

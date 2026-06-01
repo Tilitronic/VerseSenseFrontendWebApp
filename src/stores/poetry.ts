@@ -20,9 +20,11 @@ import {
 import { DEFAULT_LANGUAGE, LANGUAGES, type Language } from 'src/model/Language';
 import { parseDocument } from 'src/model/DocumentParser';
 import type { IPoetryDocument, IWordToken } from 'src/model/Token';
-import { getPhoneme } from 'src/services/poetryEngines/ua/Phonetizer';
-import { Sylabizer, type Syllable } from 'src/services/poetryEngines/ua/Sylabizer';
 import { transcribePolish } from 'src/services/phonetic/plTranscription';
+import {
+  resolveUkrainianWordSyllables,
+  type WordSyllable,
+} from 'src/services/phonetic/uaWordSyllableResolver';
 import { getWordScriptInfo } from 'src/services/languageDetection/wordScript';
 import { countVowels } from 'src/services/poetryEngines/shared/wordVowels';
 import { useUaStress } from 'src/composables/useUaStress';
@@ -39,6 +41,8 @@ import {
 import { cmuDictReady, resolveEnStress } from 'src/services/stress/enStressService';
 import { useAppStore } from 'src/stores/app';
 import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
+import { analyzePoem } from 'src/services/phonetic/analysisService';
+import type { StreamAnalysisResult } from 'src/services/phonetic/analysisTypes';
 
 const STORAGE_KEY_TEXT = 'verseSense_poemText';
 const STORAGE_KEY_DOC_LANG = 'verseSense_docLanguage';
@@ -93,9 +97,25 @@ export const usePoetryStore = defineStore('poetry', () => {
   // Tracks whether heavy background services are still initialising.
   // Drives the loading indicator in the phonetic panel header.
   const _cmuDictLoaded = ref(false);
-  void cmuDictReady.then(() => {
-    _cmuDictLoaded.value = true;
-  });
+  const CMU_READY_TIMEOUT_MS = 8000;
+  void Promise.race([
+    cmuDictReady.then(() => 'ready' as const),
+    new Promise<'timeout'>((resolve) => {
+      setTimeout(() => resolve('timeout'), CMU_READY_TIMEOUT_MS);
+    }),
+  ])
+    .then((state) => {
+      if (state === 'timeout') {
+        console.warn(
+          `[services] CMU dictionary readiness timeout after ${CMU_READY_TIMEOUT_MS}ms; continuing without blocking UI`,
+        );
+      }
+      _cmuDictLoaded.value = true;
+    })
+    .catch(() => {
+      // CMU is optional fallback for EN stress; do not keep the UI blocked.
+      _cmuDictLoaded.value = true;
+    });
 
   /**
    * True while UA WASM or the CMU pronunciation dictionary are still loading.
@@ -149,10 +169,10 @@ export const usePoetryStore = defineStore('poetry', () => {
   /** Parsed document — re-derived whenever rawText or documentLanguage changes */
   const document = ref<IPoetryDocument>(parseDocument(rawText.value));
 
-  /** Phonetized syllables cache: token id → Syllable[]
+  /** Phonetized syllables cache: token id → WordSyllable[]
    * markRaw prevents Vue from deep-proxying the Map — mutations use triggerRef.
    */
-  const syllableCache = ref(markRaw(new Map<string, Syllable[]>()));
+  const wordSyllableCache = ref(markRaw(new Map<string, WordSyllable[]>()));
 
   /**
    * Document-level language — auto-detected from rawText, overridable by user.
@@ -204,10 +224,10 @@ export const usePoetryStore = defineStore('poetry', () => {
   const pendingStressAlts = ref<Map<string, number[]>>(new Map());
   /**
    * Richer per-reading data from ua-word-stress-wasm for heteronym/variative words.
-   * Each entry holds the marked form and IPA transcription for every valid reading.
+   * Each entry holds the marked form, IPA transcription, and morphological definition for every valid reading.
    * Used by LinePanel to show informative tooltips. Not persisted.
    */
-  const pendingStressReadings = ref<Map<string, Array<{ stressedForm: string; ipa: string }>>>(
+  const pendingStressReadings = ref<Map<string, Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>>>(
     new Map(),
   );
 
@@ -217,11 +237,19 @@ export const usePoetryStore = defineStore('poetry', () => {
    */
   const detectionConfidence = ref<number>(1.0);
 
+  /**
+   * Phonetic analysis result (rhymes, rhythm, pauses, echo density).
+   * Null while analysis is pending or not yet run.
+   * Cleared whenever the document changes (to force re-analysis).
+   */
+  const analysisResult = ref<StreamAnalysisResult | null>(null);
+
   // ── Internal debounce timers ───────────────────────────────────────────────
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let stressDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let rebuildDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let analysisRunSeq = 0;
   const STRESS_DEBOUNCE_MS = 600;
   const REBUILD_DEBOUNCE_MS = 120;
 
@@ -415,9 +443,9 @@ export const usePoetryStore = defineStore('poetry', () => {
       language: lang,
       ...(shouldResetStress ? { stressIndex: null } : {}),
     });
-    const sc = new Map(syllableCache.value);
+    const sc = new Map(wordSyllableCache.value);
     sc.delete(wordId);
-    syllableCache.value = sc;
+    wordSyllableCache.value = sc;
 
     // Manual language override should immediately re-run stress pipelines.
     // This ensures EN -> PL switch triggers Polish async resolver even when
@@ -445,9 +473,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     document.value = replaceTokenField(document.value, wordId, {
       language: nextLang,
     });
-    const sc = new Map(syllableCache.value);
+    const sc = new Map(wordSyllableCache.value);
     sc.delete(wordId);
-    syllableCache.value = sc;
+    wordSyllableCache.value = sc;
   }
 
   /**
@@ -459,9 +487,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     const tok = document.value.tokenIndex.get(wordId);
     if (!tok || tok.kind !== 'WORD') return;
     document.value = replaceTokenField(document.value, wordId, { stressIndex: syllableIdx });
-    const sc = new Map(syllableCache.value);
+    const sc = new Map(wordSyllableCache.value);
     sc.delete(wordId);
-    syllableCache.value = sc;
+    wordSyllableCache.value = sc;
     // Manual user pick clears the pending flag for this word
     if (pendingStressIds.value.has(wordId)) {
       const next = new Map(pendingStressIds.value);
@@ -564,15 +592,15 @@ export const usePoetryStore = defineStore('poetry', () => {
   }
 
   /**
-   * Get phonetized syllables for a word token (cached).
-   * Currently only UA is implemented; other languages fall back to letter-split.
+   * Resolve phonetic syllables for a word token (cached).
+   * Exposes a language-agnostic API to UI components.
    */
-  function getSyllables(wordId: string): Syllable[] {
-    if (syllableCache.value.has(wordId)) return syllableCache.value.get(wordId)!;
+  function getWordSyllables(wordId: string): WordSyllable[] {
+    if (wordSyllableCache.value.has(wordId)) return wordSyllableCache.value.get(wordId)!;
     const tok = document.value.tokenIndex.get(wordId);
     if (!tok || tok.kind !== 'WORD') return [];
     const wt = tok as IWordToken;
-    let syllables: Syllable[] = [];
+    let syllables: WordSyllable[] = [];
     if (wt.language === 'pl') {
       const transcribed = transcribePolish(wt.text, wt.stressIndex ?? -1);
       syllables = transcribed.map((s, index) => ({
@@ -584,16 +612,16 @@ export const usePoetryStore = defineStore('poetry', () => {
       }));
     } else {
       try {
-        const phonemes = getPhoneme(wt.text.toLowerCase());
-        syllables = Sylabizer.createSyllables(phonemes, wt.stressIndex ?? 0);
+        syllables = resolveUkrainianWordSyllables(wt.text, wt.stressIndex);
       } catch {
         // Non-UA word or parse error — return empty
       }
     }
-    syllableCache.value.set(wordId, syllables);
-    triggerRef(syllableCache);
+    wordSyllableCache.value.set(wordId, syllables);
+    triggerRef(wordSyllableCache);
     return syllables;
   }
+
 
   /** All word tokens across the whole document (flat) */
   const allWordTokens = computed<IWordToken[]>(() => {
@@ -609,7 +637,7 @@ export const usePoetryStore = defineStore('poetry', () => {
   // ── Internal ───────────────────────────────────────────────────────────────
 
   function rebuildDocument(text: string) {
-    // Note: syllableCache is pruned at the END (after reusedWordIds is known)
+    // Note: wordSyllableCache is pruned at the END (after reusedWordIds is known)
     // so unchanged words keep their cached syllables across rebuilds.
 
     // ── Snapshot per-word annotations keyed by positional "L{li}:W{wi}" ─────
@@ -783,12 +811,12 @@ export const usePoetryStore = defineStore('poetry', () => {
     // Keep only entries whose token ID was reused (same word text at same
     // position) — those syllables are still valid after the rebuild.
     // Everything else (new or changed words) is evicted so stale data
-    // is never returned by getSyllables().
+    // is never returned by getWordSyllables().
     const reusedOldIds = new Set(reusedWordIds.values());
-    for (const id of Array.from(syllableCache.value.keys())) {
-      if (!reusedOldIds.has(id)) syllableCache.value.delete(id);
+    for (const id of Array.from(wordSyllableCache.value.keys())) {
+      if (!reusedOldIds.has(id)) wordSyllableCache.value.delete(id);
     }
-    triggerRef(syllableCache);
+    triggerRef(wordSyllableCache);
 
     stressAsyncLog.debug(
       `rebuildDocument dirtyPolishIds=${dirtyPolishIds.size} [${[...dirtyPolishIds]
@@ -1030,7 +1058,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         };
         newTokenIndex.set(tok.id, newTok);
         if (sc !== undefined) {
-          syllableCache.value.delete(tok.id);
+          wordSyllableCache.value.delete(tok.id);
           if (sc.confirmed) {
             newConfirmedAfterStress.add(tok.id);
             newPendingAfterStress.delete(tok.id);
@@ -1078,6 +1106,20 @@ export const usePoetryStore = defineStore('poetry', () => {
     { deep: false },
   );
 
+  // Trigger phonetic analysis whenever document/stress confirmation context changes.
+  // Debounced to batch quick edits into one engine call.
+  let analysisDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  watch(
+    [() => document.value, () => confirmedWords.value, () => pendingStressIds.value],
+    () => {
+      if (analysisDebounceTimer) clearTimeout(analysisDebounceTimer);
+      analysisDebounceTimer = setTimeout(() => {
+        void analyzeConfirmedLines();
+      }, 300);
+    },
+    { deep: false },
+  );
+
   // Watch rawText — debounced auto-detection (skipped if user set language manually)
   watch(rawText, (newText) => {
     if (documentLanguageManual.value) return;
@@ -1088,7 +1130,7 @@ export const usePoetryStore = defineStore('poetry', () => {
   // When document language changes, reset all non-overridden words to the new default,
   // then re-run per-word detection so Latin/PL words get corrected back immediately.
   watch(documentLanguage, () => {
-    syllableCache.value = new Map();
+    wordSyllableCache.value = new Map();
     autoDetectAndStressWords();
   });
 
@@ -1145,7 +1187,7 @@ export const usePoetryStore = defineStore('poetry', () => {
           newTokenIndex.set(tok.id, newTok);
           lineChanged = true;
           anyTokenChange = true;
-          syllableCache.value.delete(tok.id);
+          wordSyllableCache.value.delete(tok.id);
           return newTok;
         });
         return lineChanged ? { ...line, tokens: newTokens } : line;
@@ -1213,6 +1255,7 @@ export const usePoetryStore = defineStore('poetry', () => {
   autoDetectAndStressWords();
   // Ensure persisted Polish stresses are reconciled with the resolver on load.
   void resolveAllStressAsync({ forcePolish: true, reason: 'init' });
+  void analyzeConfirmedLines();
   // Trigger one immediate save so fresh annotations are in sync
   saveAnnotations();
 
@@ -1293,7 +1336,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         confirmed: boolean;
         source: 'ml' | 'heteronym' | 'variative' | 'db';
         stresses?: number[];
-        readings?: Array<{ stressedForm: string; ipa: string }>;
+        readings?: Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>;
       }
     >();
 
@@ -1422,7 +1465,7 @@ export const usePoetryStore = defineStore('poetry', () => {
             confirmed: boolean;
             source: 'db' | 'heteronym' | 'variative';
             stresses: number[];
-            readings?: Array<{ stressedForm: string; ipa: string }>;
+            readings?: Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>;
           } = {
             syllableIndex: uniqueStresses[0]!,
             confirmed,
@@ -1438,7 +1481,7 @@ export const usePoetryStore = defineStore('poetry', () => {
                 seen.add(r.syllableIndex);
                 return true;
               })
-              .map((r) => ({ stressedForm: r.stressedForm, ipa: r.ipa }));
+              .map((r) => ({ syllableIndex: r.syllableIndex, stressedForm: r.stressedForm, ipa: r.ipa, morph: r.morph }));
           }
           patches.set(tok.id, patch);
           wasmPatchedIds.add(tok.id);
@@ -1479,7 +1522,7 @@ export const usePoetryStore = defineStore('poetry', () => {
           );
           continue;
         }
-        syllableCache.value.delete(tok.id);
+        wordSyllableCache.value.delete(tok.id);
         patches.set(tok.id, {
           syllableIndex,
           confirmed: true,
@@ -1553,7 +1596,7 @@ export const usePoetryStore = defineStore('poetry', () => {
         if (!patch) return tok;
         const newTok: IWordToken = { ...tok, stressIndex: patch.syllableIndex };
         newTokenIndex.set(tok.id, newTok);
-        syllableCache.value.delete(tok.id);
+        wordSyllableCache.value.delete(tok.id);
         if (patch.confirmed) {
           newConfirmed.add(tok.id);
           newPending.delete(tok.id);
@@ -1580,6 +1623,74 @@ export const usePoetryStore = defineStore('poetry', () => {
     for (const line of document.value.lines) tryAutoConfirmLine(line.id);
   }
 
+  /**
+   * Analyze confirmed lines using the phonetic engine.
+   * Derives rhyme patterns, rhythm, pause annotations, and echo density.
+   * Result is cached in analysisResult. Non-fatal — logs errors but doesn't throw.
+   */
+  function areJsonEqual(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  function mergeAnalysisResult(
+    prev: StreamAnalysisResult | null,
+    next: StreamAnalysisResult,
+  ): StreamAnalysisResult {
+    if (!prev) return next;
+
+    const annotations = areJsonEqual(prev.annotations, next.annotations)
+      ? prev.annotations
+      : next.annotations;
+    const clusters = areJsonEqual(prev.clusters, next.clusters) ? prev.clusters : next.clusters;
+    const rhythm = areJsonEqual(prev.rhythm, next.rhythm) ? prev.rhythm : next.rhythm;
+    const echo = areJsonEqual(prev.echo, next.echo) ? prev.echo : next.echo;
+    const pauses = areJsonEqual(prev.pauses, next.pauses) ? prev.pauses : next.pauses;
+
+    if (
+      prev.version === next.version &&
+      annotations === prev.annotations &&
+      clusters === prev.clusters &&
+      rhythm === prev.rhythm &&
+      echo === prev.echo &&
+      pauses === prev.pauses
+    ) {
+      return prev;
+    }
+
+    return {
+      ...next,
+      annotations,
+      clusters,
+      rhythm,
+      echo,
+      pauses,
+    };
+  }
+
+  async function analyzeConfirmedLines() {
+    const runSeq = ++analysisRunSeq;
+    try {
+      const result = await Promise.resolve(
+        analyzePoem(document.value, isLineConfirmed, {
+          pendingStressIds: pendingStressIds.value,
+          confirmedWords: confirmedWords.value,
+        }),
+      );
+
+      // Keep only the latest analysis response to avoid stale worker writes.
+      if (runSeq !== analysisRunSeq) return;
+
+      if (!result) {
+        analysisResult.value = null;
+        return;
+      }
+      analysisResult.value = mergeAnalysisResult(analysisResult.value, result);
+    } catch (error) {
+      console.error('Phonetic analysis failed:', error);
+      analysisResult.value = null;
+    }
+  }
+
   return {
     // State
     rawText,
@@ -1593,7 +1704,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     pendingStressAlts,
     pendingStressReadings,
     detectionConfidence,
-    syllableCache,
+    analysisResult,
+    wordSyllableCache,
     allWordTokens,
     wordStressStatus,
     activeLineIndex,
@@ -1610,7 +1722,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     unconfirmLine,
     isLineConfirmed,
     tryAutoConfirmLine,
-    getSyllables,
+    getWordSyllables,
+    analyzeConfirmedLines,
     autoDetectAndStressWords,
     resolveAllStressAsync,
     setActiveLineIndex: (idx: number | null) => {
@@ -1618,3 +1731,4 @@ export const usePoetryStore = defineStore('poetry', () => {
     },
   };
 });
+

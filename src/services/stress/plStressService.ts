@@ -11,25 +11,9 @@ export interface PolishStressInfo {
 }
 
 import { stressPolishLog } from 'src/services/logging';
+import type { WordLookupResult, StressReading } from '@tilitronic/polish-stress-wasm/contracts';
 
 type PolishConfidence = PolishStressInfo['confidence'];
-
-interface PlLookupReading {
-  syllableIndex: number;
-  stressFromEnd: number;
-  syllableCount: number;
-  form: string;
-  stressedForm: string;
-  wordSyllables: string[];
-  ipa: string;
-  ipaSyllables: string[];
-  confidence: string;
-}
-
-interface PlLookupResult {
-  form: string;
-  readings: PlLookupReading[];
-}
 
 interface PlStressWasmModule {
   lookup: (word: string) => unknown;
@@ -154,9 +138,9 @@ function buildFallbackInfo(word: string): PolishStressInfo | null {
   };
 }
 
-function isLookupReading(value: unknown): value is PlLookupReading {
+function isLookupReading(value: unknown): value is StressReading {
   if (!value || typeof value !== 'object') return false;
-  const reading = value as Partial<PlLookupReading>;
+  const reading = value as Partial<StressReading>;
   return (
     typeof reading.syllableIndex === 'number' &&
     typeof reading.stressFromEnd === 'number' &&
@@ -164,14 +148,13 @@ function isLookupReading(value: unknown): value is PlLookupReading {
     typeof reading.form === 'string' &&
     Array.isArray(reading.wordSyllables) &&
     typeof reading.ipa === 'string' &&
-    Array.isArray(reading.ipaSyllables) &&
-    typeof reading.confidence === 'string'
+    Array.isArray(reading.ipaSyllables)
   );
 }
 
-function isLookupResult(value: unknown): value is PlLookupResult {
+function isLookupResult(value: unknown): value is WordLookupResult {
   if (!value || typeof value !== 'object') return false;
-  const result = value as Partial<PlLookupResult>;
+  const result = value as Partial<WordLookupResult>;
   return typeof result.form === 'string' && Array.isArray(result.readings);
 }
 
@@ -196,8 +179,9 @@ function mapLookupToInfo(normalized: string, value: unknown): PolishStressInfo |
     syllableIndex,
     stressFromEnd,
     ipa: reading.ipa ? stripIpaStress(reading.ipa) : null,
+    ...(reading.ipa ? { ipaTranscribed: reading.ipa } : {}),
     ipaSyllables: reading.ipaSyllables.map((part) => stripIpaStress(part)),
-    confidence: isPolishConfidence(reading.confidence) ? reading.confidence : 'default',
+    confidence: isPolishConfidence(reading.confidence ?? undefined) ? reading.confidence as PolishConfidence : 'default',
   };
 }
 

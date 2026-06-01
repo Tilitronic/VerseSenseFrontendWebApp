@@ -1,0 +1,8 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "/^wasm-pack --version$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}

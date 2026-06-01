@@ -98,6 +98,10 @@ function lusciniaModelPlugin(): Plugin {
       server.middlewares.use((_req, res, next) => {
         res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
         res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+        const reqUrl = _req.url ?? '';
+        if (reqUrl.includes('.wasm')) {
+          res.setHeader('Content-Type', 'application/wasm');
+        }
         next();
       });
 
@@ -138,7 +142,7 @@ export default defineConfig((ctx) => {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ['i18n', 'axios', 'localStoreBoot', 'codemirror', 'uaWasm'],
+    boot: ['i18n', 'axios', 'localStoreBoot', 'codemirror', 'uaWasm', 'phoneticsEngine'],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: ['app.scss'],
@@ -212,9 +216,23 @@ export default defineConfig((ctx) => {
           'ua-word-stress-wasm',
           'onnxruntime-web',
           '@tilitronic/polish-stress-wasm',
+          'ipa-poetry-engine',
           // cmu-pronouncing-dictionary is served as JSON via cmuDictPlugin — not imported as a module.
           'cmu-pronouncing-dictionary',
         );
+
+        // The local phonetic backend runs inside a dedicated Web Worker and imports
+        // wasm-bindgen output from ipa-poetry-engine (ESM wasm integration).
+        // Register the wasm plugin for worker bundling explicitly so Vite can transform
+        // `import * as wasm from "*.wasm"` in worker dependency graphs.
+        viteConf.worker ??= {};
+        viteConf.worker.format = 'es';
+        const existingWorkerPlugins = viteConf.worker.plugins;
+        viteConf.worker.plugins = () => {
+          const base =
+            typeof existingWorkerPlugins === 'function' ? existingWorkerPlugins() : [];
+          return [...base, wasmPlugin()];
+        };
       },
       // viteVuePluginOptions: {},
 

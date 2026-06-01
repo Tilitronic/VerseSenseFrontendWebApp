@@ -96,9 +96,8 @@ const allLines = computed<{ line: ILine; docIndex: number; hasWords: boolean }[]
   background: rgba(255, 255, 255, 0.04);
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
+  overflow: hidden;
+  white-space: normal;
   flex-shrink: 0;
 
   // Active line highlight in 'all' mode

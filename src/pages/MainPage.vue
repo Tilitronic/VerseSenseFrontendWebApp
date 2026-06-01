@@ -123,101 +123,7 @@
               </q-btn>
             </q-btn-group>
 
-            <!-- ── Stress source toggles ─────────────────────────── -->
-            <span class="stress-sep" />
-            <q-btn-group unelevated class="stress-source-group">
-              <!-- DB toggle -->
-              <q-btn
-                no-caps
-                dense
-                size="sm"
-                padding="2px 10px"
-                :color="appStore.useDbStress ? 'positive' : 'blue-grey-9'"
-                :text-color="appStore.useDbStress ? 'white' : 'grey-5'"
-                :label="$t('editor.stressDb')"
-                :title="$t(appStore.useDbStress ? 'editor.stressDbOn' : 'editor.stressDbOff')"
-                @click="appStore.setUseDbStress(!appStore.useDbStress)"
-              />
 
-              <!-- ML toggle -->
-              <q-btn
-                no-caps
-                dense
-                size="sm"
-                padding="2px 10px"
-                :color="appStore.useMlStress ? 'primary' : 'blue-grey-9'"
-                :text-color="appStore.useMlStress ? 'white' : 'grey-5'"
-                :label="$t('editor.stressMl')"
-                :title="$t(appStore.useMlStress ? 'editor.stressMlOn' : 'editor.stressMlOff')"
-                @click="appStore.setUseMlStress(!appStore.useMlStress)"
-              />
-
-              <!-- Info / docs -->
-              <q-btn
-                dense
-                unelevated
-                size="sm"
-                padding="2px 6px"
-                color="blue-grey-9"
-                text-color="grey-5"
-                icon="help_outline"
-              >
-                <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
-                  <q-card class="stress-info-card">
-                    <q-card-section class="q-pb-xs">
-                      <div class="text-subtitle2">
-                        <q-icon name="menu_book" size="xs" color="positive" class="q-mr-xs" />
-                        {{ $t('stressInfo.dbTitle') }}
-                      </div>
-                      <div class="text-body2 q-mt-xs">{{ $t('stressInfo.dbDesc') }}</div>
-                    </q-card-section>
-                    <q-card-section class="q-pt-xs">
-                      <q-btn
-                        flat
-                        no-caps
-                        dense
-                        size="sm"
-                        icon="open_in_new"
-                        :label="$t('stressInfo.dbLink')"
-                        href="https://github.com/Tilitronic/ua-stress-engine"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        type="a"
-                        color="primary"
-                      />
-                    </q-card-section>
-
-                    <q-separator />
-
-                    <q-card-section class="q-pb-xs">
-                      <div class="text-subtitle2">
-                        <q-icon name="psychology" size="xs" color="primary" class="q-mr-xs" />
-                        {{ $t('stressInfo.mlTitle') }}
-                      </div>
-                      <div class="text-body2 q-mt-xs">
-                        {{ $t('stressInfo.mlDesc') }}
-                        <div class="text-warning q-mt-xs">{{ $t('stressInfo.mlWarning') }}</div>
-                      </div>
-                    </q-card-section>
-                    <q-card-section class="q-pt-xs">
-                      <q-btn
-                        flat
-                        no-caps
-                        dense
-                        size="sm"
-                        icon="open_in_new"
-                        :label="$t('stressInfo.mlLink')"
-                        href="https://github.com/Tilitronic/ua-stress-engine"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        type="a"
-                        color="primary"
-                      />
-                    </q-card-section>
-                  </q-card>
-                </q-menu>
-              </q-btn>
-            </q-btn-group>
 
             <!-- ── Detection language filter ─────────────────────── -->
             <span class="stress-sep" />
@@ -292,6 +198,19 @@
       <div class="panel__header">
         <h2 class="panel__title">{{ $t('phonetic.title') }}</h2>
         <div class="panel__actions">
+          <!-- Visualizer tab switcher -->
+          <div class="panel__action-group panel__action-group--tabs">
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': visualizerTab === 'phonetic' }"
+              @click="visualizerTab = 'phonetic'"
+            >{{ $t('phonetic.tabPhonetic') }}</button>
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': visualizerTab === 'mol' }"
+              @click="visualizerTab = 'mol'"
+            >Mol*</button>
+          </div>
           <div class="panel__action-group">
             <!-- Sound web toggle -->
             <button
@@ -426,6 +345,26 @@
               </svg>
               {{ $t('phonetic.rhymesHighlight') }}
             </button>
+            <!-- Rhyme web toggle: connect same-group occurrences with lines -->
+            <button
+              class="panel__web-btn"
+              :class="{ 'panel__web-btn--active': showRhymeWeb }"
+              :title="$t('phonetic.rhymeWebTitle')"
+              @click="showRhymeWeb = !showRhymeWeb"
+            >
+              <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
+                <circle cx="3" cy="7" r="2.5" fill="currentColor" fill-opacity="0.85" />
+                <circle cx="17" cy="7" r="2.5" fill="currentColor" fill-opacity="0.85" />
+                <path
+                  d="M5.5 7 C 8 2, 12 2, 14.5 7"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                />
+              </svg>
+              {{ $t('phonetic.rhymeWeb') }}
+            </button>
           </div>
           <div class="panel__action-group">
             <!-- Row badge column toggles -->
@@ -477,46 +416,17 @@
               </svg>
               {{ $t('phonetic.soundsColor') }}
             </button>
-          </div>
-          <div class="panel__action-group">
-            <!-- Rhymes panel toggle -->
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showRhymesPanel }"
-              :title="$t('phonetic.rhymesPanelTitle')"
-              @click="showRhymesPanel = !showRhymesPanel"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect
-                  x="1"
-                  y="2"
-                  width="14"
-                  height="3"
-                  rx="1.5"
-                  fill="currentColor"
-                  fill-opacity="0.9"
-                />
-                <rect
-                  x="1"
-                  y="7"
-                  width="10"
-                  height="3"
-                  rx="1.5"
-                  fill="currentColor"
-                  fill-opacity="0.65"
-                />
-                <rect
-                  x="1"
-                  y="12"
-                  width="7"
-                  height="2"
-                  rx="1"
-                  fill="currentColor"
-                  fill-opacity="0.4"
-                />
-              </svg>
-              {{ $t('phonetic.rhymesPanel') }}
-            </button>
+            <label class="panel__range" title="Alliteration density sensitivity">
+              <span class="panel__range-label">A</span>
+              <input
+                v-model.number="alliterationThreshold"
+                class="panel__range-input"
+                type="range"
+                min="0.05"
+                max="0.8"
+                step="0.05"
+              />
+            </label>
           </div>
           <div class="panel__action-group">
             <!-- Legend link -->
@@ -557,8 +467,8 @@
             <button
               class="panel__web-btn panel__web-btn--export"
               :disabled="!hasConfirmedLines"
-              :title="exportWithLegend ? $t('phonetic.exportSvgLegend') : $t('phonetic.exportSvg')"
-              @click="phoneticPanelRef?.exportSvg(exportWithLegend)"
+              :title="$t('phonetic.exportSvg')"
+              @click="phoneticPanelRef?.exportSvg()"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path
@@ -577,78 +487,51 @@
               </svg>
               {{ $t('phonetic.exportSvg') }}
             </button>
-            <!-- Sub-setting: include legend in exported SVG -->
+            <!-- Metrics summary button -->
             <button
-              class="panel__web-btn panel__web-btn--sub"
-              :class="{ 'panel__web-btn--active': exportWithLegend }"
-              :title="$t('phonetic.exportLegendTitle')"
-              @click="exportWithLegend = !exportWithLegend"
+              class="panel__web-btn"
+              :disabled="!visualizerInput.analysisResult"
+              :title="$t('metrics.button')"
+              @click="showMetricsDialog = true"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect
-                  x="2"
-                  y="2"
-                  width="5"
-                  height="5"
-                  rx="1"
-                  fill="currentColor"
-                  fill-opacity="0.7"
-                />
-                <rect x="9" y="3" width="5" height="1.5" rx="0.75" fill="currentColor" />
-                <rect
-                  x="9"
-                  y="6"
-                  width="3"
-                  height="1.5"
-                  rx="0.75"
-                  fill="currentColor"
-                  fill-opacity="0.5"
-                />
-                <rect
-                  x="2"
-                  y="9"
-                  width="5"
-                  height="5"
-                  rx="1"
-                  fill="currentColor"
-                  fill-opacity="0.4"
-                />
-                <rect x="9" y="10" width="5" height="1.5" rx="0.75" fill="currentColor" />
-                <rect
-                  x="9"
-                  y="13"
-                  width="3"
-                  height="1.5"
-                  rx="0.75"
-                  fill="currentColor"
-                  fill-opacity="0.5"
-                />
+                <rect x="1" y="9" width="3" height="6" fill="currentColor" rx="1" />
+                <rect x="6" y="5" width="3" height="10" fill="currentColor" rx="1" />
+                <rect x="11" y="1" width="3" height="14" fill="currentColor" rx="1" />
               </svg>
-              {{ $t('phonetic.exportLegend') }}
+              {{ $t('metrics.button') }}
             </button>
           </div>
         </div>
       </div>
-      <div class="panel__body panel__body--split" ref="splitBodyRef">
-        <AsyncPhoneticPanel
-          ref="phoneticPanelRef"
-          class="panel__split-main"
-          v-model:showWeb="showSoundWeb"
-          v-model:alignRight="showAlignRight"
-          v-model:bindTabs="bindTabIndent"
-          v-model:manualMode="manualGridMode"
-          v-model:showRhymes="showRhymes"
-          v-model:showSounds="showSounds"
-          v-model:showNumBadge="showNumBadge"
-          v-model:showSylBadge="showSylBadge"
-          v-model:showCvBadge="showCvBadge"
-        />
-        <Transition name="rp-slide">
-          <div v-if="showRhymesPanel" class="panel__rp-wrap">
-            <div class="panel__rp-divider" @pointerdown="onRpDividerPointerDown" />
-            <AsyncRhymesPanel class="panel__split-side" :style="rhymesPanelStyle" />
-          </div>
-        </Transition>
+      <div class="panel__body panel__body--split">
+        <!-- Visualization pane (tab bar + active panel, stacked vertically) -->
+        <div class="panel__viz-pane">
+          <AsyncPhoneticPanel
+            v-show="visualizerTab === 'phonetic'"
+            ref="phoneticPanelRef"
+            class="panel__viz-pane__content"
+            :input="visualizerInput"
+            :editor-channel="editorVisualizerChannel"
+            v-model:showWeb="showSoundWeb"
+            v-model:alignRight="showAlignRight"
+            v-model:bindTabs="bindTabIndent"
+            v-model:manualMode="manualGridMode"
+            v-model:showRhymes="showRhymes"
+            v-model:showRhymeWeb="showRhymeWeb"
+            v-model:showSounds="showSounds"
+            v-model:alliterationThreshold="alliterationThreshold"
+            v-model:showNumBadge="showNumBadge"
+            v-model:showSylBadge="showSylBadge"
+            v-model:showCvBadge="showCvBadge"
+          />
+
+          <MolVisualizerTab
+            v-if="visualizerTab === 'mol'"
+            class="panel__viz-pane__content"
+            :molstar="visualizerInput.analysisResult?.molstar ?? null"
+          />
+        </div>
 
         <!-- Full-panel overlay while UA WASM / CMU dict are initialising -->
         <Transition name="svc-fade">
@@ -668,6 +551,11 @@
       </div>
     </div>
   </q-page>
+
+  <AnalysisMetricsDialog
+    v-model="showMetricsDialog"
+    :result="visualizerInput.analysisResult ?? null"
+  />
 </template>
 
 <script setup lang="ts">
@@ -676,7 +564,13 @@ import { useAppStore } from 'stores/app';
 import { usePoetryStore } from 'stores/poetry';
 import { LANGUAGES, LANGUAGE_META, type Language } from 'src/model/Language';
 import type { ToolbarMode } from 'stores/localConfig';
+import type {
+  EditorVisualizerChannel,
+  PhoneticVisualizerInput,
+} from 'src/components/visualizer/phoneticVisualizerContract';
 import PoetryEditor from 'components/PoetryEditor.vue';
+import MolVisualizerTab from 'components/MolVisualizerTab.vue';
+import AnalysisMetricsDialog from 'components/AnalysisMetricsDialog.vue';
 
 const phoneticPanelChunkReady = ref(false);
 const AsyncPhoneticPanel = defineAsyncComponent(async () => {
@@ -684,7 +578,6 @@ const AsyncPhoneticPanel = defineAsyncComponent(async () => {
   phoneticPanelChunkReady.value = true;
   return mod;
 });
-const AsyncRhymesPanel = defineAsyncComponent(() => import('components/RhymesPanel.vue'));
 
 const SVC_IPA_SYMBOLS = [
   'ɪ',
@@ -795,7 +688,8 @@ const SVC_SPIRAL_ITEMS = SVC_IPA_SYMBOLS.map((symbol, index) => {
 const appStore = useAppStore();
 const poetryStore = usePoetryStore();
 
-const phoneticPanelRef = ref<{ exportSvg: (withLegend: boolean) => void } | null>(null);
+const phoneticPanelRef = ref<{ exportSvg: () => void } | null>(null);
+const visualizerTab = ref<'phonetic' | 'mol'>('phonetic');
 
 const wordCount = computed(() => poetryStore.allWordTokens.length);
 const hasConfirmedLines = computed(() =>
@@ -805,20 +699,34 @@ const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
 const bindTabIndent = ref(true);
 const manualGridMode = ref(false);
-const showRhymes = ref(false);
+const showRhymes = ref(true);
+const showRhymeWeb = ref(false);
 const showSounds = ref(true);
-const showRhymesPanel = ref(false);
+const alliterationThreshold = ref(0.35);
 const showRowSettings = ref(true);
-const exportWithLegend = ref(false);
 const showNumBadge = ref(true);
 const showSylBadge = ref(true);
 const showCvBadge = ref(true);
+const showMetricsDialog = ref(false);
 const enabledLanguageCount = computed(
   () => LANGUAGES.filter((lang) => appStore.enabledLanguages[lang]).length,
 );
 const visualizerLoading = computed(
   () => !phoneticPanelChunkReady.value || poetryStore.servicesLoading,
 );
+
+const visualizerInput = computed<PhoneticVisualizerInput>(() => ({
+  document: poetryStore.document,
+  allWordTokenCount: poetryStore.allWordTokens.length,
+  activeLineIndex: poetryStore.activeLineIndex,
+  rawText: poetryStore.rawText,
+  analysisResult: poetryStore.analysisResult,
+  isLineConfirmed: poetryStore.isLineConfirmed,
+}));
+
+const editorVisualizerChannel: EditorVisualizerChannel = {
+  setRawText: (text: string) => poetryStore.setRawText(text),
+};
 
 type InteractionMode = 'tabs' | 'manual';
 
@@ -848,39 +756,6 @@ function onLanguageToggle(lang: Language, checked: boolean | null) {
   appStore.setLanguageEnabled(lang, checked === true);
 }
 
-// ── Resizable rhymes panel ───────────────────────────────────────────────────
-const splitBodyRef = ref<HTMLElement | null>(null);
-const rhymesPanelPx = ref(220);
-
-const rhymesPanelStyle = computed(() => ({ width: `${rhymesPanelPx.value}px` }));
-
-let rpDragStartX = 0;
-let rpDragStartPx = 0;
-
-function onRpDividerPointerDown(e: PointerEvent) {
-  e.preventDefault();
-  rpDragStartX = e.clientX;
-  rpDragStartPx = rhymesPanelPx.value;
-  window.addEventListener('pointermove', onRpDividerPointerMove);
-  window.addEventListener('pointerup', onRpDividerPointerUp);
-  document.body.style.cursor = 'col-resize';
-  document.body.style.userSelect = 'none';
-}
-
-function onRpDividerPointerMove(e: PointerEvent) {
-  // dragging left = bigger panel (divider is on the LEFT of the panel)
-  const delta = rpDragStartX - e.clientX;
-  const containerW = splitBodyRef.value?.clientWidth ?? window.innerWidth;
-  rhymesPanelPx.value = Math.min(containerW * 0.6, Math.max(140, rpDragStartPx + delta));
-}
-
-function onRpDividerPointerUp() {
-  window.removeEventListener('pointermove', onRpDividerPointerMove);
-  window.removeEventListener('pointerup', onRpDividerPointerUp);
-  document.body.style.cursor = '';
-  document.body.style.userSelect = '';
-}
-
 const allLinesConfirmed = computed(() => {
   const lines = poetryStore.document.lines;
   const wordLines = lines.filter((l) => l.tokens.some((t) => t.kind === 'WORD'));
@@ -907,7 +782,7 @@ async function copyAllText() {
 .poetry-page {
   display: flex;
   align-items: stretch;
-  height: calc(100vh - 50px); /* subtract header height */
+  height: calc(100vh - 35px); /* subtract header height (35px after 30% reduction) */
   padding: 0;
   gap: 0;
   overflow: hidden;
@@ -935,6 +810,21 @@ async function copyAllText() {
       padding-right: 20px;
     }
 
+    // Multi-row toolbar — buttons wrap to 2–3 rows rather than overflowing
+    .panel__actions {
+      flex-wrap: wrap;
+      overflow-x: hidden;
+      gap: 3px;
+      row-gap: 2px;
+    }
+
+    .panel__action-group {
+      flex: 0 0 auto;
+      margin-bottom: 1px;
+      margin-right: 3px;
+      gap: 3px;
+    }
+
     .panel__title {
       color: rgba(255, 255, 255, 0.45);
     }
@@ -946,13 +836,13 @@ async function copyAllText() {
     .panel__web-btn {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
+      gap: 3px;
+      padding: 1px 5px;
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 4px;
       background: transparent;
       color: rgba(255, 255, 255, 0.35);
-      font-size: 0.68rem;
+      font-size: 0.63rem;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
@@ -974,6 +864,29 @@ async function copyAllText() {
       }
     }
   }
+    &__range {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 6px;
+      padding: 2px 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    &__range-label {
+      font-size: 0.66rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.8);
+      width: 12px;
+      text-align: center;
+    }
+
+    &__range-input {
+      width: 92px;
+      accent-color: #ffffff;
+      cursor: pointer;
+    }
 
   &__header {
     display: flex;
@@ -1289,5 +1202,27 @@ async function copyAllText() {
 .svc-fade-enter-from,
 .svc-fade-leave-to {
   opacity: 0;
+}
+
+// ── Visualizer pane layout ────────────────────────────────────────────────────
+.panel__viz-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+
+  &__content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+// ── Tab group in toolbar ──────────────────────────────────────────────────────
+.panel__action-group--tabs {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  padding-right: 8px;
+  margin-right: 4px;
 }
 </style>

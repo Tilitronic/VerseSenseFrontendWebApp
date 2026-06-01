@@ -42,9 +42,11 @@
           :key="idx"
           class="wcm__syl-btn"
           :class="{ 'wcm__syl-btn--active': token.stressIndex === idx }"
+          :title="sylDefinitions.get(idx) ?? undefined"
           @click="onPickStress(idx)"
         >
           {{ syl.phonetic || `s${idx + 1}` }}
+          <span v-if="sylDefinitions.get(idx)" class="wcm__syl-def">{{ sylDefinitions.get(idx) }}</span>
         </button>
         <button
           class="wcm__syl-btn wcm__syl-btn--clear"
@@ -81,7 +83,19 @@ const emit = defineEmits<{
 const store = usePoetryStore();
 const step = ref<'language' | 'stress'>('language');
 
-const syllables = computed(() => store.getSyllables(props.token.id));
+const syllables = computed(() => store.getWordSyllables(props.token.id));
+
+/** Definitions for each syllable position (for UA heteronyms). */
+const sylDefinitions = computed((): Map<number, string> => {
+  const map = new Map<number, string>();
+  const readings = store.pendingStressReadings.get(props.token.id);
+  if (!readings) return map;
+  for (const r of readings) {
+    const defs = r.morph.map((m) => m.definition).filter(Boolean).join(', ');
+    if (defs) map.set(r.syllableIndex, defs);
+  }
+  return map;
+});
 
 function onPickLanguage(lang: Language) {
   emit('set-language', lang);
@@ -203,6 +217,9 @@ function onPickStress(idx: number | null) {
   }
 
   &__syl-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     padding: 4px 10px;
     border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -230,6 +247,18 @@ function onPickStress(idx: number | null) {
         background: rgba(255, 100, 100, 0.1);
       }
     }
+  }
+
+  &__syl-def {
+    font-family: inherit;
+    font-size: 0.6rem;
+    color: rgba(255, 220, 80, 0.75);
+    font-style: italic;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
   }
 
   &__no-syllables {

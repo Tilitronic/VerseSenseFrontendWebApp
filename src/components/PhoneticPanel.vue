@@ -1,7 +1,7 @@
 <template>
   <div class="pp-root">
     <!-- Empty state -->
-    <div v-if="store.allWordTokens.length === 0" class="pp-empty">
+    <div v-if="allWordTokenCount === 0" class="pp-empty">
       <q-icon name="music_note" size="2.5rem" color="grey-7" />
       <p>Confirm each line to see its phonetic grid.</p>
     </div>
@@ -31,27 +31,48 @@
           />
         </svg>
 
+        <!-- SVG rhyme web (connects same-group rhyme occurrences) -->
+        <svg
+          v-if="showRhymeWeb"
+          class="pp-rhyme-web-svg"
+          :width="rhymeWebSize.w"
+          :height="rhymeWebSize.h"
+          :viewBox="`0 0 ${rhymeWebSize.w} ${rhymeWebSize.h}`"
+        >
+          <path
+            v-for="(seg, i) in rhymeWebPaths"
+            :key="i"
+            :d="seg.d"
+            :stroke="seg.color"
+            :stroke-opacity="seg.opacity"
+            stroke-width="2.5"
+            fill="none"
+            stroke-linecap="round"
+          />
+        </svg>
+
         <div class="pp-lines" :class="{ 'pp-lines--right': alignRight }">
-          <template v-for="(line, lineIdx) in store.document.lines" :key="line.id">
+          <template v-for="(line, lineIdx) in visualizerDocument.lines" :key="line.id">
             <!-- Empty line (no tokens at all) → blank row -->
             <div v-if="line.tokens.length === 0" class="pp-blank-row" />
 
             <!-- TAB-only line with no words → compact blank row (indented empty line) -->
             <div
-              v-else-if="wordTokensInLine(line).length === 0 && !store.isLineConfirmed(line.id)"
+              v-else-if="wordTokensInLine(line).length === 0 && !isLineConfirmed(line.id)"
               class="pp-blank-row"
             />
 
             <!-- Unconfirmed line that has words → dim placeholder -->
             <div
-              v-else-if="!store.isLineConfirmed(line.id)"
+              v-else-if="!isLineConfirmed(line.id)"
               :ref="(el) => setRowRef(lineIdx, el)"
               class="pp-row pp-row--pending"
-              :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
+              :class="{ 'pp-row--active': activeLineIndex === lineIdx }"
             >
               <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
               <span v-if="showSylBadge" class="pp-row__syl" />
               <span v-if="showCvBadge" class="pp-row__cv" />
+              <span v-if="hasAnyRhythm" class="pp-row__rhythm pp-row__rhythm--hidden" />
               <span class="pp-row__hint">· · ·</span>
             </div>
 
@@ -60,11 +81,17 @@
               v-else
               :ref="(el) => setRowRef(lineIdx, el)"
               class="pp-row"
-              :class="{ 'pp-row--active': store.activeLineIndex === lineIdx }"
+              :class="{ 'pp-row--active': activeLineIndex === lineIdx }"
             >
               <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
               <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
               <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
+              <span
+                v-if="hasAnyRhythm"
+                class="pp-row__rhythm"
+                :class="{ 'pp-row__rhythm--hidden': !lineRhythmLabel(lineIdx) }"
+                :title="lineRhythmTitle(lineIdx)"
+              >{{ lineRhythmLabel(lineIdx) }}</span>
               <div
                 class="pp-row__interactive"
                 :class="{
@@ -144,20 +171,26 @@
                           >{{ token }}</span
                         >
                       </div>
-                      <template v-if="showRhymes && item.motifWordId && item.ipaTokens">
-                        <div
-                          v-for="(motif, mi) in sylMotifs(
-                            item.motifWordId,
-                            item.motifSyllableIndex ?? -1,
-                            item.ipaTokens.length,
-                          )"
-                          :key="motif.id"
-                          class="pp-cell__rhyme-bar"
-                          :class="`pp-cell__rhyme-bar--${motif.tier}`"
-                          :style="rhymeBarStyle(motif, mi)"
-                          :title="`[${motif.tier}] ${motif.canonicalTokens.join('')}`"
-                        />
-                      </template>
+                      <div
+                        v-if="showRhymes && item.motifWordId"
+                        class="pp-cell__rhyme-bar"
+                        :class="{ 'pp-cell__rhyme-bar--word-last': item.wordLast }"
+                        :style="engineRhymeBarStyle(item.motifWordId)"
+                        :title="engineRhymeTitle(item.motifWordId)"
+                      />
+                      <!-- Label bubble: sibling of bar so it is NOT affected by bar's CSS opacity -->
+                      <div
+                        v-if="showRhymes && item.motifWordId && isRhymeLabelCell(line, itemIdx, item.motifWordId)"
+                        :ref="(el) => setRhymeDotRef(item.motifWordId, el)"
+                        class="pp-cell__rhyme-dot"
+                        :style="engineRhymeDotStyle(item.motifWordId)"
+                      >{{ rhymeLabel(item.motifWordId) }}</div>
+                      <div
+                        v-if="item.wordLast && item.motifWordId"
+                        class="pp-cell__pause-mark"
+                        :style="pauseMarkStyle(item.motifWordId)"
+                        :title="pauseMarkTitle(item.motifWordId)"
+                      />
                     </div>
                   </template>
                 </div>
@@ -212,24 +245,61 @@
 import { watch, computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { usePoetryStore } from 'src/stores/poetry';
 import type { ILine, IWordToken } from 'src/model/Token';
-import { analyzeSoundPatterns } from 'src/services/phonetic/soundPatternAnalyzer';
 import { ipaTokenColor, ipaTokenStyle, type TokenVisual } from 'src/services/phonetic/ipaColorMap';
-import { analyzeRhymes } from 'src/services/phonetic/rhyme/rhymeAnalyzer';
-import type { PhonemeMotif, RhymeAnalysis } from 'src/services/phonetic/rhyme/types';
 import { generateVisualizationSvg, downloadSvg, textHash } from 'src/composables/useSvgExport';
 import { buildVisualizationLineItems } from 'src/services/phonetic/visualizationLine';
+import type { EchoAnnotation, StreamAnalysisResult } from 'src/services/phonetic/analysisTypes';
+import type {
+  EditorVisualizerChannel,
+  PhoneticVisualizerInput,
+} from 'src/components/visualizer/phoneticVisualizerContract';
+import { analyzeRhymes } from 'src/services/phonetic/rhyme/rhymeAnalyzer';
+import type { MotifTier, RhymeAnalysis } from 'src/services/phonetic/rhyme/types';
+
+const props = defineProps<{
+  input?: PhoneticVisualizerInput;
+  editorChannel?: EditorVisualizerChannel;
+}>();
 
 const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
 const bindTabs = defineModel<boolean>('bindTabs', { default: true });
 const manualMode = defineModel<boolean>('manualMode', { default: false });
 const showRhymes = defineModel<boolean>('showRhymes', { default: false });
+const showRhymeWeb = defineModel<boolean>('showRhymeWeb', { default: false });
 const showSounds = defineModel<boolean>('showSounds', { default: true });
+const alliterationThreshold = defineModel<number>('alliterationThreshold', { default: 0.35 });
 const showNumBadge = defineModel<boolean>('showNumBadge', { default: true });
 const showSylBadge = defineModel<boolean>('showSylBadge', { default: true });
 const showCvBadge = defineModel<boolean>('showCvBadge', { default: true });
 
 const store = usePoetryStore();
+
+const fallbackInput = computed<PhoneticVisualizerInput>(() => ({
+  document: store.document,
+  allWordTokenCount: store.allWordTokens.length,
+  activeLineIndex: store.activeLineIndex,
+  rawText: store.rawText,
+  analysisResult: store.analysisResult,
+  isLineConfirmed: store.isLineConfirmed,
+}));
+
+const visualizerInput = computed<PhoneticVisualizerInput>(() => props.input ?? fallbackInput.value);
+const visualizerDocument = computed(() => visualizerInput.value.document);
+const allWordTokenCount = computed(() => visualizerInput.value.allWordTokenCount);
+const activeLineIndex = computed(() => visualizerInput.value.activeLineIndex);
+
+function isLineConfirmed(lineId: string): boolean {
+  return visualizerInput.value.isLineConfirmed(lineId);
+}
+
+function setRawTextFromChannel(nextText: string): void {
+  if (props.editorChannel) {
+    props.editorChannel.setRawText(nextText);
+    return;
+  }
+  store.setRawText(nextText);
+}
 
 // ── Scroll sync ──────────────────────────────────────────────────────────────
 const rowRefs = new Map<number, Element>();
@@ -239,7 +309,7 @@ function setRowRef(lineIdx: number, el: unknown) {
 }
 
 watch(
-  () => store.activeLineIndex,
+  activeLineIndex,
   (idx) => {
     if (idx === null) return;
     const el = rowRefs.get(idx);
@@ -330,7 +400,7 @@ function canMoveUp(lineIdx: number): boolean {
 }
 
 function canMoveDown(lineIdx: number): boolean {
-  return lineIdx < store.document.lines.length - 1;
+  return lineIdx < visualizerDocument.value.lines.length - 1;
 }
 
 /**
@@ -465,12 +535,12 @@ function onLeftHandlePointerMove(e: PointerEvent) {
   if (deltaY >= ROW_STEP_PX) {
     moveLastWordDown(dragLineIdx);
     dragLineIdx += 1;
-    hoveredLeftLineId.value = store.document.lines[dragLineIdx]?.id ?? null;
+    hoveredLeftLineId.value = visualizerDocument.value.lines[dragLineIdx]?.id ?? null;
     dragStartY += ROW_STEP_PX;
   } else if (deltaY <= -ROW_STEP_PX) {
     moveFirstWordUp(dragLineIdx);
     dragLineIdx = Math.max(0, dragLineIdx - 1);
-    hoveredLeftLineId.value = store.document.lines[dragLineIdx]?.id ?? null;
+    hoveredLeftLineId.value = visualizerDocument.value.lines[dragLineIdx]?.id ?? null;
     dragStartY -= ROW_STEP_PX;
   }
 }
@@ -561,7 +631,7 @@ function composeWords(prefix: string, words: string[]): string {
 
 function moveFirstWordUp(lineIdx: number) {
   if (lineIdx <= 0) return;
-  const lines = store.rawText.split('\n');
+  const lines = visualizerInput.value.rawText.split('\n');
   if (lineIdx >= lines.length) return;
 
   const cur = splitWords(lines[lineIdx] ?? '');
@@ -574,11 +644,11 @@ function moveFirstWordUp(lineIdx: number) {
 
   lines[lineIdx - 1] = composeWords(prev.prefix, prev.words);
   lines[lineIdx] = composeWords(cur.prefix, cur.words);
-  store.setRawText(lines.join('\n'));
+  setRawTextFromChannel(lines.join('\n'));
 }
 
 function moveLastWordDown(lineIdx: number) {
-  const lines = store.rawText.split('\n');
+  const lines = visualizerInput.value.rawText.split('\n');
   if (lineIdx < 0 || lineIdx >= lines.length) return;
   if (lineIdx === lines.length - 1) lines.push('');
 
@@ -592,7 +662,7 @@ function moveLastWordDown(lineIdx: number) {
 
   lines[lineIdx] = composeWords(cur.prefix, cur.words);
   lines[lineIdx + 1] = composeWords(next.prefix, next.words);
-  store.setRawText(lines.join('\n'));
+  setRawTextFromChannel(lines.join('\n'));
 }
 
 watch(
@@ -681,8 +751,8 @@ interface IndexedToken {
 const indexedTokens = computed<IndexedToken[]>(() => {
   const result: IndexedToken[] = [];
   let flatIdx = 0;
-  for (const line of store.document.lines) {
-    if (!store.isLineConfirmed(line.id)) continue;
+  for (const line of visualizerDocument.value.lines) {
+    if (!isLineConfirmed(line.id)) continue;
     for (const item of visualizationItems(line)) {
       if (item.type !== 'cell') continue;
       const ipaTokens = item.ipaTokens ?? [];
@@ -700,55 +770,203 @@ const indexedTokens = computed<IndexedToken[]>(() => {
   return result;
 });
 
-const soundAnalysis = computed(() => analyzeSoundPatterns(indexedTokens.value.map((t) => t.token)));
+const analysis = computed<StreamAnalysisResult | null>(() => visualizerInput.value.analysisResult);
+
+const echoByFlatIndex = computed<Map<number, EchoAnnotation>>(() => {
+  const map = new Map<number, EchoAnnotation>();
+  for (const entry of analysis.value?.echo ?? []) {
+    map.set(entry.source.flatIndex, entry);
+  }
+  return map;
+});
+
+const pauseStrengthByWordId = computed<Map<string, number>>(() => {
+  const map = new Map<string, number>();
+  for (const pause of analysis.value?.pauses ?? []) {
+    const current = map.get(pause.afterWordId) ?? 0;
+    if (pause.strength > current) map.set(pause.afterWordId, pause.strength);
+  }
+  return map;
+});
+
+const rhythmByEngineLineIndex = computed(() => {
+  const map = new Map<number, StreamAnalysisResult['rhythm'][number]>();
+  for (const line of analysis.value?.rhythm ?? []) {
+    map.set(line.lineIndex, line);
+  }
+  return map;
+});
+
+function confirmedLineOrdinal(lineIdx: number): number {
+  let ordinal = -1;
+  for (let i = 0; i <= lineIdx; i++) {
+    const line = visualizerDocument.value.lines[i];
+    if (line && isLineConfirmed(line.id)) ordinal++;
+  }
+  return ordinal;
+}
+
+function lineRhythmLabel(lineIdx: number): string {
+  const ordinal = confirmedLineOrdinal(lineIdx);
+  if (ordinal < 0) return '';
+  const rhythm = rhythmByEngineLineIndex.value.get(ordinal);
+  if (!rhythm) return '';
+  const foot = rhythm.period === 2 ? '2-beat' : '3-beat';
+  return `${foot} · ${rhythm.clausula}`;
+}
+
+function lineRhythmTitle(lineIdx: number): string {
+  const ordinal = confirmedLineOrdinal(lineIdx);
+  if (ordinal < 0) return '';
+  const rhythm = rhythmByEngineLineIndex.value.get(ordinal);
+  if (!rhythm) return '';
+  return `Period ${rhythm.period}, phase ${rhythm.phase}, confidence ${rhythm.confidence.toFixed(2)}`;
+}
+
+/** True when the engine has returned rhythm data for at least one line. */
+const hasAnyRhythm = computed(() => rhythmByEngineLineIndex.value.size > 0);
 
 const tokenStyleMap = computed<Map<string, TokenVisual>>(() => {
   const map = new Map<string, TokenVisual>();
-  const { opacityByIndex } = soundAnalysis.value;
+  const threshold = Math.max(0.05, Math.min(0.8, alliterationThreshold.value));
   for (const { token, flatIdx, renderKey } of indexedTokens.value) {
-    const opacity = opacityByIndex.get(flatIdx);
-    if (opacity === undefined) continue;
-    const visual = ipaTokenStyle(token, opacity);
+    const rawOpacity = echoByFlatIndex.value.get(flatIdx)?.opacity;
+    if (rawOpacity === undefined || rawOpacity < threshold) continue;
+    const normalised = (rawOpacity - threshold) / Math.max(0.0001, 1 - threshold);
+    const visual = ipaTokenStyle(token, Math.max(0.05, Math.min(1, normalised)));
     if (visual) map.set(renderKey, visual);
   }
   return map;
 });
 
-// ── Rhyme analysis ────────────────────────────────────────────────────────────
+// ── Engine-driven annotation layer ───────────────────────────────────────────
 
-const rhymeAnalysis = computed<RhymeAnalysis>(() => {
-  if (!showRhymes.value) return { motifs: [], cellMotifs: new Map() };
-  return analyzeRhymes(store.document, store.isLineConfirmed);
-});
-
-/** All motifs that touch any token of this syllable cell. */
-function sylMotifs(wordId: string, sylIdx: number, tokenCount: number): PhonemeMotif[] {
-  const { cellMotifs, motifs } = rhymeAnalysis.value;
-  const seen = new Set<string>();
-  for (let ti = 0; ti < tokenCount; ti++) {
-    cellMotifs.get(`${wordId}:${sylIdx}:${ti}`)?.forEach((id) => seen.add(id));
-  }
-  return [...seen].map((id) => motifs.find((m) => m.id === id)!).filter(Boolean);
+function groupHue(group: string): number {
+  let hash = 0;
+  for (let i = 0; i < group.length; i++) hash = (hash * 31 + group.charCodeAt(i)) >>> 0;
+  return hash % 360;
 }
 
-const BAR_H = 5; // px — height of each rhyme bar
-const BAR_GAP = 2; // px — gap between stacked bars
+// ── Local rhyme analysis (reliable, always available) ─────────────────────────
+
+const TIER_PRIO: Record<MotifTier, number> = { exact: 0, near: 1, structural: 2 };
+
+interface WordRhymeEntry {
+  color: string;
+  opacity: number;
+  tier: MotifTier;
+  label: string;
+  motifId: string;
+}
+
+/** Single analyzeRhymes call shared by the bar map and the rhyme web. */
+const localRhymeAnalysis = computed<RhymeAnalysis | null>(() => {
+  if (!showRhymes.value && !showRhymeWeb.value) return null;
+  return analyzeRhymes(visualizerDocument.value, isLineConfirmed);
+});
+
+const localRhymeWordMap = computed<Map<string, WordRhymeEntry>>(() => {
+  const ra = localRhymeAnalysis.value;
+  if (!ra) return new Map();
+  const map = new Map<string, WordRhymeEntry>();
+  for (const motif of ra.motifs) {
+    for (const span of motif.spans) {
+      const existing = map.get(span.wordId);
+      if (!existing || TIER_PRIO[motif.tier] < TIER_PRIO[existing.tier]) {
+        map.set(span.wordId, {
+          color: motif.color,
+          opacity: motif.opacity,
+          tier: motif.tier,
+          label: motif.label,
+          motifId: motif.id,
+        });
+      }
+    }
+  }
+  return map;
+});
 
 /**
- * Inline style for one rhyme bar inside a syllable cell.
- * Bars stack from the bottom upward; each is a thin colored strip
- * in the same visual language as phoneme area shapes.
+ * Returns true for the one cell (the center syllable of a word) where the
+ * group-label bubble is rendered.
  */
-function rhymeBarStyle(motif: PhonemeMotif, stackIndex: number): Record<string, string> {
-  const bottom = stackIndex * (BAR_H + BAR_GAP);
-  const radius =
-    motif.tier === 'exact' ? '2px 2px 0 0' : motif.tier === 'near' ? '1px 1px 0 0' : '0';
+function isRhymeLabelCell(line: ILine, itemIdx: number, wordId: string | undefined): boolean {
+  if (!wordId) return false;
+  const items = visualizationItems(line);
+  const cellIndices: number[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (it?.type === 'cell' && it.motifWordId === wordId) cellIndices.push(i);
+  }
+  if (cellIndices.length === 0) return false;
+  return itemIdx === cellIndices[Math.floor(cellIndices.length / 2)]!;
+}
+
+function rhymeLabel(wordId: string): string {
+  const local = localRhymeWordMap.value.get(wordId);
+  if (local) return local.label;
+  const ann = analysis.value?.annotations[wordId];
+  return ann?.rhymeGroup ?? '';
+}
+
+function engineRhymeBarStyle(wordId: string): Record<string, string> {
+  // Try local analyzer first (always available, fast); geometry handled by CSS
+  const local = localRhymeWordMap.value.get(wordId);
+  if (local) {
+    return { background: local.color, opacity: String(local.opacity) };
+  }
+  // Fall back to engine annotations
+  const ann = analysis.value?.annotations[wordId];
+  if (!ann?.rhymeGroup) return { display: 'none' };
+  const hue = groupHue(ann.rhymeGroup);
+  const score = ann.rhymeScore ?? 0.4;
   return {
-    background: motif.color,
-    height: `${BAR_H}px`,
-    bottom: `${bottom}px`,
-    borderRadius: radius,
+    background: `hsl(${hue} 72% 52%)`,
+    opacity: String(Math.max(0.20, Math.min(1, score))),
   };
+}
+
+/** Opaque dot style — NOT affected by the bar's CSS opacity since it is a sibling element. */
+function engineRhymeDotStyle(wordId: string): Record<string, string> {
+  const local = localRhymeWordMap.value.get(wordId);
+  if (local) return { background: local.color };
+  const ann = analysis.value?.annotations[wordId];
+  if (!ann?.rhymeGroup) return { display: 'none' };
+  return { background: `hsl(${groupHue(ann.rhymeGroup)}, 72%, 52%)` };
+}
+
+function engineRhymeTitle(wordId: string): string {
+  const local = localRhymeWordMap.value.get(wordId);
+  if (local) return `Rhyme ${local.label} [${local.tier}]`;
+  const ann = analysis.value?.annotations[wordId];
+  if (!ann?.rhymeGroup) return '';
+  const score = ann.rhymeScore === null ? 'n/a' : ann.rhymeScore.toFixed(2);
+  return `Rhyme ${ann.rhymeGroup} (score ${score})`;
+}
+
+// ── Rhyme dot refs (for rhyme-web connection endpoints) ───────────────────────
+
+const rhymeDotElems = new Map<string, Element>();
+function setRhymeDotRef(wordId: string | undefined, el: unknown) {
+  if (!wordId) return;
+  if (el instanceof Element) rhymeDotElems.set(wordId, el);
+  else rhymeDotElems.delete(wordId);
+}
+
+function pauseMarkStyle(wordId: string): Record<string, string> {
+  const strength = pauseStrengthByWordId.value.get(wordId);
+  if (strength === undefined || strength <= 0) return { display: 'none' };
+  const width = Math.max(1, Math.round(strength * 6));
+  return {
+    width: `${width}px`,
+    opacity: `${Math.max(0.25, strength)}`,
+  };
+}
+
+function pauseMarkTitle(wordId: string): string {
+  const strength = pauseStrengthByWordId.value.get(wordId);
+  if (strength === undefined || strength <= 0) return '';
+  return `Pause strength ${strength.toFixed(2)}`;
 }
 
 // ── Clustering web ───────────────────────────────────────────────────────────
@@ -774,6 +992,24 @@ interface WebSegment {
 const svgSize = ref({ w: 0, h: 0 });
 const webSegments = ref<WebSegment[]>([]);
 
+const patterningSounds = computed<Set<string>>(() => {
+  const threshold = Math.max(0.05, Math.min(0.8, alliterationThreshold.value));
+  const byToken = new Map<string, { sum: number; count: number }>();
+  for (const item of indexedTokens.value) {
+    const opacity = echoByFlatIndex.value.get(item.flatIdx)?.opacity;
+    if (opacity === undefined) continue;
+    const agg = byToken.get(item.token) ?? { sum: 0, count: 0 };
+    agg.sum += opacity;
+    agg.count += 1;
+    byToken.set(item.token, agg);
+  }
+  const out = new Set<string>();
+  for (const [token, agg] of byToken) {
+    if (agg.count > 0 && agg.sum / agg.count >= threshold) out.add(token);
+  }
+  return out;
+});
+
 function rebuildWeb() {
   const container = gridContainer.value;
   if (!container || !showWeb.value) {
@@ -784,8 +1020,7 @@ function rebuildWeb() {
   // Canvas must cover the full scrollable content height
   svgSize.value = { w: container.clientWidth, h: container.scrollHeight };
 
-  const { patterningSounds } = soundAnalysis.value;
-  if (patterningSounds.size === 0) {
+  if (patterningSounds.value.size === 0) {
     webSegments.value = [];
     return;
   }
@@ -796,7 +1031,7 @@ function rebuildWeb() {
   // Collect scroll-adjusted center point for every patterning token
   const byToken = new Map<string, Array<{ x: number; y: number; flatIdx: number }>>();
   for (const { token, flatIdx, renderKey } of indexedTokens.value) {
-    if (!patterningSounds.has(token)) continue;
+    if (!patterningSounds.value.has(token)) continue;
     const el = tokenElems.get(renderKey);
     if (!el) continue;
     const er = el.getBoundingClientRect();
@@ -825,7 +1060,7 @@ function rebuildWeb() {
   webSegments.value = segs;
 }
 
-watch([showWeb, indexedTokens, soundAnalysis], async () => {
+watch([showWeb, indexedTokens, patterningSounds], async () => {
   if (!showWeb.value) {
     webSegments.value = [];
     return;
@@ -834,10 +1069,82 @@ watch([showWeb, indexedTokens, soundAnalysis], async () => {
   rebuildWeb();
 });
 
+// ── Rhyme web (connecting same-group rhyme occurrences) ───────────────────────
+
+interface RhymeWebPath {
+  d: string;
+  color: string;
+  opacity: number;
+}
+
+const rhymeWebSize = ref({ w: 0, h: 0 });
+const rhymeWebPaths = ref<RhymeWebPath[]>([]);
+
+function rebuildRhymeWeb() {
+  const container = gridContainer.value;
+  if (!container || !showRhymeWeb.value) {
+    rhymeWebPaths.value = [];
+    return;
+  }
+  rhymeWebSize.value = { w: container.clientWidth, h: container.scrollHeight };
+
+  const ra = localRhymeAnalysis.value;
+  if (!ra || ra.motifs.length === 0) {
+    rhymeWebPaths.value = [];
+    return;
+  }
+
+  const containerRect = container.getBoundingClientRect();
+  const scrollTop = container.scrollTop;
+  const paths: RhymeWebPath[] = [];
+
+  for (const motif of ra.motifs) {
+    // Collect one representative point per occurrence (taken from the dot element)
+    const byOcc = new Map<number, Element>();
+    for (const span of motif.spans) {
+      if (!byOcc.has(span.occurrenceIdx)) {
+        const el = rhymeDotElems.get(span.wordId);
+        if (el) byOcc.set(span.occurrenceIdx, el);
+      }
+    }
+    const occIds = [...byOcc.keys()].sort((a, b) => a - b);
+    if (occIds.length < 2) continue;
+
+    for (let k = 0; k + 1 < occIds.length; k++) {
+      const elA = byOcc.get(occIds[k]!);
+      const elB = byOcc.get(occIds[k + 1]!);
+      if (!elA || !elB) continue;
+
+      const ra2 = elA.getBoundingClientRect();
+      const rb = elB.getBoundingClientRect();
+      const ax = ra2.left - containerRect.left + ra2.width / 2;
+      const ay = ra2.top - containerRect.top + ra2.height / 2 + scrollTop;
+      const bx = rb.left - containerRect.left + rb.width / 2;
+      const by2 = rb.top - containerRect.top + rb.height / 2 + scrollTop;
+
+      // Vertical S-curve with horizontal control points
+      const cy = (ay + by2) / 2;
+      const d = `M ${ax} ${ay} C ${ax} ${cy}, ${bx} ${cy}, ${bx} ${by2}`;
+      paths.push({ d, color: motif.color, opacity: Math.min(1, motif.opacity + 0.25) });
+    }
+  }
+  rhymeWebPaths.value = paths;
+}
+
+watch([showRhymeWeb, localRhymeAnalysis], async () => {
+  if (!showRhymeWeb.value) {
+    rhymeWebPaths.value = [];
+    return;
+  }
+  await nextTick();
+  rebuildRhymeWeb();
+});
+
 let ro: ResizeObserver | null = null;
 onMounted(() => {
   ro = new ResizeObserver(() => {
     if (showWeb.value) void nextTick().then(rebuildWeb);
+    if (showRhymeWeb.value) void nextTick().then(rebuildRhymeWeb);
   });
   if (gridContainer.value) ro.observe(gridContainer.value);
 });
@@ -849,21 +1156,19 @@ onBeforeUnmount(() => {
 
 // ── SVG Export ───────────────────────────────────────────────────────────────
 
-function exportSvg(includeLegend = false): void {
-  const rawText = store.document.lines
-    .flatMap((l) => l.tokens.flatMap((t) => ('text' in t ? [t.text] : [])))
-    .join('');
+function exportSvg(): void {
+  const rawText = visualizerInput.value.rawText;
   const hash = textHash(rawText);
+  const analyzerVersion = analysis.value?.analyzer?.version ?? '';
   const svg = generateVisualizationSvg(
-    store.document.lines,
-    store.isLineConfirmed,
+    visualizerDocument.value.lines,
+    isLineConfirmed,
     tokenStyleMap.value,
     '',
-    includeLegend,
+    analyzerVersion,
   );
   downloadSvg(svg, `phonetic-${hash}.svg`);
 }
-
 defineExpose({ exportSvg });
 </script>
 
@@ -990,6 +1295,16 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   z-index: 10;
 }
 
+// ── rhyme web SVG overlay (below phoneme web, above bars) ────────────────────
+.pp-rhyme-web-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 9;
+}
+
 // ── empty ─────────────────────────────────────────────────────────────────────
 .pp-empty {
   flex: 1;
@@ -1040,7 +1355,8 @@ $consonant-col: rgba(0, 0, 0, 0.75);
 
   &__num,
   &__syl,
-  &__cv {
+  &__cv,
+  &__rhythm {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
@@ -1066,6 +1382,19 @@ $consonant-col: rgba(0, 0, 0, 0.75);
 
   &__cv {
     clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+
+  &__rhythm {
+    width: 84px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+
+    &--hidden {
+      visibility: hidden;
+    }
   }
 
   &__hint {
@@ -1189,7 +1518,7 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   width: $cell-w; // FIXED — same for every cell across every line
   height: $cell-h;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible; // rhyme bar extends -1 px to bridge inter-syllable borders
   box-sizing: border-box;
   background: $cell-bg;
   border: 1px solid $border-col;
@@ -1198,10 +1527,49 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   // ── rhyme bar: thin colored strip at the bottom of the cell ───────────────
   &__rhyme-bar {
     position: absolute;
-    left: 2px;
-    right: 2px;
+    left: 0;
+    right: -1px;   // extends 1 px to bridge the collapsed inter-syllable border
+    bottom: 0;
+    height: 4px;
     pointer-events: none;
-    // height and bottom are set inline via rhymeBarStyle()
+    z-index: 3;
+
+    &--word-last {
+      right: 0; // don’t bridge word boundaries — the 3 px gap is informative
+    }
+    // color and opacity are set inline via engineRhymeBarStyle()
+  }
+
+  // ── rhyme label bubble: opaque circle centered on the bar (sibling element) ─
+  &__rhyme-dot {
+    position: absolute;
+    left: 50%;
+    bottom: 2px;                    // bar center = 2 px from cell bottom (bar h=4 at bottom:0)
+    transform: translate(-50%, 50%); // centers 13 px circle on that point
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 900;
+    font-family: sans-serif;
+    color: #000;
+    z-index: 5;
+    pointer-events: none;
+    line-height: 1;
+    user-select: none;
+  }
+
+  &__pause-mark {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    right: -2px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    pointer-events: none;
   }
 
   // TAB indent cell — same dimensions as syllable cell, visually empty
