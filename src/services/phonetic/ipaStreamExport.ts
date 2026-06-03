@@ -99,12 +99,7 @@ export type {
 export type { IpaStreamPunctuation as IpaStreamPunct } from 'ipa-poetry-engine';
 export type { StreamElement as IpaStreamItem } from 'ipa-poetry-engine';
 
-import type {
-  StressSource,
-  IpaStreamSyllable,
-  StreamElement,
-  IpaStream,
-} from 'ipa-poetry-engine';
+import type { StressSource, IpaStreamSyllable, StreamElement, IpaStream } from 'ipa-poetry-engine';
 
 // ── Punctuation normalisation ─────────────────────────────────────────────────
 
@@ -119,13 +114,25 @@ const DASH_RE = /^[-–|]+$/;
  * Covers the basic set for Ukrainian, Polish, and English.
  */
 const PASSTHROUGH_PUNCT = new Set([
-  '—',  // em-dash (U+2014)
-  ',', '.', ':', ';', '?', '!',
-  '(', ')', '[', ']',
-  '«', '»',              // Ukrainian/Polish guillemets
-  '„', '"', '"',         // typographic double quotes
-  '\u2018', '\u2019',    // typographic single quotes ' '
-  '…',                   // ellipsis (U+2026)
+  '—', // em-dash (U+2014)
+  ',',
+  '.',
+  ':',
+  ';',
+  '?',
+  '!',
+  '(',
+  ')',
+  '[',
+  ']',
+  '«',
+  '»', // Ukrainian/Polish guillemets
+  '„',
+  '"',
+  '"', // typographic double quotes
+  '\u2018',
+  '\u2019', // typographic single quotes ' '
+  '…', // ellipsis (U+2026)
 ]);
 
 /**

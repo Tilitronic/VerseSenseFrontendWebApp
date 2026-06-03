@@ -32,6 +32,27 @@ import { encodeToken } from './phonemeEncoder';
 import { findMotifs, type FlatToken } from './motifFinder';
 import type { PhonemeMotif, MotifSpan, RhymeAnalysis, MotifTier } from './types';
 
+export type RhymeLengthMode = 'sounds' | 'vowels';
+
+export interface RhymeFilterOptions {
+  /** Minimum motif length to keep. Default: 2 */
+  minLength?: number;
+  /** Length mode: all sounds (IPA tokens) or only vowels. Default: sounds */
+  mode?: RhymeLengthMode;
+  /**
+   * Minimum similarity score (0–1) to keep a motif.
+   * Motifs with similarity < threshold are discarded.
+   * Default: 0 (show all).
+   */
+  similarityThreshold?: number;
+}
+
+const TIER_SIMILARITY: Record<MotifTier, number> = {
+  exact: 1.0,
+  near: 0.7,
+  structural: 0.4,
+};
+
 // ── Lightness per tier ────────────────────────────────────────────────────────
 
 const TIER_LIGHTNESS: Record<MotifTier, number> = {
@@ -45,6 +66,21 @@ const TIER_SATURATION: Record<MotifTier, number> = {
   near: 68,
   structural: 48,
 };
+
+const IPA_VOWEL_CHAR = /[æɛɪɒʌɑɔəɜʊaeiouyɨøœɯɐɵʉʏɤɞаеєиіїоуюя]/i;
+
+function isVowelToken(token: string): boolean {
+  return IPA_VOWEL_CHAR.test(token[0] ?? '');
+}
+
+function motifLengthByMode(tokens: string[], mode: RhymeLengthMode): number {
+  if (mode === 'sounds') return tokens.length;
+  let count = 0;
+  for (const token of tokens) {
+    if (isVowelToken(token)) count++;
+  }
+  return count;
+}
 
 // ── Flat sequence builder ─────────────────────────────────────────────────────
 
@@ -139,10 +175,7 @@ function makeBoundary(wordId: string, lineIdx: number, code: number): FlatEntry 
  * letters, then digits. Provides ~78 unique labels before repeating.
  */
 const RHYME_LABELS =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
-  'АБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯ' +
-  'ĄĆĘŁŃÓŚŹŻ' +
-  '1234567890';
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + 'АБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯ' + 'ĄĆĘŁŃÓŚŹŻ' + '1234567890';
 
 /**
  * Compute the circular mean of a list of hue values (in degrees).
@@ -207,15 +240,15 @@ function computeGroupColor(canonicalTokens: string[], tier: MotifTier): string {
  *   raw = length_score * 0.5 + proximity_score * 0.5
  *   opacity = clamp(raw, MIN_OPACITY, 1.0)
  */
-const LENGTH_TARGET = 5;   // tokens at which length contribution maxes out
+const LENGTH_TARGET = 5; // tokens at which length contribution maxes out
 // Proximity model:
 //   gap ≤ CLOSE_GAP (≈10 syllables × 3 tokens)  → nearly fully opaque
 //   gap > CLOSE_GAP                              → exponential decay
 //   floor at MIN_OPACITY regardless of distance
-const CLOSE_GAP = 30;      // flat-token threshold ≈ 10 syllables
-const GAP_DECAY = 55;      // decay constant beyond CLOSE_GAP (flat tokens)
-const MIN_OPACITY = 0.20;
-const PROX_MAX = 0.90;     // max proximity contribution (within CLOSE_GAP)
+const CLOSE_GAP = 30; // flat-token threshold ≈ 10 syllables
+const GAP_DECAY = 55; // decay constant beyond CLOSE_GAP (flat tokens)
+const MIN_OPACITY = 0.2;
+const PROX_MAX = 0.9; // max proximity contribution (within CLOSE_GAP)
 
 function computeOpacity(length: number, occurrenceStarts: number[]): number {
   const lengthScore = Math.min(1, length / LENGTH_TARGET);
@@ -238,7 +271,7 @@ function computeOpacity(length: number, occurrenceStarts: number[]): number {
   }
 
   // Length contributes 30%, proximity 70%
-  const raw = lengthScore * 0.30 + proximityScore * 0.70;
+  const raw = lengthScore * 0.3 + proximityScore * 0.7;
   return Math.max(MIN_OPACITY, Math.min(1.0, raw));
 }
 
@@ -259,6 +292,7 @@ function motifId(canonicalTokens: string[], tier: MotifTier): string {
 export function analyzeRhymes(
   doc: IPoetryDocument,
   isLineConfirmed: (lineId: string) => boolean,
+  options?: RhymeFilterOptions,
 ): RhymeAnalysis {
   const flat = buildFlatSequence(doc, isLineConfirmed);
 
@@ -267,11 +301,20 @@ export function analyzeRhymes(
 
   const rawMotifs = findMotifs(phonemeFlat);
 
-  if (rawMotifs.length === 0) return { motifs: [], cellMotifs: new Map() };
+  const mode: RhymeLengthMode = options?.mode ?? 'sounds';
+  const minLength = Math.max(1, Math.floor(options?.minLength ?? 2));
+  const similarityThreshold = options?.similarityThreshold ?? 0;
+  const filteredMotifs = rawMotifs.filter(
+    (m) =>
+      motifLengthByMode(m.canonicalTokens, mode) >= minLength
+      && TIER_SIMILARITY[m.tier] >= similarityThreshold,
+  );
+
+  if (filteredMotifs.length === 0) return { motifs: [], cellMotifs: new Map() };
 
   // ── Sort: exact first, then near, structural; within tier: longer then more frequent
   const tierOrder: Record<MotifTier, number> = { exact: 0, near: 1, structural: 2 };
-  rawMotifs.sort((a, b) => {
+  filteredMotifs.sort((a, b) => {
     const to = tierOrder[a.tier] - tierOrder[b.tier];
     if (to !== 0) return to;
     const lo = b.length - a.length;
@@ -285,8 +328,8 @@ export function analyzeRhymes(
   const motifs: PhonemeMotif[] = [];
   const cellMotifs = new Map<string, string[]>();
 
-  for (let mi = 0; mi < rawMotifs.length; mi++) {
-    const raw = rawMotifs[mi]!;
+  for (let mi = 0; mi < filteredMotifs.length; mi++) {
+    const raw = filteredMotifs[mi]!;
     const tier = raw.tier;
     const opacity = computeOpacity(raw.length, raw.occurrenceStarts);
     const color = computeGroupColor(raw.canonicalTokens, tier);
@@ -320,6 +363,7 @@ export function analyzeRhymes(
       color,
       label,
       opacity,
+      similarity: TIER_SIMILARITY[tier],
     };
     motifs.push(motif);
 

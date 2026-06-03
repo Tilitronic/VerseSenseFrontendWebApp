@@ -83,6 +83,16 @@ export interface PhonemeMotif {
    *   occurrences closer together → higher weight
    */
   opacity: number;
+
+  /**
+   * Phonetic similarity score in [0, 1].
+   * Based on the DTW thresholds used during motif discovery:
+   *   exact       → 1.0  (identical tokens)
+   *   near        → 0.7  (1 - NEAR_DTW_THRESHOLD)
+   *   structural  → 0.4  (1 - STRUCTURAL_DTW_THRESHOLD)
+   * Used by the "Similarity ≥" slider to filter which tiers are visible.
+   */
+  similarity: number;
 }
 
 // ── Analysis result ───────────────────────────────────────────────────────────

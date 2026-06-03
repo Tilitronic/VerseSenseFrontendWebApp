@@ -6,6 +6,19 @@
 
         <q-toolbar-title> VerseSense </q-toolbar-title>
 
+        <q-btn
+          flat
+          dense
+          no-caps
+          class="feedback-btn q-mr-xs"
+          size="sm"
+          icon="feedback"
+          :label="$t('nav.feedback')"
+          href="https://forms.gle/q8UJtxtR1344Jfcb8"
+          target="_blank"
+          rel="noopener noreferrer"
+        />
+
         <!-- Language switcher -->
         <q-btn flat dense no-caps class="lang-btn q-mr-xs" size="sm">
           <LangFlag :lang="currentLang.value" class="q-mr-xs" />
@@ -133,6 +146,14 @@ function isActive(path: string): boolean {
   letter-spacing: 0.01em;
   border-radius: 4px;
   padding: 2px 6px;
+}
+
+.feedback-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: 4px;
+  padding: 2px 8px;
 }
 
 .lang-label {

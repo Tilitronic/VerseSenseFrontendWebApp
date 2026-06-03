@@ -46,7 +46,9 @@
           @click="onPickStress(idx)"
         >
           {{ syl.phonetic || `s${idx + 1}` }}
-          <span v-if="sylDefinitions.get(idx)" class="wcm__syl-def">{{ sylDefinitions.get(idx) }}</span>
+          <span v-if="sylDefinitions.get(idx)" class="wcm__syl-def">{{
+            sylDefinitions.get(idx)
+          }}</span>
         </button>
         <button
           class="wcm__syl-btn wcm__syl-btn--clear"
@@ -91,7 +93,10 @@ const sylDefinitions = computed((): Map<number, string> => {
   const readings = store.pendingStressReadings.get(props.token.id);
   if (!readings) return map;
   for (const r of readings) {
-    const defs = r.morph.map((m) => m.definition).filter(Boolean).join(', ');
+    const defs = r.morph
+      .map((m) => m.definition)
+      .filter(Boolean)
+      .join(', ');
     if (defs) map.set(r.syllableIndex, defs);
   }
   return map;

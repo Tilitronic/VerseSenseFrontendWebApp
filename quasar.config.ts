@@ -229,8 +229,7 @@ export default defineConfig((ctx) => {
         viteConf.worker.format = 'es';
         const existingWorkerPlugins = viteConf.worker.plugins;
         viteConf.worker.plugins = () => {
-          const base =
-            typeof existingWorkerPlugins === 'function' ? existingWorkerPlugins() : [];
+          const base = typeof existingWorkerPlugins === 'function' ? existingWorkerPlugins() : [];
           return [...base, wasmPlugin()];
         };
       },

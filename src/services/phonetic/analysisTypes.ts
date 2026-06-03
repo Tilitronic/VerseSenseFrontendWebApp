@@ -25,7 +25,6 @@ export type {
   StructuralityAnalysis,
   StructuralityComponent,
   StructuralityWeights,
-  MolstarTranscription,
   AnalyzerInfo,
   ResponseSchemaInfo,
 } from 'ipa-poetry-engine';

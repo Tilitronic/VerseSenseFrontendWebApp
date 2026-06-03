@@ -123,8 +123,6 @@
               </q-btn>
             </q-btn-group>
 
-
-
             <!-- ── Detection language filter ─────────────────────── -->
             <span class="stress-sep" />
             <q-btn
@@ -198,42 +196,7 @@
       <div class="panel__header">
         <h2 class="panel__title">{{ $t('phonetic.title') }}</h2>
         <div class="panel__actions">
-          <!-- Visualizer tab switcher -->
-          <div class="panel__action-group panel__action-group--tabs">
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': visualizerTab === 'phonetic' }"
-              @click="visualizerTab = 'phonetic'"
-            >{{ $t('phonetic.tabPhonetic') }}</button>
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': visualizerTab === 'mol' }"
-              @click="visualizerTab = 'mol'"
-            >Mol*</button>
-          </div>
           <div class="panel__action-group">
-            <!-- Sound web toggle -->
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showSoundWeb }"
-              :title="$t('phonetic.soundsWebTitle')"
-              @click="showSoundWeb = !showSoundWeb"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="3" cy="8" r="1.8" fill="currentColor" />
-                <circle cx="13" cy="3" r="1.8" fill="currentColor" />
-                <circle cx="13" cy="13" r="1.8" fill="currentColor" />
-                <circle cx="8" cy="2" r="1.8" fill="currentColor" />
-                <circle cx="8" cy="14" r="1.8" fill="currentColor" />
-                <line x1="3" y1="8" x2="13" y2="3" stroke="currentColor" stroke-width="1.2" />
-                <line x1="3" y1="8" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" />
-                <line x1="3" y1="8" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
-                <line x1="3" y1="8" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
-                <line x1="13" y1="3" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" />
-                <line x1="13" y1="13" x2="8" y2="2" stroke="currentColor" stroke-width="1.2" />
-              </svg>
-              {{ $t('phonetic.soundsWeb') }}
-            </button>
             <!-- Right-align toggle -->
             <button
               class="panel__web-btn"
@@ -253,7 +216,7 @@
               class="panel__web-btn"
               :class="{ 'panel__web-btn--active': bindTabIndent }"
               title="Toggle tab-coupled indent cells"
-              @click="selectInteractionMode('tabs')"
+              @click="bindTabIndent = !bindTabIndent"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path
@@ -264,171 +227,150 @@
                   stroke-linejoin="round"
                 />
               </svg>
-              Tab Bind
+              Tab
             </button>
-            <!-- Manual grid mode toggle -->
+            <!-- Sounds dropdown: highlight + web + threshold -->
+            <q-btn-dropdown
+              dense
+              no-caps
+              size="sm"
+              class="panel__web-btn panel__web-btn--dropdown"
+              :class="{ 'panel__web-btn--active': showSounds || showSoundWeb }"
+              :label="$t('phonetic.soundsWeb')"
+            >
+              <q-list dense class="panel__menu-list">
+                <q-item clickable @click="showSounds = !showSounds">
+                  <q-item-section avatar>
+                    <q-icon name="palette" :color="showSounds ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.soundsColor') }}</q-item-section>
+                </q-item>
+                <q-item clickable @click="showSoundWeb = !showSoundWeb">
+                  <q-item-section avatar>
+                    <q-icon name="hub" :color="showSoundWeb ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.soundsWeb') }}</q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item>
+                  <q-item-section>
+                    <q-input
+                      v-model.number="alliterationThreshold"
+                      type="number"
+                      dense
+                      filled
+                      debounce="300"
+                      label="Density ≥"
+                      min="0.05"
+                      max="0.8"
+                      step="0.05"
+                    />
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+
+            <!-- Rhymes dropdown: highlight + web + filters -->
+            <q-btn-dropdown
+              dense
+              no-caps
+              size="sm"
+              class="panel__web-btn panel__web-btn--dropdown"
+              :class="{ 'panel__web-btn--active': showRhymes || showRhymeWeb }"
+              :label="$t('phonetic.rhymesHighlight')"
+            >
+              <q-list dense class="panel__menu-list">
+                <q-item clickable @click="showRhymes = !showRhymes">
+                  <q-item-section avatar>
+                    <q-icon name="check_circle" :color="showRhymes ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.rhymesHighlight') }}</q-item-section>
+                </q-item>
+                <q-item clickable @click="showRhymeWeb = !showRhymeWeb">
+                  <q-item-section avatar>
+                    <q-icon name="hub" :color="showRhymeWeb ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.rhymeWeb') }}</q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item>
+                  <q-item-section>
+                    <q-input
+                      v-model.number="rhymeMinLength"
+                      type="number"
+                      dense
+                      filled
+                      debounce="300"
+                      label="Min. Rhyme Length ≥"
+                      min="1"
+                      max="12"
+                      step="1"
+                    />
+                  </q-item-section>
+                </q-item>
+                <q-item>
+                  <q-item-section>
+                    <q-input
+                      v-model.number="rhymeThreshold"
+                      type="number"
+                      dense
+                      filled
+                      debounce="300"
+                      label="Similarity ≥"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                    />
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+
+            <!-- Display dropdown: row metadata toggles -->
+            <q-btn-dropdown
+              dense
+              no-caps
+              size="sm"
+              class="panel__web-btn panel__web-btn--dropdown"
+              label="Display"
+            >
+              <q-list dense class="panel__menu-list">
+                <q-item clickable @click="showNumBadge = !showNumBadge">
+                  <q-item-section avatar>
+                    <q-icon name="crop_square" :color="showNumBadge ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.rowNum') }}</q-item-section>
+                </q-item>
+                <q-item clickable @click="showSylBadge = !showSylBadge">
+                  <q-item-section avatar>
+                    <q-icon name="circle" :color="showSylBadge ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.syllables') }}</q-item-section>
+                </q-item>
+                <q-item clickable @click="showCvBadge = !showCvBadge">
+                  <q-item-section avatar>
+                    <q-icon name="diamond" :color="showCvBadge ? 'positive' : 'grey-6'" />
+                  </q-item-section>
+                  <q-item-section>{{ $t('phonetic.cvRatio') }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+          </div>
+          <div class="panel__action-group">
+            <!-- Global metric overlay toggle -->
             <button
               class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': manualGridMode }"
-              title="Manual row/word movement mode"
-              @click="selectInteractionMode('manual')"
+              :class="{ 'panel__web-btn--active': showGlobalMetricOverlay }"
+              :title="$t('phonetic.globalMetricOverlayTitle')"
+              @click="showGlobalMetricOverlay = !showGlobalMetricOverlay"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="2" fill="currentColor" />
-                <path
-                  d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3"
-                  stroke="currentColor"
-                  stroke-width="1.2"
-                  stroke-linecap="round"
-                />
+                <rect x="1" y="7" width="3" height="7" fill="currentColor" rx="0.8" />
+                <rect x="6" y="4" width="3" height="10" fill="currentColor" rx="0.8" />
+                <rect x="11" y="1" width="3" height="13" fill="currentColor" rx="0.8" />
               </svg>
-              Manual
+              {{ $t('phonetic.globalMetricOverlay') }}
             </button>
-            <!-- Rhyme motif detection toggle -->
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showRhymes }"
-              :title="$t('phonetic.rhymesHighlightTitle')"
-              @click="showRhymes = !showRhymes"
-            >
-              <svg
-                width="28"
-                height="14"
-                viewBox="0 0 28 14"
-                fill="none"
-                style="font-family: serif"
-              >
-                <text
-                  x="0"
-                  y="11"
-                  font-size="8"
-                  font-family="Georgia,serif"
-                  font-weight="700"
-                  fill="currentColor"
-                  opacity="1.0"
-                >
-                  A
-                </text>
-                <text
-                  x="7"
-                  y="11"
-                  font-size="8"
-                  font-family="Georgia,serif"
-                  font-weight="700"
-                  fill="currentColor"
-                  opacity="0.55"
-                >
-                  B
-                </text>
-                <text
-                  x="14"
-                  y="11"
-                  font-size="8"
-                  font-family="Georgia,serif"
-                  font-weight="700"
-                  fill="currentColor"
-                  opacity="0.55"
-                >
-                  B
-                </text>
-                <text
-                  x="21"
-                  y="11"
-                  font-size="8"
-                  font-family="Georgia,serif"
-                  font-weight="700"
-                  fill="currentColor"
-                  opacity="1.0"
-                >
-                  A
-                </text>
-              </svg>
-              {{ $t('phonetic.rhymesHighlight') }}
-            </button>
-            <!-- Rhyme web toggle: connect same-group occurrences with lines -->
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showRhymeWeb }"
-              :title="$t('phonetic.rhymeWebTitle')"
-              @click="showRhymeWeb = !showRhymeWeb"
-            >
-              <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
-                <circle cx="3" cy="7" r="2.5" fill="currentColor" fill-opacity="0.85" />
-                <circle cx="17" cy="7" r="2.5" fill="currentColor" fill-opacity="0.85" />
-                <path
-                  d="M5.5 7 C 8 2, 12 2, 14.5 7"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  fill="none"
-                  stroke-linecap="round"
-                />
-              </svg>
-              {{ $t('phonetic.rhymeWeb') }}
-            </button>
-          </div>
-          <div class="panel__action-group">
-            <!-- Row badge column toggles -->
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showNumBadge }"
-              :title="$t('phonetic.rowNumTitle')"
-              @click="showNumBadge = !showNumBadge"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="1" width="12" height="12" rx="2" fill="currentColor" />
-              </svg>
-              {{ $t('phonetic.rowNum') }}
-            </button>
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showSylBadge }"
-              :title="$t('phonetic.syllablesTitle')"
-              @click="showSylBadge = !showSylBadge"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <circle cx="7" cy="7" r="6" fill="currentColor" />
-              </svg>
-              {{ $t('phonetic.syllables') }}
-            </button>
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showCvBadge }"
-              :title="$t('phonetic.cvRatioTitle')"
-              @click="showCvBadge = !showCvBadge"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <polygon points="7,1 13,7 7,13 1,7" fill="currentColor" />
-              </svg>
-              {{ $t('phonetic.cvRatio') }}
-            </button>
-          </div>
-          <div class="panel__action-group">
-            <!-- Sound pattern colours toggle -->
-            <button
-              class="panel__web-btn"
-              :class="{ 'panel__web-btn--active': showSounds }"
-              :title="$t('phonetic.soundsColorTitle')"
-              @click="showSounds = !showSounds"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="5" cy="8" r="3" fill="currentColor" fill-opacity="0.6" />
-                <circle cx="11" cy="8" r="3" fill="currentColor" fill-opacity="0.85" />
-              </svg>
-              {{ $t('phonetic.soundsColor') }}
-            </button>
-            <label class="panel__range" title="Alliteration density sensitivity">
-              <span class="panel__range-label">A</span>
-              <input
-                v-model.number="alliterationThreshold"
-                class="panel__range-input"
-                type="range"
-                min="0.05"
-                max="0.8"
-                step="0.05"
-              />
-            </label>
-          </div>
-          <div class="panel__action-group">
             <!-- Legend link -->
             <a
               href="/#/legend"
@@ -508,7 +450,6 @@
         <!-- Visualization pane (tab bar + active panel, stacked vertically) -->
         <div class="panel__viz-pane">
           <AsyncPhoneticPanel
-            v-show="visualizerTab === 'phonetic'"
             ref="phoneticPanelRef"
             class="panel__viz-pane__content"
             :input="visualizerInput"
@@ -516,20 +457,16 @@
             v-model:showWeb="showSoundWeb"
             v-model:alignRight="showAlignRight"
             v-model:bindTabs="bindTabIndent"
-            v-model:manualMode="manualGridMode"
             v-model:showRhymes="showRhymes"
             v-model:showRhymeWeb="showRhymeWeb"
+            v-model:rhymeMinLength="rhymeMinLength"
+            v-model:rhymeThreshold="rhymeThreshold"
+            v-model:showGlobalMetric="showGlobalMetricOverlay"
             v-model:showSounds="showSounds"
             v-model:alliterationThreshold="alliterationThreshold"
             v-model:showNumBadge="showNumBadge"
             v-model:showSylBadge="showSylBadge"
             v-model:showCvBadge="showCvBadge"
-          />
-
-          <MolVisualizerTab
-            v-if="visualizerTab === 'mol'"
-            class="panel__viz-pane__content"
-            :molstar="visualizerInput.analysisResult?.molstar ?? null"
           />
         </div>
 
@@ -569,7 +506,6 @@ import type {
   PhoneticVisualizerInput,
 } from 'src/components/visualizer/phoneticVisualizerContract';
 import PoetryEditor from 'components/PoetryEditor.vue';
-import MolVisualizerTab from 'components/MolVisualizerTab.vue';
 import AnalysisMetricsDialog from 'components/AnalysisMetricsDialog.vue';
 
 const phoneticPanelChunkReady = ref(false);
@@ -689,7 +625,6 @@ const appStore = useAppStore();
 const poetryStore = usePoetryStore();
 
 const phoneticPanelRef = ref<{ exportSvg: () => void } | null>(null);
-const visualizerTab = ref<'phonetic' | 'mol'>('phonetic');
 
 const wordCount = computed(() => poetryStore.allWordTokens.length);
 const hasConfirmedLines = computed(() =>
@@ -698,9 +633,11 @@ const hasConfirmedLines = computed(() =>
 const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
 const bindTabIndent = ref(true);
-const manualGridMode = ref(false);
 const showRhymes = ref(true);
 const showRhymeWeb = ref(false);
+const rhymeMinLength = ref(3);
+const rhymeThreshold = ref(0.6);
+const showGlobalMetricOverlay = ref(false);
 const showSounds = ref(true);
 const alliterationThreshold = ref(0.35);
 const showRowSettings = ref(true);
@@ -727,30 +664,6 @@ const visualizerInput = computed<PhoneticVisualizerInput>(() => ({
 const editorVisualizerChannel: EditorVisualizerChannel = {
   setRawText: (text: string) => poetryStore.setRawText(text),
 };
-
-type InteractionMode = 'tabs' | 'manual';
-
-function selectInteractionMode(mode: InteractionMode) {
-  if (mode === 'tabs') {
-    // Radio-like exclusivity, but allow toggling active mode OFF -> none.
-    if (bindTabIndent.value) {
-      bindTabIndent.value = false;
-      manualGridMode.value = false;
-      return;
-    }
-    bindTabIndent.value = true;
-    manualGridMode.value = false;
-    return;
-  }
-
-  if (manualGridMode.value) {
-    bindTabIndent.value = false;
-    manualGridMode.value = false;
-    return;
-  }
-  bindTabIndent.value = false;
-  manualGridMode.value = true;
-}
 
 function onLanguageToggle(lang: Language, checked: boolean | null) {
   appStore.setLanguageEnabled(lang, checked === true);
@@ -806,23 +719,24 @@ async function copyAllText() {
     .panel__header {
       background: #12121c;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      padding-left: 20px;
-      padding-right: 20px;
+      padding: 6px 20px;
+      align-items: center;
+      gap: 6px;
+      min-height: 48px;
     }
 
-    // Multi-row toolbar — buttons wrap to 2–3 rows rather than overflowing
     .panel__actions {
       flex-wrap: wrap;
-      overflow-x: hidden;
-      gap: 3px;
-      row-gap: 2px;
+      overflow: hidden;
+      gap: 2px;
+      column-gap: 4px;
+      padding: 0;
     }
 
     .panel__action-group {
       flex: 0 0 auto;
-      margin-bottom: 1px;
-      margin-right: 3px;
-      gap: 3px;
+      margin: 0;
+      gap: 2px;
     }
 
     .panel__title {
@@ -836,13 +750,14 @@ async function copyAllText() {
     .panel__web-btn {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
-      padding: 1px 5px;
+      gap: 2px;
+      padding: 0 3px;
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 4px;
       background: transparent;
       color: rgba(255, 255, 255, 0.35);
-      font-size: 0.63rem;
+      font-size: 0.6rem;
+      line-height: 1.3;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
@@ -862,32 +777,13 @@ async function copyAllText() {
         border-color: rgba(255, 255, 255, 0.5);
         color: rgba(255, 255, 255, 0.9);
       }
+
+      svg {
+        max-width: 12px;
+        max-height: 12px;
+      }
     }
   }
-    &__range {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-left: 6px;
-      padding: 2px 4px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    &__range-label {
-      font-size: 0.66rem;
-      font-weight: 700;
-      color: rgba(255, 255, 255, 0.8);
-      width: 12px;
-      text-align: center;
-    }
-
-    &__range-input {
-      width: 92px;
-      accent-color: #ffffff;
-      cursor: pointer;
-    }
-
   &__header {
     display: flex;
     align-items: center;
@@ -1219,10 +1115,11 @@ async function copyAllText() {
   }
 }
 
-// ── Tab group in toolbar ──────────────────────────────────────────────────────
-.panel__action-group--tabs {
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  padding-right: 8px;
-  margin-right: 4px;
+.panel__web-btn--dropdown {
+  min-width: 70px;
+}
+
+.panel__menu-list {
+  min-width: 220px;
 }
 </style>

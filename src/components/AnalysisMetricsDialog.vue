@@ -8,7 +8,13 @@
           {{ $t('metrics.title') }}
         </div>
         <div v-if="result" class="metrics-card__engine">
-          {{ result.analyzer.name }} · v{{ result.analyzer.version }}
+          <div>{{ result.analyzer.name }} · v{{ result.analyzer.version }}</div>
+          <div class="metrics-card__schema">
+            {{ $t('metrics.schema') }}: {{ result.responseSchema.name }} · v{{
+              result.responseSchema.version
+            }}
+            · {{ result.responseSchema.dialect }}
+          </div>
         </div>
         <q-btn flat dense round icon="close" color="grey-6" size="sm" @click="open = false" />
       </div>
@@ -33,12 +39,21 @@
               <div class="ms__global-interp">
                 <div class="ms__global-row">
                   <span class="ms__global-key">{{ $t('metrics.model') }}</span>
-                  <span class="ms__global-val">{{ result.structurality.interdependencyModel }}</span>
+                  <span class="ms__global-val">{{
+                    result.structurality.interdependencyModel
+                  }}</span>
                 </div>
-                <div class="ms__global-row ms__global-row--score" :class="scoreClass(result.structurality.global)">
+                <div
+                  class="ms__global-row ms__global-row--score"
+                  :class="scoreClass(result.structurality.global)"
+                >
                   {{ globalVerdict(result.structurality.global) }}
                 </div>
               </div>
+            </div>
+            <div class="ms__global-row ms__global-row--meta">
+              <span class="ms__global-key">{{ $t('metrics.interdependency') }}</span>
+              <span class="ms__global-val">{{ result.structurality.interdependencyModel }}</span>
             </div>
           </div>
 
@@ -64,9 +79,14 @@
                   <div class="ms__track ms__track--baseline">
                     <div class="ms__track-label">{{ $t('metrics.baseline') }}</div>
                     <div class="ms__bar-wrap">
-                      <div class="ms__bar ms__bar--baseline" :style="{ width: `${plane.baseline * 100}%` }" />
+                      <div
+                        class="ms__bar ms__bar--baseline"
+                        :style="{ width: `${plane.baseline * 100}%` }"
+                      />
                     </div>
-                    <div class="ms__track-val ms__track-val--dim">{{ pctDisplay(plane.baseline) }}</div>
+                    <div class="ms__track-val ms__track-val--dim">
+                      {{ pctDisplay(plane.baseline) }}
+                    </div>
                   </div>
                   <!-- Above-baseline score -->
                   <div class="ms__track">
@@ -78,7 +98,10 @@
                         :style="{ width: `${plane.score * 100}%` }"
                       />
                     </div>
-                    <div class="ms__track-val" :class="{ 'ms__track-val--dim': plane.score < 0.05 }">
+                    <div
+                      class="ms__track-val"
+                      :class="{ 'ms__track-val--dim': plane.score < 0.05 }"
+                    >
                       {{ pctDisplay(plane.score) }}
                     </div>
                   </div>
@@ -96,9 +119,30 @@
             <div class="ms__label">{{ $t('metrics.weights') }}</div>
             <div class="ms__weights">
               <span v-for="(w, key) in result.structurality.weights" :key="key" class="ms__wpill">
-                {{ WEIGHT_LABELS[key] ?? key }}
+                {{ weightLabel(key) }}
                 <strong>{{ Math.round(w * 100) }}%</strong>
               </span>
+            </div>
+          </div>
+
+          <!-- ── Metric glossary ─────────────────────────────────── -->
+          <div v-if="result.metricGlossary.length > 0" class="ms ms--small">
+            <div class="ms__label">{{ $t('metrics.glossary') }}</div>
+            <div class="ms__glossary">
+              <article v-for="entry in result.metricGlossary" :key="entry.id" class="ms__gitem">
+                <div class="ms__ghead">
+                  <code>{{ entry.id }}</code>
+                </div>
+                <p class="ms__gdesc">{{ entry.description }}</p>
+                <p class="ms__ginterp">
+                  <span>{{ $t('metrics.interpretation') }}:</span>
+                  {{ entry.interpretation }}
+                </p>
+                <p class="ms__gsrc">
+                  <span>{{ $t('metrics.source') }}:</span>
+                  <code>{{ entry.source }}</code>
+                </p>
+              </article>
             </div>
           </div>
         </template>
@@ -110,7 +154,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { StreamAnalysisResult, StructuralityComponent } from 'src/services/phonetic/analysisTypes';
+import type {
+  StreamAnalysisResult,
+  StructuralityComponent,
+} from 'src/services/phonetic/analysisTypes';
 
 const open = defineModel<boolean>({ required: true });
 
@@ -122,38 +169,39 @@ const { t } = useI18n();
 
 // ── Plane display metadata ────────────────────────────────────────────────────
 
-type PlaneKey = 'rhythm' | 'localPhonemePatterning' | 'soundSequencePatterning' | 'pausePatterning' | 'crossLevelCoupling';
+type PlaneKey =
+  | 'rhythm'
+  | 'localPhonemePatterning'
+  | 'soundSequencePatterning'
+  | 'pausePatterning'
+  | 'crossLevelCoupling';
 
 interface PlaneEntry extends StructuralityComponent {
   key: PlaneKey;
   label: string;
 }
 
-const PLANE_LABELS: Record<PlaneKey, string> = {
-  rhythm:                  'Rhythm',
-  localPhonemePatterning:  'Local Phoneme Patterning',
-  soundSequencePatterning: 'Sound Sequence / Rhyme',
-  pausePatterning:         'Pause Patterning',
-  crossLevelCoupling:      'Cross-level Coupling',
-};
-
-const WEIGHT_LABELS: Record<string, string> = {
-  rhythm:                  'Rhythm',
-  localPhonemePatterning:  'Local',
-  soundSequencePatterning: 'Sound Seq.',
-  pausePatterning:         'Pauses',
-  crossLevelCoupling:      'Coupling',
-};
+const PLANE_LABELS = computed<Record<PlaneKey, string>>(() => ({
+  rhythm: t('metrics.planeRhythm'),
+  localPhonemePatterning: t('metrics.planeLocalPhonemePatterning'),
+  soundSequencePatterning: t('metrics.planeSoundSequencePatterning'),
+  pausePatterning: t('metrics.planePausePatterning'),
+  crossLevelCoupling: t('metrics.planeCrossLevelCoupling'),
+}));
 
 const planes = computed<PlaneEntry[]>(() => {
   const s = props.result?.structurality;
   if (!s) return [];
-  return (Object.keys(PLANE_LABELS) as PlaneKey[]).map((key) => ({
+  return (Object.keys(PLANE_LABELS.value) as PlaneKey[]).map((key) => ({
     key,
-    label: PLANE_LABELS[key],
-    ...(s[key]),
+    label: PLANE_LABELS.value[key],
+    ...s[key],
   }));
 });
+
+function weightLabel(key: string): string {
+  return PLANE_LABELS.value[key as PlaneKey] ?? key;
+}
 
 function planeWeight(key: PlaneKey): number {
   const w = props.result?.structurality.weights;
@@ -176,7 +224,7 @@ function scoreClass(v: number): string {
 function globalVerdict(v: number): string {
   if (v >= 0.75) return t('metrics.verdictHigh');
   if (v >= 0.45) return t('metrics.verdictMid');
-  if (v >= 0.20) return t('metrics.verdictLow');
+  if (v >= 0.2) return t('metrics.verdictLow');
   return t('metrics.verdictNone');
 }
 
@@ -210,8 +258,8 @@ const ringStyle = computed(() => {
   display: flex;
   flex-direction: column;
   background: #13131f;
-  color: rgba(255,255,255,0.88);
-  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   overflow: hidden;
 
@@ -220,7 +268,7 @@ const ringStyle = computed(() => {
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     flex-shrink: 0;
   }
 
@@ -229,7 +277,7 @@ const ringStyle = computed(() => {
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.65);
+    color: rgba(255, 255, 255, 0.65);
     flex: 1;
     display: flex;
     align-items: center;
@@ -237,9 +285,17 @@ const ringStyle = computed(() => {
 
   &__engine {
     font-size: 0.68rem;
-    color: rgba(255,255,255,0.25);
+    color: rgba(255, 255, 255, 0.25);
     font-family: monospace;
     white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-end;
+  }
+
+  &__schema {
+    color: rgba(255, 255, 255, 0.2);
   }
 
   &__body {
@@ -260,7 +316,9 @@ const ringStyle = computed(() => {
     opacity: 0.5;
     font-size: 0.82rem;
 
-    p { margin: 0; }
+    p {
+      margin: 0;
+    }
   }
 }
 
@@ -270,14 +328,16 @@ const ringStyle = computed(() => {
   flex-direction: column;
   gap: 10px;
 
-  &--small { gap: 6px; }
+  &--small {
+    gap: 6px;
+  }
 
   &__label {
     font-size: 0.67rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.28);
+    color: rgba(255, 255, 255, 0.28);
   }
 }
 
@@ -324,7 +384,7 @@ const ringStyle = computed(() => {
   font-size: 0.52rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255, 255, 255, 0.4);
   margin-top: 2px;
 }
 
@@ -337,7 +397,11 @@ const ringStyle = computed(() => {
 
 .ms__global-row {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255, 255, 255, 0.55);
+
+  &--meta {
+    margin-top: -2px;
+  }
 
   &--score {
     font-weight: 600;
@@ -347,13 +411,25 @@ const ringStyle = computed(() => {
     border: 1px solid;
   }
 
-  &--high { color: #4cdb8a; border-color: rgba(76,219,138,0.35); background: rgba(76,219,138,0.08); }
-  &--mid  { color: #f0c040; border-color: rgba(240,192,64,0.35);  background: rgba(240,192,64,0.08);  }
-  &--low  { color: #e08060; border-color: rgba(224,128,96,0.35);  background: rgba(224,128,96,0.08);  }
+  &--high {
+    color: #4cdb8a;
+    border-color: rgba(76, 219, 138, 0.35);
+    background: rgba(76, 219, 138, 0.08);
+  }
+  &--mid {
+    color: #f0c040;
+    border-color: rgba(240, 192, 64, 0.35);
+    background: rgba(240, 192, 64, 0.08);
+  }
+  &--low {
+    color: #e08060;
+    border-color: rgba(224, 128, 96, 0.35);
+    background: rgba(224, 128, 96, 0.08);
+  }
 }
 
 .ms__global-key {
-  color: rgba(255,255,255,0.28);
+  color: rgba(255, 255, 255, 0.28);
   margin-right: 6px;
   font-size: 0.68rem;
 }
@@ -361,7 +437,7 @@ const ringStyle = computed(() => {
 .ms__global-val {
   font-size: 0.7rem;
   font-family: monospace;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 // ── Per-plane bars ────────────────────────────────────────────────────────────
@@ -380,7 +456,7 @@ const ringStyle = computed(() => {
   &-name {
     font-size: 0.74rem;
     font-weight: 600;
-    color: rgba(255,255,255,0.7);
+    color: rgba(255, 255, 255, 0.7);
     grid-column: 1;
     grid-row: 1;
   }
@@ -398,7 +474,7 @@ const ringStyle = computed(() => {
     grid-row: 1 / 3;
     align-self: center;
     font-size: 0.62rem;
-    color: rgba(255,255,255,0.22);
+    color: rgba(255, 255, 255, 0.22);
     white-space: nowrap;
     font-family: monospace;
   }
@@ -413,7 +489,7 @@ const ringStyle = computed(() => {
   &-label {
     width: 52px;
     font-size: 0.62rem;
-    color: rgba(255,255,255,0.28);
+    color: rgba(255, 255, 255, 0.28);
     text-align: right;
     flex-shrink: 0;
   }
@@ -421,19 +497,21 @@ const ringStyle = computed(() => {
   &-val {
     width: 32px;
     font-size: 0.68rem;
-    color: rgba(255,255,255,0.55);
+    color: rgba(255, 255, 255, 0.55);
     text-align: right;
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
 
-    &--dim { color: rgba(255,255,255,0.22); }
+    &--dim {
+      color: rgba(255, 255, 255, 0.22);
+    }
   }
 }
 
 .ms__bar-wrap {
   flex: 1;
   height: 6px;
-  background: rgba(255,255,255,0.07);
+  background: rgba(255, 255, 255, 0.07);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -443,10 +521,19 @@ const ringStyle = computed(() => {
   border-radius: 3px;
   transition: width 0.4s ease;
 
-  &--raw     { background: #5588dd; }
-  &--baseline { background: rgba(255,255,255,0.18); }
-  &--score   { background: #44bb88; }
-  &--low     { background: #666; opacity: 0.4; }
+  &--raw {
+    background: #5588dd;
+  }
+  &--baseline {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  &--score {
+    background: #44bb88;
+  }
+  &--low {
+    background: #666;
+    opacity: 0.4;
+  }
 }
 
 // ── Weights pills ─────────────────────────────────────────────────────────────
@@ -456,16 +543,64 @@ const ringStyle = computed(() => {
   gap: 6px;
 }
 
+.ms__glossary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms__gitem {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ms__ghead {
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
+
+  code {
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.ms__gdesc,
+.ms__ginterp,
+.ms__gsrc {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+
+  span {
+    color: rgba(255, 255, 255, 0.45);
+    margin-right: 4px;
+  }
+
+  code {
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.86);
+  }
+}
+
+.ms__gdesc,
+.ms__ginterp {
+  margin-bottom: 4px;
+}
+
 .ms__wpill {
   font-size: 0.68rem;
-  color: rgba(255,255,255,0.4);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   padding: 2px 8px;
 
   strong {
-    color: rgba(255,255,255,0.7);
+    color: rgba(255, 255, 255, 0.7);
     margin-left: 4px;
   }
 }

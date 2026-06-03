@@ -40,7 +40,7 @@ import {
 } from 'src/services/stress/uaWasmService';
 import { cmuDictReady, resolveEnStress } from 'src/services/stress/enStressService';
 import { useAppStore } from 'src/stores/app';
-import { stressSyncLog, stressAsyncLog } from 'src/services/logging';
+import { stressSyncLog, stressAsyncLog, phoneticLog } from 'src/services/logging';
 import { analyzePoem } from 'src/services/phonetic/analysisService';
 import type { StreamAnalysisResult } from 'src/services/phonetic/analysisTypes';
 
@@ -227,9 +227,12 @@ export const usePoetryStore = defineStore('poetry', () => {
    * Each entry holds the marked form, IPA transcription, and morphological definition for every valid reading.
    * Used by LinePanel to show informative tooltips. Not persisted.
    */
-  const pendingStressReadings = ref<Map<string, Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>>>(
-    new Map(),
-  );
+  const pendingStressReadings = ref<
+    Map<
+      string,
+      Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>
+    >
+  >(new Map());
 
   /**
    * Confidence of the last auto-detection (0.0–1.0).
@@ -621,7 +624,6 @@ export const usePoetryStore = defineStore('poetry', () => {
     triggerRef(wordSyllableCache);
     return syllables;
   }
-
 
   /** All word tokens across the whole document (flat) */
   const allWordTokens = computed<IWordToken[]>(() => {
@@ -1336,7 +1338,12 @@ export const usePoetryStore = defineStore('poetry', () => {
         confirmed: boolean;
         source: 'ml' | 'heteronym' | 'variative' | 'db';
         stresses?: number[];
-        readings?: Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>;
+        readings?: Array<{
+          syllableIndex: number;
+          stressedForm: string;
+          ipa: string;
+          morph: UaMorphEntry[];
+        }>;
       }
     >();
 
@@ -1465,7 +1472,12 @@ export const usePoetryStore = defineStore('poetry', () => {
             confirmed: boolean;
             source: 'db' | 'heteronym' | 'variative';
             stresses: number[];
-            readings?: Array<{ syllableIndex: number; stressedForm: string; ipa: string; morph: UaMorphEntry[] }>;
+            readings?: Array<{
+              syllableIndex: number;
+              stressedForm: string;
+              ipa: string;
+              morph: UaMorphEntry[];
+            }>;
           } = {
             syllableIndex: uniqueStresses[0]!,
             confirmed,
@@ -1481,7 +1493,12 @@ export const usePoetryStore = defineStore('poetry', () => {
                 seen.add(r.syllableIndex);
                 return true;
               })
-              .map((r) => ({ syllableIndex: r.syllableIndex, stressedForm: r.stressedForm, ipa: r.ipa, morph: r.morph }));
+              .map((r) => ({
+                syllableIndex: r.syllableIndex,
+                stressedForm: r.stressedForm,
+                ipa: r.ipa,
+                morph: r.morph,
+              }));
           }
           patches.set(tok.id, patch);
           wasmPatchedIds.add(tok.id);
@@ -1681,13 +1698,13 @@ export const usePoetryStore = defineStore('poetry', () => {
       if (runSeq !== analysisRunSeq) return;
 
       if (!result) {
-        analysisResult.value = null;
+        phoneticLog.warn('analyzePoem returned null (no confirmed words in stream) — keeping previous result');
         return;
       }
       analysisResult.value = mergeAnalysisResult(analysisResult.value, result);
     } catch (error) {
       console.error('Phonetic analysis failed:', error);
-      analysisResult.value = null;
+      phoneticLog.warn('keeping previous analysis result despite error');
     }
   }
 
@@ -1731,4 +1748,3 @@ export const usePoetryStore = defineStore('poetry', () => {
     },
   };
 });
-

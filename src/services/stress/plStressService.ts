@@ -181,7 +181,9 @@ function mapLookupToInfo(normalized: string, value: unknown): PolishStressInfo |
     ipa: reading.ipa ? stripIpaStress(reading.ipa) : null,
     ...(reading.ipa ? { ipaTranscribed: reading.ipa } : {}),
     ipaSyllables: reading.ipaSyllables.map((part) => stripIpaStress(part)),
-    confidence: isPolishConfidence(reading.confidence ?? undefined) ? reading.confidence as PolishConfidence : 'default',
+    confidence: isPolishConfidence(reading.confidence ?? undefined)
+      ? (reading.confidence as PolishConfidence)
+      : 'default',
   };
 }
 

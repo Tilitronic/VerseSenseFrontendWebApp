@@ -24,8 +24,8 @@ type PendingRequest = {
 };
 
 class PhoneticEngineBackend {
-  private static readonly INIT_TIMEOUT_MS = 45000;
-  private static readonly ANALYZE_TIMEOUT_MS = 20000;
+  private static readonly INIT_TIMEOUT_MS = 120000;
+  private static readonly ANALYZE_TIMEOUT_MS = 120000;
   private worker: Worker | null = null;
   private pending = new Map<string, PendingRequest>();
   private nextId = 0;

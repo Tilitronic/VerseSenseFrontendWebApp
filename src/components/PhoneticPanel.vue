@@ -51,6 +51,16 @@
           />
         </svg>
 
+        <div
+          v-if="showGlobalMetric && overallMetricPct !== null"
+          class="pp-global-metric"
+          :style="overallMetricStyle"
+          :title="overallMetricTitle"
+        >
+          <span class="pp-global-metric__label">{{ $t('metrics.globalScore') }}</span>
+          <span class="pp-global-metric__value">{{ overallMetricPct }}%</span>
+        </div>
+
         <div class="pp-lines" :class="{ 'pp-lines--right': alignRight }">
           <template v-for="(line, lineIdx) in visualizerDocument.lines" :key="line.id">
             <!-- Empty line (no tokens at all) → blank row -->
@@ -72,7 +82,6 @@
               <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
               <span v-if="showSylBadge" class="pp-row__syl" />
               <span v-if="showCvBadge" class="pp-row__cv" />
-              <span v-if="hasAnyRhythm" class="pp-row__rhythm pp-row__rhythm--hidden" />
               <span class="pp-row__hint">· · ·</span>
             </div>
 
@@ -87,131 +96,78 @@
               <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
               <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
               <span
-                v-if="hasAnyRhythm"
+                v-if="lineRhythmLabel(lineIdx)"
                 class="pp-row__rhythm"
-                :class="{ 'pp-row__rhythm--hidden': !lineRhythmLabel(lineIdx) }"
                 :title="lineRhythmTitle(lineIdx)"
-              >{{ lineRhythmLabel(lineIdx) }}</span>
-              <div
-                class="pp-row__interactive"
-                :class="{
-                  'pp-row__interactive--guide-active': manualMode && hoveredLeftLineId === line.id,
-                }"
+                >{{ lineRhythmLabel(lineIdx) }}</span
               >
-                <button
-                  v-if="manualMode"
-                  class="pp-handle pp-handle--left"
-                  title="Drag: left/right = row shift, up/down = move words between rows"
-                  @mouseenter="hoveredLeftLineId = line.id"
-                  @mouseleave="hoveredLeftLineId = null"
-                  @pointerdown="onLeftHandlePointerDown($event, line, lineIdx)"
-                />
-
-                <div class="pp-cells" :style="cellsStyle(line)">
-                  <!-- Horizontal triangles (left/right) — move with cells -->
+              <div class="pp-cells">
+                <template
+                  v-for="(item, itemIdx) in visualizationItems(line)"
+                  :key="`${line.id}:${itemIdx}`"
+                >
                   <div
-                    v-if="manualMode && hoveredLeftLineId === line.id && canShiftLeft(line)"
-                    class="pp-triangle pp-triangle--left"
+                    v-if="item.type === 'tab' && !alignRight && bindTabs"
+                    class="pp-cell pp-cell--tab"
                   />
                   <div
-                    v-if="manualMode && hoveredLeftLineId === line.id && canShiftRight()"
-                    class="pp-triangle pp-triangle--right"
-                  />
-
-                  <template
-                    v-for="(item, itemIdx) in visualizationItems(line)"
-                    :key="`${line.id}:${itemIdx}`"
+                    v-else-if="item.type === 'cell'"
+                    class="pp-cell"
+                    :class="{
+                      'pp-cell--stressed': item.stressed,
+                      'pp-cell--word-last': item.wordLast,
+                    }"
                   >
-                    <div
-                      v-if="item.type === 'tab' && !alignRight && bindTabs"
-                      class="pp-cell pp-cell--tab"
-                    />
-                    <div
-                      v-else-if="item.type === 'cell'"
-                      class="pp-cell"
-                      :class="{
-                        'pp-cell--stressed': item.stressed,
-                        'pp-cell--word-last': item.wordLast,
-                        'pp-cell--module-hot':
-                          manualMode &&
-                          hoveredLeftLineId === line.id &&
-                          isEdgeModuleCell(line, item.motifWordId),
-                        'pp-cell--guide-up':
-                          manualMode &&
-                          hoveredLeftLineId === line.id &&
-                          isFirstWordFirstCell(line, itemIdx, item.motifWordId),
-                        'pp-cell--guide-down':
-                          manualMode &&
-                          hoveredLeftLineId === line.id &&
-                          isLastWordLastCell(line, itemIdx, item.motifWordId),
-                      }"
-                    >
-                      <div class="pp-cell__tokens">
-                        <span
-                          v-for="(token, ti) in item.ipaTokens"
-                          :key="ti"
-                          :ref="
-                            (el) =>
-                              setTokenRef(
-                                item.renderKeys?.[ti] ?? `${line.id}:${itemIdx}:${ti}`,
-                                el,
-                              )
-                          "
-                          class="pp-cell__token"
-                          :class="
-                            isVowelToken(token)
-                              ? 'pp-cell__token--vowel'
-                              : 'pp-cell__token--consonant'
-                          "
-                          :style="
-                            showSounds
-                              ? (tokenStyleMap.get(item.renderKeys?.[ti] ?? '') ?? undefined)
-                              : undefined
-                          "
-                          >{{ token }}</span
-                        >
-                      </div>
-                      <div
-                        v-if="showRhymes && item.motifWordId"
-                        class="pp-cell__rhyme-bar"
-                        :class="{ 'pp-cell__rhyme-bar--word-last': item.wordLast }"
-                        :style="engineRhymeBarStyle(item.motifWordId)"
-                        :title="engineRhymeTitle(item.motifWordId)"
-                      />
-                      <!-- Label bubble: sibling of bar so it is NOT affected by bar's CSS opacity -->
-                      <div
-                        v-if="showRhymes && item.motifWordId && isRhymeLabelCell(line, itemIdx, item.motifWordId)"
-                        :ref="(el) => setRhymeDotRef(item.motifWordId, el)"
-                        class="pp-cell__rhyme-dot"
-                        :style="engineRhymeDotStyle(item.motifWordId)"
-                      >{{ rhymeLabel(item.motifWordId) }}</div>
-                      <div
-                        v-if="item.wordLast && item.motifWordId"
-                        class="pp-cell__pause-mark"
-                        :style="pauseMarkStyle(item.motifWordId)"
-                        :title="pauseMarkTitle(item.motifWordId)"
-                      />
+                    <div class="pp-cell__tokens">
+                      <span
+                        v-for="(token, ti) in item.ipaTokens"
+                        :key="ti"
+                        :ref="
+                          (el) =>
+                            setTokenRef(item.renderKeys?.[ti] ?? `${line.id}:${itemIdx}:${ti}`, el)
+                        "
+                        class="pp-cell__token"
+                        :class="
+                          isVowelToken(token)
+                            ? 'pp-cell__token--vowel'
+                            : 'pp-cell__token--consonant'
+                        "
+                        :style="
+                          showSounds
+                            ? (tokenStyleMap.get(item.renderKeys?.[ti] ?? '') ?? undefined)
+                            : undefined
+                        "
+                        >{{ token }}</span
+                      >
                     </div>
-                  </template>
-                </div>
-
-                <!-- Vertical triangle for moving up (top, positioned on first word center) -->
-                <div
-                  v-if="manualMode && hoveredLeftLineId === line.id && canMoveUp(lineIdx)"
-                  class="pp-row__vertical-triangle pp-row__vertical-triangle--top"
-                  :style="{ left: topTriangleLeftOffset(line) }"
-                >
-                  <div class="pp-triangle pp-triangle--top" />
-                </div>
-
-                <!-- Vertical triangle for moving down (bottom, positioned on last word center) -->
-                <div
-                  v-if="manualMode && hoveredLeftLineId === line.id && canMoveDown(lineIdx)"
-                  class="pp-row__vertical-triangle pp-row__vertical-triangle--bottom"
-                  :style="{ left: bottomTriangleLeftOffset(line) }"
-                >
-                  <div class="pp-triangle pp-triangle--bottom" />
-                </div>
+                    <div
+                      v-if="showRhymes && item.motifWordId"
+                      class="pp-cell__rhyme-bar"
+                      :class="{ 'pp-cell__rhyme-bar--word-last': item.wordLast }"
+                      :style="engineRhymeBarStyle(line, item, item.motifWordId)"
+                      :title="engineRhymeTitle(item.motifWordId)"
+                    />
+                    <!-- Label bubble: sibling of bar so it is NOT affected by bar's CSS opacity -->
+                    <div
+                      v-if="
+                        showRhymes &&
+                        item.motifWordId &&
+                        isRhymeLabelCell(line, itemIdx, item.motifWordId)
+                      "
+                      :ref="(el) => setRhymeDotRef(item.motifWordId, el)"
+                      class="pp-cell__rhyme-dot"
+                      :style="engineRhymeDotStyle(line, itemIdx, item.motifWordId)"
+                    >
+                      {{ rhymeLabel(item.motifWordId) }}
+                    </div>
+                    <div
+                      v-if="item.wordLast && item.motifWordId"
+                      class="pp-cell__pause-mark"
+                      :style="pauseMarkStyle(item.motifWordId)"
+                      :title="pauseMarkTitle(item.motifWordId)"
+                    />
+                  </div>
+                </template>
               </div>
             </div>
           </template>
@@ -220,14 +176,6 @@
     </template>
 
     <!-- Demo badge — always-visible notice in the bottom-right corner -->
-    <button
-      v-if="manualMode"
-      class="pp-reset-dot"
-      :style="{ '--pp-reset-progress': String(resetGestureProgress) }"
-      title="Hold and draw a circle to reset manual shifts and re-enable tab binding"
-      @pointerdown="onResetDotPointerDown"
-    />
-
     <div class="pp-demo-badge">
       Demo
       <q-tooltip anchor="top right" self="bottom right" :offset="[0, 6]" class="pp-demo-tooltip">
@@ -254,6 +202,8 @@ import type {
   PhoneticVisualizerInput,
 } from 'src/components/visualizer/phoneticVisualizerContract';
 import { analyzeRhymes } from 'src/services/phonetic/rhyme/rhymeAnalyzer';
+import { dtwDistance } from 'src/services/phonetic/rhyme/motifFinder';
+import { transcribeWord } from 'src/services/phonetic/wordTranscription';
 import type { MotifTier, RhymeAnalysis } from 'src/services/phonetic/rhyme/types';
 
 const props = defineProps<{
@@ -264,14 +214,33 @@ const props = defineProps<{
 const showWeb = defineModel<boolean>('showWeb', { default: false });
 const alignRight = defineModel<boolean>('alignRight', { default: false });
 const bindTabs = defineModel<boolean>('bindTabs', { default: true });
-const manualMode = defineModel<boolean>('manualMode', { default: false });
 const showRhymes = defineModel<boolean>('showRhymes', { default: false });
 const showRhymeWeb = defineModel<boolean>('showRhymeWeb', { default: false });
+const rhymeMinLength = defineModel<number>('rhymeMinLength', { default: 3 });
+const rhymeThreshold = defineModel<number>('rhymeThreshold', { default: 0.6 });
+const showGlobalMetric = defineModel<boolean>('showGlobalMetric', { default: false });
 const showSounds = defineModel<boolean>('showSounds', { default: true });
 const alliterationThreshold = defineModel<number>('alliterationThreshold', { default: 0.35 });
 const showNumBadge = defineModel<boolean>('showNumBadge', { default: true });
 const showSylBadge = defineModel<boolean>('showSylBadge', { default: true });
 const showCvBadge = defineModel<boolean>('showCvBadge', { default: true });
+
+// Debounce rhyme min length so expensive analyzeRhymes() doesn't run on every
+// keystroke — even with q-input debounce, step-button clicks and rapid typing
+// can trigger multiple synchronous recomputes that freeze the UI.
+const committedMinLength = ref(rhymeMinLength.value);
+let commitMinLenTimer: ReturnType<typeof setTimeout>;
+watch(
+  rhymeMinLength,
+  (val) => {
+    clearTimeout(commitMinLenTimer);
+    commitMinLenTimer = setTimeout(() => {
+      committedMinLength.value = val;
+    }, 400);
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => clearTimeout(commitMinLenTimer));
 
 const store = usePoetryStore();
 
@@ -293,14 +262,6 @@ function isLineConfirmed(lineId: string): boolean {
   return visualizerInput.value.isLineConfirmed(lineId);
 }
 
-function setRawTextFromChannel(nextText: string): void {
-  if (props.editorChannel) {
-    props.editorChannel.setRawText(nextText);
-    return;
-  }
-  store.setRawText(nextText);
-}
-
 // ── Scroll sync ──────────────────────────────────────────────────────────────
 const rowRefs = new Map<number, Element>();
 function setRowRef(lineIdx: number, el: unknown) {
@@ -308,371 +269,15 @@ function setRowRef(lineIdx: number, el: unknown) {
   else rowRefs.delete(lineIdx);
 }
 
-watch(
-  activeLineIndex,
-  (idx) => {
-    if (idx === null) return;
-    const el = rowRefs.get(idx);
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  },
-);
+watch(activeLineIndex, (idx) => {
+  if (idx === null) return;
+  const el = rowRefs.get(idx);
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
 
 function wordTokensInLine(line: ILine): IWordToken[] {
   return line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
 }
-
-// ── Manual grid mode ────────────────────────────────────────────────────────
-const CELL_STEP_PX = 52;
-const ROW_STEP_PX = 34;
-
-const rowManualShift = ref<Map<string, number>>(new Map());
-const hoveredLeftLineId = ref<string | null>(null);
-
-function wordEdgeIds(line: ILine): { first: string | null; last: string | null } {
-  const words = wordTokensInLine(line);
-  return {
-    first: words[0]?.id ?? null,
-    last: words[words.length - 1]?.id ?? null,
-  };
-}
-
-function isEdgeModuleCell(line: ILine, wordId: string | undefined): boolean {
-  if (!wordId) return false;
-  const edges = wordEdgeIds(line);
-  return wordId === edges.first || wordId === edges.last;
-}
-
-function isFirstWordFirstCell(line: ILine, itemIdx: number, wordId: string | undefined): boolean {
-  const firstId = wordEdgeIds(line).first;
-  if (!wordId || !firstId || wordId !== firstId) return false;
-  const items = visualizationItems(line);
-  for (let i = 0; i < itemIdx; i++) {
-    const prev = items[i];
-    if (prev?.type === 'cell' && prev.motifWordId === wordId) return false;
-  }
-  return true;
-}
-
-function isLastWordLastCell(line: ILine, itemIdx: number, wordId: string | undefined): boolean {
-  const lastId = wordEdgeIds(line).last;
-  if (!wordId || !lastId || wordId !== lastId) return false;
-  const items = visualizationItems(line);
-  for (let i = itemIdx + 1; i < items.length; i++) {
-    const next = items[i];
-    if (next?.type === 'cell' && next.motifWordId === wordId) return false;
-  }
-  return true;
-}
-
-function currentShift(lineId: string): number {
-  return rowManualShift.value.get(lineId) ?? 0;
-}
-
-function setShift(lineId: string, next: number) {
-  const map = new Map(rowManualShift.value);
-  if (next <= 0) map.delete(lineId);
-  else map.set(lineId, next);
-  rowManualShift.value = map;
-}
-
-function cellsStyle(line: ILine): Record<string, string> | undefined {
-  if (!manualMode.value) return undefined;
-  const steps = currentShift(line.id);
-  if (steps === 0) return undefined;
-  return {
-    transform: `translateX(${steps * CELL_STEP_PX}px)`,
-  };
-}
-
-// ── Movement predicates ────────────────────────────────────────────────────────
-
-function canShiftLeft(line: ILine): boolean {
-  return currentShift(line.id) > 0;
-}
-
-function canShiftRight(): boolean {
-  // Right shift is always possible (no hard limit)
-  return true;
-}
-
-function canMoveUp(lineIdx: number): boolean {
-  return lineIdx > 0;
-}
-
-function canMoveDown(lineIdx: number): boolean {
-  return lineIdx < visualizerDocument.value.lines.length - 1;
-}
-
-/**
- * Get center position (in cells) of first word module.
- * For 2 syllables: return 0.5 (between them).
- * For 3+ syllables: return middle index.
- */
-function getFirstWordModuleCenter(line: ILine): number | null {
-  const items = visualizationItems(line);
-  const firstWordId = wordEdgeIds(line).first;
-  if (!firstWordId) return null;
-
-  const cellIndices: number[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item?.type === 'cell' && item.motifWordId === firstWordId) {
-      cellIndices.push(i);
-    }
-  }
-
-  if (cellIndices.length === 0) return null;
-  return cellIndices.length === 2 
-    ? cellIndices[0]! + 0.5
-    : cellIndices[Math.floor(cellIndices.length / 2)]!;
-}
-
-/**
- * Get center position (in cells) of last word module.
- */
-function getLastWordModuleCenter(line: ILine): number | null {
-  const items = visualizationItems(line);
-  const lastWordId = wordEdgeIds(line).last;
-  if (!lastWordId) return null;
-
-  const cellIndices: number[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item?.type === 'cell' && item.motifWordId === lastWordId) {
-      cellIndices.push(i);
-    }
-  }
-
-  if (cellIndices.length === 0) return null;
-  return cellIndices.length === 2 
-    ? cellIndices[0]! + 0.5
-    : cellIndices[Math.floor(cellIndices.length / 2)]!;
-}
-
-/**
- * Calculate left offset (px) for top vertical triangle (positioned on first word center).
- */
-function topTriangleLeftOffset(line: ILine): string {
-  const center = getFirstWordModuleCenter(line);
-  if (center === null) return '50%';
-  const offsetPx = center * CELL_STEP_PX + CELL_STEP_PX / 2;
-  return `${offsetPx}px`;
-}
-
-/**
- * Calculate left offset (px) for bottom vertical triangle (positioned on last word center).
- */
-function bottomTriangleLeftOffset(line: ILine): string {
-  const center = getLastWordModuleCenter(line);
-  if (center === null) return '50%';
-  const offsetPx = center * CELL_STEP_PX + CELL_STEP_PX / 2;
-  return `${offsetPx}px`;
-}
-
-let dragLineId: string | null = null;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragStartShift = 0;
-let dragLineIdx: number | null = null;
-let dragAxisLock: 'x' | 'y' | null = null;
-const AXIS_LOCK_THRESHOLD_PX = 6;
-
-const resetGestureProgress = ref(0);
-let resetCenterX = 0;
-let resetCenterY = 0;
-let resetActive = false;
-let resetAccumAbs = 0;
-let resetLastAngle: number | null = null;
-let resetDone = false;
-const RESET_MIN_RADIUS_PX = 10;
-const RESET_REQUIRED_ARC = Math.PI * 2.15;
-
-function onLeftHandlePointerDown(e: PointerEvent, line: ILine, lineIdx: number) {
-  if (!manualMode.value) return;
-  e.preventDefault();
-  // As soon as manual dragging starts, detach visual tab coupling.
-  bindTabs.value = false;
-  // Pressing the handle immediately activates highlight for this row.
-  hoveredLeftLineId.value = line.id;
-  dragLineId = line.id;
-  dragLineIdx = lineIdx;
-  dragStartX = e.clientX;
-  dragStartY = e.clientY;
-  dragStartShift = currentShift(line.id);
-  dragAxisLock = null;
-  window.addEventListener('pointermove', onLeftHandlePointerMove);
-  window.addEventListener('pointerup', onLeftHandlePointerUp);
-  document.body.style.cursor = 'all-scroll';
-  document.body.style.userSelect = 'none';
-}
-
-function onLeftHandlePointerMove(e: PointerEvent) {
-  if (!dragLineId || dragLineIdx === null) return;
-
-  // First meaningful movement locks the whole interaction session to one axis.
-  const absDx = Math.abs(e.clientX - dragStartX);
-  const absDy = Math.abs(e.clientY - dragStartY);
-  if (!dragAxisLock && (absDx >= AXIS_LOCK_THRESHOLD_PX || absDy >= AXIS_LOCK_THRESHOLD_PX)) {
-    dragAxisLock = absDx >= absDy ? 'x' : 'y';
-    document.body.style.cursor = dragAxisLock === 'x' ? 'ew-resize' : 'ns-resize';
-  }
-
-  if (!dragAxisLock) return;
-
-  if (dragAxisLock === 'x') {
-    // Horizontal step movement of the full row block.
-    const delta = e.clientX - dragStartX;
-    const stepDelta = Math.round(delta / CELL_STEP_PX);
-    const next = Math.max(0, dragStartShift + stepDelta);
-    setShift(dragLineId, next);
-    return;
-  }
-
-  // Vertical movement: one boundary crossing => one-row move.
-  // This prevents accidental jumps across multiple rows.
-  const deltaY = e.clientY - dragStartY;
-
-  if (deltaY >= ROW_STEP_PX) {
-    moveLastWordDown(dragLineIdx);
-    dragLineIdx += 1;
-    hoveredLeftLineId.value = visualizerDocument.value.lines[dragLineIdx]?.id ?? null;
-    dragStartY += ROW_STEP_PX;
-  } else if (deltaY <= -ROW_STEP_PX) {
-    moveFirstWordUp(dragLineIdx);
-    dragLineIdx = Math.max(0, dragLineIdx - 1);
-    hoveredLeftLineId.value = visualizerDocument.value.lines[dragLineIdx]?.id ?? null;
-    dragStartY -= ROW_STEP_PX;
-  }
-}
-
-function onLeftHandlePointerUp() {
-  dragLineId = null;
-  dragLineIdx = null;
-  dragAxisLock = null;
-  window.removeEventListener('pointermove', onLeftHandlePointerMove);
-  window.removeEventListener('pointerup', onLeftHandlePointerUp);
-  document.body.style.cursor = '';
-  document.body.style.userSelect = '';
-}
-
-function resetManualLayout() {
-  rowManualShift.value = new Map();
-  bindTabs.value = false;
-  manualMode.value = false;
-}
-
-function onResetDotPointerDown(e: PointerEvent) {
-  if (!manualMode.value) return;
-  const el = e.currentTarget as HTMLElement | null;
-  if (!el) return;
-
-  e.preventDefault();
-  const rect = el.getBoundingClientRect();
-  resetCenterX = rect.left + rect.width / 2;
-  resetCenterY = rect.top + rect.height / 2;
-  resetActive = true;
-  resetDone = false;
-  resetAccumAbs = 0;
-  resetLastAngle = null;
-  resetGestureProgress.value = 0;
-
-  window.addEventListener('pointermove', onResetDotPointerMove);
-  window.addEventListener('pointerup', onResetDotPointerUp);
-}
-
-function onResetDotPointerMove(e: PointerEvent) {
-  if (!resetActive) return;
-  const dx = e.clientX - resetCenterX;
-  const dy = e.clientY - resetCenterY;
-  const radius = Math.hypot(dx, dy);
-  if (radius < RESET_MIN_RADIUS_PX) return;
-
-  const angle = Math.atan2(dy, dx);
-  if (resetLastAngle === null) {
-    resetLastAngle = angle;
-    return;
-  }
-
-  let delta = angle - resetLastAngle;
-  while (delta > Math.PI) delta -= Math.PI * 2;
-  while (delta < -Math.PI) delta += Math.PI * 2;
-  resetAccumAbs += Math.abs(delta);
-  resetLastAngle = angle;
-
-  const progress = Math.min(1, resetAccumAbs / RESET_REQUIRED_ARC);
-  resetGestureProgress.value = progress;
-
-  if (!resetDone && progress >= 1) {
-    resetDone = true;
-    resetManualLayout();
-  }
-}
-
-function onResetDotPointerUp() {
-  resetActive = false;
-  resetLastAngle = null;
-  window.removeEventListener('pointermove', onResetDotPointerMove);
-  window.removeEventListener('pointerup', onResetDotPointerUp);
-  // Fast visual rewind if circle wasn't completed.
-  if (!resetDone) resetGestureProgress.value = 0;
-}
-
-function splitWords(lineText: string): { prefix: string; words: string[] } {
-  const prefixMatch = lineText.match(/^[\t ]*/);
-  const prefix = prefixMatch?.[0] ?? '';
-  const body = lineText.slice(prefix.length).trim();
-  const words = body.length > 0 ? body.split(/\s+/) : [];
-  return { prefix, words };
-}
-
-function composeWords(prefix: string, words: string[]): string {
-  return words.length > 0 ? `${prefix}${words.join(' ')}` : prefix;
-}
-
-function moveFirstWordUp(lineIdx: number) {
-  if (lineIdx <= 0) return;
-  const lines = visualizerInput.value.rawText.split('\n');
-  if (lineIdx >= lines.length) return;
-
-  const cur = splitWords(lines[lineIdx] ?? '');
-  if (cur.words.length === 0) return;
-  const prev = splitWords(lines[lineIdx - 1] ?? '');
-
-  const moved = cur.words.shift();
-  if (!moved) return;
-  prev.words.push(moved);
-
-  lines[lineIdx - 1] = composeWords(prev.prefix, prev.words);
-  lines[lineIdx] = composeWords(cur.prefix, cur.words);
-  setRawTextFromChannel(lines.join('\n'));
-}
-
-function moveLastWordDown(lineIdx: number) {
-  const lines = visualizerInput.value.rawText.split('\n');
-  if (lineIdx < 0 || lineIdx >= lines.length) return;
-  if (lineIdx === lines.length - 1) lines.push('');
-
-  const cur = splitWords(lines[lineIdx] ?? '');
-  if (cur.words.length === 0) return;
-  const next = splitWords(lines[lineIdx + 1] ?? '');
-
-  const moved = cur.words.pop();
-  if (!moved) return;
-  next.words.unshift(moved);
-
-  lines[lineIdx] = composeWords(cur.prefix, cur.words);
-  lines[lineIdx + 1] = composeWords(next.prefix, next.words);
-  setRawTextFromChannel(lines.join('\n'));
-}
-
-watch(
-  () => manualMode.value,
-  (enabled) => {
-    if (enabled) return;
-    hoveredLeftLineId.value = null;
-    onLeftHandlePointerUp();
-  },
-);
 
 function lineSyllableCount(line: ILine): number {
   return visualizationItems(line).filter((item) => item.type === 'cell' && item.countsAsSyllable)
@@ -775,7 +380,65 @@ const analysis = computed<StreamAnalysisResult | null>(() => visualizerInput.val
 const echoByFlatIndex = computed<Map<number, EchoAnnotation>>(() => {
   const map = new Map<number, EchoAnnotation>();
   for (const entry of analysis.value?.echo ?? []) {
-    map.set(entry.source.flatIndex, entry);
+    const flatIndex =
+      (entry.source as { flatIndex?: number; flat_index?: number }).flatIndex ??
+      (entry.source as { flatIndex?: number; flat_index?: number }).flat_index;
+    if (typeof flatIndex === 'number') map.set(flatIndex, entry);
+  }
+  return map;
+});
+
+const echoByRenderKey = computed<Map<string, EchoAnnotation>>(() => {
+  const map = new Map<string, EchoAnnotation>();
+  for (const entry of analysis.value?.echo ?? []) {
+    const src = entry.source as {
+      wordId?: string;
+      word_id?: string;
+      syllableIndex?: number;
+      syllable_index?: number;
+      phonemeIndex?: number;
+      phoneme_index?: number;
+    };
+    const wordId = src.wordId ?? src.word_id;
+    const syllableIndex = src.syllableIndex ?? src.syllable_index;
+    const phonemeIndex = src.phonemeIndex ?? src.phoneme_index;
+    if (!wordId || typeof syllableIndex !== 'number' || typeof phonemeIndex !== 'number') {
+      continue;
+    }
+    const key = `${wordId}:${syllableIndex}:${phonemeIndex}`;
+    const prev = map.get(key);
+    if (!prev || entry.opacity > prev.opacity) map.set(key, entry);
+  }
+  return map;
+});
+
+const echoOpacityByRenderKeyFromLayer = computed<Map<string, number>>(() => {
+  const map = new Map<string, number>();
+  const entries = ((analysis.value as { phonemes?: { entries?: unknown[] } } | null)?.phonemes
+    ?.entries ?? []) as Array<{
+    source?: {
+      wordId?: string;
+      word_id?: string;
+      syllableIndex?: number;
+      syllable_index?: number;
+      phonemeIndex?: number;
+      phoneme_index?: number;
+    };
+    computedMetrics?: { echoOpacity?: number };
+    computed_metrics?: { echo_opacity?: number };
+  }>;
+
+  for (const entry of entries) {
+    const source = entry.source;
+    const wordId = source?.wordId ?? source?.word_id;
+    const syllableIndex = source?.syllableIndex ?? source?.syllable_index;
+    const phonemeIndex = source?.phonemeIndex ?? source?.phoneme_index;
+    const opacity = entry.computedMetrics?.echoOpacity ?? entry.computed_metrics?.echo_opacity;
+    if (!wordId || typeof syllableIndex !== 'number' || typeof phonemeIndex !== 'number') continue;
+    if (typeof opacity !== 'number' || Number.isNaN(opacity)) continue;
+    const key = `${wordId}:${syllableIndex}:${phonemeIndex}`;
+    const prev = map.get(key) ?? 0;
+    if (opacity > prev) map.set(key, opacity);
   }
   return map;
 });
@@ -812,7 +475,7 @@ function lineRhythmLabel(lineIdx: number): string {
   const rhythm = rhythmByEngineLineIndex.value.get(ordinal);
   if (!rhythm) return '';
   const foot = rhythm.period === 2 ? '2-beat' : '3-beat';
-  return `${foot} · ${rhythm.clausula}`;
+  return `${foot} · ${rhythm.clausula} · ${Math.round(rhythm.confidence * 100)}%`;
 }
 
 function lineRhythmTitle(lineIdx: number): string {
@@ -820,17 +483,45 @@ function lineRhythmTitle(lineIdx: number): string {
   if (ordinal < 0) return '';
   const rhythm = rhythmByEngineLineIndex.value.get(ordinal);
   if (!rhythm) return '';
-  return `Period ${rhythm.period}, phase ${rhythm.phase}, confidence ${rhythm.confidence.toFixed(2)}`;
+  return `Period ${rhythm.period}, phase ${rhythm.phase}, clausula ${rhythm.clausula}, confidence ${rhythm.confidence.toFixed(2)}, syllables ${rhythm.syllableCount}`;
 }
 
-/** True when the engine has returned rhythm data for at least one line. */
-const hasAnyRhythm = computed(() => rhythmByEngineLineIndex.value.size > 0);
+const overallMetric = computed<number | null>(() => {
+  const global = analysis.value?.structurality?.global;
+  if (typeof global !== 'number' || Number.isNaN(global)) return null;
+  return Math.max(0, Math.min(1, global));
+});
+
+const overallMetricPct = computed<number | null>(() => {
+  const global = overallMetric.value;
+  if (global === null) return null;
+  return Math.round(global * 100);
+});
+
+const overallMetricStyle = computed<Record<string, string>>(() => {
+  const global = overallMetric.value ?? 0;
+  const hue = Math.round(global * 120);
+  return {
+    borderColor: `hsl(${hue}, 70%, 44%)`,
+    background: `linear-gradient(135deg, hsla(${hue}, 80%, 50%, 0.16), rgba(255, 255, 255, 0.92))`,
+    boxShadow: `0 4px 14px hsla(${hue}, 80%, 35%, 0.18)`,
+  };
+});
+
+const overallMetricTitle = computed<string>(() => {
+  const pct = overallMetricPct.value;
+  if (pct === null) return '';
+  return `${pct}%`;
+});
 
 const tokenStyleMap = computed<Map<string, TokenVisual>>(() => {
   const map = new Map<string, TokenVisual>();
   const threshold = Math.max(0.05, Math.min(0.8, alliterationThreshold.value));
   for (const { token, flatIdx, renderKey } of indexedTokens.value) {
-    const rawOpacity = echoByFlatIndex.value.get(flatIdx)?.opacity;
+    const rawOpacity =
+      echoOpacityByRenderKeyFromLayer.value.get(renderKey) ??
+      echoByRenderKey.value.get(renderKey)?.opacity ??
+      echoByFlatIndex.value.get(flatIdx)?.opacity;
     if (rawOpacity === undefined || rawOpacity < threshold) continue;
     const normalised = (rawOpacity - threshold) / Math.max(0.0001, 1 - threshold);
     const visual = ipaTokenStyle(token, Math.max(0.05, Math.min(1, normalised)));
@@ -838,6 +529,79 @@ const tokenStyleMap = computed<Map<string, TokenVisual>>(() => {
   }
   return map;
 });
+
+const RHYME_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function buildGroupsFromPairs(
+  res: StreamAnalysisResult,
+  threshold: number,
+  minLength: number,
+): Map<string, EngineRhymeEntry> {
+  const pairs = (res.rhyme_pairs ?? []).filter(
+    (pair) =>
+      pair.similarity >= threshold &&
+      Math.min(pair.codaLengthA ?? 0, pair.codaLengthB ?? 0) >= minLength,
+  );
+  if (pairs.length === 0) return new Map();
+
+  const adj = new Map<string, Set<string>>();
+  const bestByWord = new Map<string, number>();
+
+  for (const pair of pairs) {
+    const a = pair.wordIdA;
+    const b = pair.wordIdB;
+    if (!a || !b || a === b) continue;
+
+    const aSet = adj.get(a) ?? new Set<string>();
+    aSet.add(b);
+    adj.set(a, aSet);
+
+    const bSet = adj.get(b) ?? new Set<string>();
+    bSet.add(a);
+    adj.set(b, bSet);
+
+    bestByWord.set(a, Math.max(bestByWord.get(a) ?? 0, pair.similarity));
+    bestByWord.set(b, Math.max(bestByWord.get(b) ?? 0, pair.similarity));
+  }
+
+  const out = new Map<string, EngineRhymeEntry>();
+  const visited = new Set<string>();
+  let groupIdx = 0;
+
+  for (const wordId of adj.keys()) {
+    if (visited.has(wordId)) continue;
+
+    const stack = [wordId];
+    const members: string[] = [];
+    visited.add(wordId);
+
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      members.push(current);
+      for (const next of adj.get(current) ?? []) {
+        if (visited.has(next)) continue;
+        visited.add(next);
+        stack.push(next);
+      }
+    }
+
+    if (members.length < 2) continue;
+
+    const label = RHYME_LABELS[groupIdx % RHYME_LABELS.length] ?? String(groupIdx + 1);
+    const color = `hsl(${groupHue(label)} 72% 52%)`;
+    groupIdx++;
+
+    for (const member of members) {
+      out.set(member, {
+        label,
+        color,
+        score: Math.max(0.2, Math.min(1, bestByWord.get(member) ?? threshold)),
+      });
+    }
+  }
+
+  return out;
+}
 
 // ── Engine-driven annotation layer ───────────────────────────────────────────
 
@@ -851,18 +615,287 @@ function groupHue(group: string): number {
 
 const TIER_PRIO: Record<MotifTier, number> = { exact: 0, near: 1, structural: 2 };
 
+interface EngineRhymeEntry {
+  label: string;
+  color: string;
+  score: number;
+}
+
 interface WordRhymeEntry {
   color: string;
   opacity: number;
   tier: MotifTier;
   label: string;
   motifId: string;
+  renderKeys: Set<string>;
 }
+
+function normalizeRhymeThreshold(value: number): number {
+  if (Number.isNaN(value)) return 0.6;
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeMinRhymeLength(value: number): number {
+  if (Number.isNaN(value)) return 3;
+  return Math.max(1, Math.floor(value));
+}
+
+/**
+ * Build the engine rhyme word map from local motif analysis when available,
+ * falling back to rhyme_pairs or engine annotations.
+ *
+ * NOTE: This uses the *same* `localRhymeAnalysis` computed as the bar/label
+ * rendering, so `analyzeRhymes()` runs only ONCE per reactive flush instead
+ * of twice — crucial for avoiding UI freezes on threshold changes.
+ */
+const engineRhymeWordMap = computed<Map<string, EngineRhymeEntry>>(() => {
+  const res = analysis.value;
+  if (!res) return new Map();
+
+  const threshold = normalizeRhymeThreshold(rhymeThreshold.value);
+  const minLength = normalizeMinRhymeLength(committedMinLength.value);
+
+  // Primary path: use DTW-based word similarity grouping from the local
+  // motif analysis.  Instead of grouping by motif label (which is fixed
+  // regardless of the Similarity ≥ slider), we compute pairwise phonetic
+  // similarity between all words that participate in ANY motif, then form
+  // connected components where similarity >= threshold.
+  //
+  // This makes the "Similarity ≥" slider directly control group merging:
+  //   high threshold → only nearly identical words group together
+  //   low threshold  → phonetically distant words merge into one group
+  const ra = localRhymeAnalysis.value;
+  if (ra && ra.motifs.length > 0) {
+    // Collect unique wordIds from all motif spans.
+    const wordIds = new Set<string>();
+    for (const motif of ra.motifs) {
+      for (const span of motif.spans) wordIds.add(span.wordId);
+    }
+    if (wordIds.size < 2) return new Map();
+
+    // Build full IPA token sequence for each word.
+    const wordIpa = new Map<string, string[]>();
+    for (const wordId of wordIds) {
+      const tok = visualizerDocument.value.tokenIndex.get(wordId);
+      if (!tok || tok.kind !== 'WORD') continue;
+      const tw = transcribeWord(tok);
+      const tokens: string[] = [];
+      for (const syl of tw.syllables) tokens.push(...syl.ipaTokens);
+      wordIpa.set(wordId, tokens);
+    }
+
+    // Build the best-motif info per word (for label/color assignment later).
+    const wordBestMotif = new Map<string, { label: string; color: string; score: number }>();
+    for (const motif of ra.motifs) {
+      for (const span of motif.spans) {
+        if (!wordBestMotif.has(span.wordId)) {
+          wordBestMotif.set(span.wordId, {
+            label: motif.label,
+            color: motif.color,
+            score: motif.opacity,
+          });
+        }
+      }
+    }
+
+    // Compute pairwise DTW similarity and build adjacency graph.
+    const wordArr = [...wordIds];
+    const adj = new Map<string, Set<string>>();
+    for (let i = 0; i < wordArr.length; i++) {
+      for (let j = i + 1; j < wordArr.length; j++) {
+        const a = wordArr[i]!;
+        const b = wordArr[j]!;
+        const ipaA = wordIpa.get(a);
+        const ipaB = wordIpa.get(b);
+        if (!ipaA || !ipaB) continue;
+        const dist = dtwDistance(ipaA, ipaB);
+        if (1 - dist >= threshold) {
+          let s = adj.get(a);
+          if (!s) {
+            s = new Set();
+            adj.set(a, s);
+          }
+          s.add(b);
+          s = adj.get(b);
+          if (!s) {
+            s = new Set();
+            adj.set(b, s);
+          }
+          s.add(a);
+        }
+      }
+    }
+
+    // Connected components = rhyme groups.
+    const visited = new Set<string>();
+    const groups: string[][] = [];
+    for (const wordId of wordIds) {
+      if (visited.has(wordId)) continue;
+      const stack = [wordId];
+      const group: string[] = [];
+      visited.add(wordId);
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        group.push(cur);
+        for (const next of adj.get(cur) ?? []) {
+          if (!visited.has(next)) {
+            visited.add(next);
+            stack.push(next);
+          }
+        }
+      }
+      if (group.length >= 2) groups.push(group);
+    }
+
+    if (groups.length === 0) return new Map();
+
+    // Assign group labels (A, B, C …) and pick a representative color.
+    const out = new Map<string, EngineRhymeEntry>();
+    for (let gi = 0; gi < groups.length; gi++) {
+      const groupLabel = RHYME_LABELS[gi % RHYME_LABELS.length] ?? String(gi + 1);
+      let bestScore = 0;
+      let groupColor = `hsl(${(gi * 137.5) % 360}, 72%, 52%)`;
+      for (const wordId of groups[gi]!) {
+        const info = wordBestMotif.get(wordId);
+        if (info && info.score > bestScore) {
+          bestScore = info.score;
+          groupColor = info.color;
+        }
+      }
+      for (const wordId of groups[gi]!) {
+        const info = wordBestMotif.get(wordId);
+        out.set(wordId, {
+          label: groupLabel,
+          color: groupColor,
+          score: Math.max(0.2, info?.score ?? 0.5),
+        });
+      }
+    }
+    if (out.size > 0) return out;
+  }
+
+  // Fallback: DTW-based grouping on ALL words in the document.
+  // This handles the case where minLength is too high for the motif
+  // finder to find shared patterns (e.g. only ɔn shared across words,
+  // but minLength=3), yet we still want the Similarity ≥ slider to
+  // control phonetic merge distance.
+  const allWordIds = new Set<string>();
+  for (const line of visualizerDocument.value.lines) {
+    if (!isLineConfirmed(line.id)) continue;
+    for (const tok of line.tokens) {
+      if (tok.kind === 'WORD' && /[А-ЯЄІЇҐа-яєіїґA-Za-z]/.test(tok.text)) {
+        allWordIds.add(tok.id);
+      }
+    }
+  }
+  if (allWordIds.size >= 2) {
+    const wordIpa = new Map<string, string[]>();
+    for (const wordId of allWordIds) {
+      const tok = visualizerDocument.value.tokenIndex.get(wordId);
+      if (!tok || tok.kind !== 'WORD') continue;
+      const tw = transcribeWord(tok);
+      const tokens: string[] = [];
+      for (const syl of tw.syllables) tokens.push(...syl.ipaTokens);
+      wordIpa.set(wordId, tokens);
+    }
+    const wordArr = [...allWordIds];
+    const adj = new Map<string, Set<string>>();
+    for (let i = 0; i < wordArr.length; i++) {
+      for (let j = i + 1; j < wordArr.length; j++) {
+        const a = wordArr[i]!;
+        const b = wordArr[j]!;
+        const ipaA = wordIpa.get(a);
+        const ipaB = wordIpa.get(b);
+        if (!ipaA || !ipaB) continue;
+        const dist = dtwDistance(ipaA, ipaB);
+        if (1 - dist >= threshold) {
+          let s = adj.get(a);
+          if (!s) {
+            s = new Set();
+            adj.set(a, s);
+          }
+          s.add(b);
+          s = adj.get(b);
+          if (!s) {
+            s = new Set();
+            adj.set(b, s);
+          }
+          s.add(a);
+        }
+      }
+    }
+    const visited = new Set<string>();
+    const groups: string[][] = [];
+    for (const wordId of allWordIds) {
+      if (visited.has(wordId)) continue;
+      const stack = [wordId];
+      const group: string[] = [];
+      visited.add(wordId);
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        group.push(cur);
+        for (const next of adj.get(cur) ?? []) {
+          if (!visited.has(next)) {
+            visited.add(next);
+            stack.push(next);
+          }
+        }
+      }
+      if (group.length >= 2) groups.push(group);
+    }
+    if (groups.length > 0) {
+      const out = new Map<string, EngineRhymeEntry>();
+      for (let gi = 0; gi < groups.length; gi++) {
+        const groupLabel = RHYME_LABELS[gi % RHYME_LABELS.length] ?? String(gi + 1);
+        const color = `hsl(${groupHue(groupLabel)} 72% 52%)`;
+        for (const wordId of groups[gi]!) {
+          out.set(wordId, { label: groupLabel, color, score: threshold });
+        }
+      }
+      if (out.size > 0) return out;
+    }
+  }
+
+  // Last-resort: pair-based grouping from WASM engine.
+  const fromPairs = buildGroupsFromPairs(res, threshold, minLength);
+  if (fromPairs.size > 0) return fromPairs;
+
+  // Last fallback: use the engine's rhymeGroup annotations directly.
+  const byGroup = new Map<string, string[]>();
+  for (const [wordId, ann] of Object.entries(res.annotations ?? {})) {
+    if (!ann.rhymeGroup) continue;
+    const score = ann.rhymeScore;
+    if (score !== null && score !== undefined && score < threshold) continue;
+    const list = byGroup.get(ann.rhymeGroup) ?? [];
+    list.push(wordId);
+    byGroup.set(ann.rhymeGroup, list);
+  }
+
+  const out2 = new Map<string, EngineRhymeEntry>();
+  for (const [label, members] of byGroup) {
+    if (members.length < 2) continue;
+    const color = `hsl(${groupHue(label)} 72% 52%)`;
+    for (const cid of members) {
+      const ann = res.annotations[cid];
+      out2.set(cid, {
+        label,
+        color,
+        score: Math.max(0.2, Math.min(1, ann?.rhymeScore ?? threshold)),
+      });
+    }
+  }
+
+  return out2;
+});
 
 /** Single analyzeRhymes call shared by the bar map and the rhyme web. */
 const localRhymeAnalysis = computed<RhymeAnalysis | null>(() => {
   if (!showRhymes.value && !showRhymeWeb.value) return null;
-  return analyzeRhymes(visualizerDocument.value, isLineConfirmed);
+  return analyzeRhymes(visualizerDocument.value, isLineConfirmed, {
+    minLength: normalizeMinRhymeLength(committedMinLength.value),
+    similarityThreshold: normalizeRhymeThreshold(rhymeThreshold.value),
+    mode: 'sounds',
+  });
 });
 
 const localRhymeWordMap = computed<Map<string, WordRhymeEntry>>(() => {
@@ -871,6 +904,7 @@ const localRhymeWordMap = computed<Map<string, WordRhymeEntry>>(() => {
   const map = new Map<string, WordRhymeEntry>();
   for (const motif of ra.motifs) {
     for (const span of motif.spans) {
+      if (!engineRhymeWordMap.value.has(span.wordId)) continue;
       const existing = map.get(span.wordId);
       if (!existing || TIER_PRIO[motif.tier] < TIER_PRIO[existing.tier]) {
         map.set(span.wordId, {
@@ -879,6 +913,7 @@ const localRhymeWordMap = computed<Map<string, WordRhymeEntry>>(() => {
           tier: motif.tier,
           label: motif.label,
           motifId: motif.id,
+          renderKeys: new Set(span.renderKeys),
         });
       }
     }
@@ -892,56 +927,154 @@ const localRhymeWordMap = computed<Map<string, WordRhymeEntry>>(() => {
  */
 function isRhymeLabelCell(line: ILine, itemIdx: number, wordId: string | undefined): boolean {
   if (!wordId) return false;
-  const items = visualizationItems(line);
-  const cellIndices: number[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    if (it?.type === 'cell' && it.motifWordId === wordId) cellIndices.push(i);
-  }
-  if (cellIndices.length === 0) return false;
-  return itemIdx === cellIndices[Math.floor(cellIndices.length / 2)]!;
+  const cells = wordCells(line, wordId);
+  if (cells.length === 0) return false;
+  // Dot owner is the first cell of the word; left offset places it on actual rhyme midpoint.
+  return itemIdx === cells[0]!.itemIdx;
 }
 
 function rhymeLabel(wordId: string): string {
-  const local = localRhymeWordMap.value.get(wordId);
-  if (local) return local.label;
-  const ann = analysis.value?.annotations[wordId];
-  return ann?.rhymeGroup ?? '';
+  const engine = engineRhymeWordMap.value.get(wordId);
+  if (engine) return engine.label;
+  return '';
 }
 
-function engineRhymeBarStyle(wordId: string): Record<string, string> {
-  // Try local analyzer first (always available, fast); geometry handled by CSS
+interface WordCellMeta {
+  itemIdx: number;
+  renderKeys: string[];
+}
+
+function wordCells(line: ILine, wordId: string): WordCellMeta[] {
+  const items = visualizationItems(line);
+  const out: WordCellMeta[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (it?.type !== 'cell' || it.motifWordId !== wordId) continue;
+    out.push({ itemIdx: i, renderKeys: [...(it.renderKeys ?? [])] });
+  }
+  return out;
+}
+
+function localWordRhymeBounds(line: ILine, wordId: string): { start: number; end: number } | null {
+  const local = localRhymeWordMap.value.get(wordId);
+  if (!local) return null;
+  const cells = wordCells(line, wordId);
+  if (cells.length === 0) return null;
+
+  let minEdge = Number.POSITIVE_INFINITY;
+  let maxEdge = Number.NEGATIVE_INFINITY;
+
+  for (let ci = 0; ci < cells.length; ci++) {
+    const cell = cells[ci]!;
+    const tokenCount = Math.max(1, cell.renderKeys.length);
+    for (let ti = 0; ti < cell.renderKeys.length; ti++) {
+      const rk = cell.renderKeys[ti]!;
+      if (!local.renderKeys.has(rk)) continue;
+      const left = ci + ti / tokenCount;
+      const right = ci + (ti + 1) / tokenCount;
+      if (left < minEdge) minEdge = left;
+      if (right > maxEdge) maxEdge = right;
+    }
+  }
+
+  if (!Number.isFinite(minEdge) || !Number.isFinite(maxEdge)) return null;
+  return { start: minEdge, end: maxEdge };
+}
+
+function cellLocalRhymeSegment(
+  line: ILine,
+  wordId: string,
+  itemRenderKeys: string[] | undefined,
+): { leftPct: number; rightPct: number } | null {
+  const local = localRhymeWordMap.value.get(wordId);
+  if (!local || !itemRenderKeys || itemRenderKeys.length === 0) return null;
+
+  const matched: number[] = [];
+  for (let i = 0; i < itemRenderKeys.length; i++) {
+    if (local.renderKeys.has(itemRenderKeys[i]!)) matched.push(i);
+  }
+  if (matched.length === 0) return null;
+
+  const tokenCount = itemRenderKeys.length;
+  const first = matched[0]!;
+  const last = matched[matched.length - 1]!;
+  const leftPct = (first / tokenCount) * 100;
+  const rightPct = ((tokenCount - (last + 1)) / tokenCount) * 100;
+  return { leftPct, rightPct };
+}
+
+function engineRhymeBarStyle(
+  line: ILine,
+  item: { renderKeys?: string[] },
+  wordId: string,
+): Record<string, string> {
+  const engine = engineRhymeWordMap.value.get(wordId);
+  if (!engine) return { display: 'none' };
+
+  // Use local motif geometry when available, but keep engine group color/score.
   const local = localRhymeWordMap.value.get(wordId);
   if (local) {
-    return { background: local.color, opacity: String(local.opacity) };
+    const seg = cellLocalRhymeSegment(line, wordId, item.renderKeys);
+    if (!seg) return { display: 'none' };
+    return {
+      background: engine.color,
+      opacity: String(Math.max(local.opacity, engine.score)),
+      left: `${seg.leftPct.toFixed(3)}%`,
+      right: `${seg.rightPct.toFixed(3)}%`,
+    };
   }
-  // Fall back to engine annotations
-  const ann = analysis.value?.annotations[wordId];
-  if (!ann?.rhymeGroup) return { display: 'none' };
-  const hue = groupHue(ann.rhymeGroup);
-  const score = ann.rhymeScore ?? 0.4;
+
   return {
-    background: `hsl(${hue} 72% 52%)`,
-    opacity: String(Math.max(0.20, Math.min(1, score))),
+    background: engine.color,
+    opacity: String(engine.score),
   };
 }
 
 /** Opaque dot style — NOT affected by the bar's CSS opacity since it is a sibling element. */
-function engineRhymeDotStyle(wordId: string): Record<string, string> {
+function engineRhymeDotStyle(line: ILine, itemIdx: number, wordId: string): Record<string, string> {
+  const engine = engineRhymeWordMap.value.get(wordId);
+  if (!engine) return { display: 'none' };
+
   const local = localRhymeWordMap.value.get(wordId);
-  if (local) return { background: local.color };
-  const ann = analysis.value?.annotations[wordId];
-  if (!ann?.rhymeGroup) return { display: 'none' };
-  return { background: `hsl(${groupHue(ann.rhymeGroup)}, 72%, 52%)` };
+  if (local) {
+    const bounds = localWordRhymeBounds(line, wordId);
+    const cells = wordCells(line, wordId);
+    if (!bounds || cells.length === 0) return { background: engine.color };
+    const ownerIdx = cells[0]!.itemIdx;
+    if (ownerIdx !== itemIdx) return { display: 'none' };
+    const midpoint = (bounds.start + bounds.end) / 2;
+    const leftPct = midpoint * 100;
+    return { background: engine.color, left: `${leftPct.toFixed(3)}%` };
+  }
+  return { background: engine.color };
 }
 
 function engineRhymeTitle(wordId: string): string {
+  const engine = engineRhymeWordMap.value.get(wordId);
+  if (!engine) return '';
+
   const local = localRhymeWordMap.value.get(wordId);
-  if (local) return `Rhyme ${local.label} [${local.tier}]`;
   const ann = analysis.value?.annotations[wordId];
-  if (!ann?.rhymeGroup) return '';
-  const score = ann.rhymeScore === null ? 'n/a' : ann.rhymeScore.toFixed(2);
-  return `Rhyme ${ann.rhymeGroup} (score ${score})`;
+  const parts: string[] = [];
+
+  parts.push(`Rhyme ${engine.label} (score ${(engine.score ?? 0).toFixed(2)})`);
+  parts.push(
+    `Filters: group score ≥ ${normalizeRhymeThreshold(rhymeThreshold.value).toFixed(2)}, local motif length ≥ ${normalizeMinRhymeLength(rhymeMinLength.value)}`,
+  );
+
+  if (local) {
+    parts.push(`Local rhyme ${local.label} [${local.tier}]`);
+  }
+
+  if (ann?.rhymeScore !== null && ann?.rhymeScore !== undefined) {
+    parts.push(`Best engine pair score ${ann.rhymeScore.toFixed(2)}`);
+  }
+
+  if (ann?.structuralRhymeGroup) {
+    parts.push(`Structural rhyme ${ann.structuralRhymeGroup}`);
+  }
+
+  return parts.join(' · ');
 }
 
 // ── Rhyme dot refs (for rhyme-web connection endpoints) ───────────────────────
@@ -1088,8 +1221,8 @@ function rebuildRhymeWeb() {
   }
   rhymeWebSize.value = { w: container.clientWidth, h: container.scrollHeight };
 
-  const ra = localRhymeAnalysis.value;
-  if (!ra || ra.motifs.length === 0) {
+  const groups = engineRhymeWordMap.value;
+  if (groups.size === 0) {
     rhymeWebPaths.value = [];
     return;
   }
@@ -1098,40 +1231,63 @@ function rebuildRhymeWeb() {
   const scrollTop = container.scrollTop;
   const paths: RhymeWebPath[] = [];
 
-  for (const motif of ra.motifs) {
-    // Collect one representative point per occurrence (taken from the dot element)
-    const byOcc = new Map<number, Element>();
-    for (const span of motif.spans) {
-      if (!byOcc.has(span.occurrenceIdx)) {
-        const el = rhymeDotElems.get(span.wordId);
-        if (el) byOcc.set(span.occurrenceIdx, el);
-      }
-    }
-    const occIds = [...byOcc.keys()].sort((a, b) => a - b);
-    if (occIds.length < 2) continue;
+  interface DotPoint {
+    wordId: string;
+    el: Element;
+    lineIndex: number;
+    wordIndex: number;
+    score: number;
+    color: string;
+  }
 
-    for (let k = 0; k + 1 < occIds.length; k++) {
-      const elA = byOcc.get(occIds[k]!);
-      const elB = byOcc.get(occIds[k + 1]!);
-      if (!elA || !elB) continue;
+  const byLabel = new Map<string, DotPoint[]>();
+  const annotations = analysis.value?.annotations ?? {};
 
-      const ra2 = elA.getBoundingClientRect();
-      const rb = elB.getBoundingClientRect();
+  for (const [wordId, group] of groups) {
+    const el = rhymeDotElems.get(wordId);
+    const ann = annotations[wordId];
+    if (!el || !ann) continue;
+    const list = byLabel.get(group.label) ?? [];
+    list.push({
+      wordId,
+      el,
+      lineIndex: ann.lineIndex,
+      wordIndex: ann.wordIndex,
+      score: group.score,
+      color: group.color,
+    });
+    byLabel.set(group.label, list);
+  }
+
+  for (const dots of byLabel.values()) {
+    if (dots.length < 2) continue;
+    dots.sort((a, b) =>
+      a.lineIndex - b.lineIndex !== 0 ? a.lineIndex - b.lineIndex : a.wordIndex - b.wordIndex,
+    );
+
+    for (let k = 0; k + 1 < dots.length; k++) {
+      const a = dots[k]!;
+      const b = dots[k + 1]!;
+      const ra2 = a.el.getBoundingClientRect();
+      const rb = b.el.getBoundingClientRect();
       const ax = ra2.left - containerRect.left + ra2.width / 2;
       const ay = ra2.top - containerRect.top + ra2.height / 2 + scrollTop;
       const bx = rb.left - containerRect.left + rb.width / 2;
       const by2 = rb.top - containerRect.top + rb.height / 2 + scrollTop;
 
-      // Vertical S-curve with horizontal control points
       const cy = (ay + by2) / 2;
       const d = `M ${ax} ${ay} C ${ax} ${cy}, ${bx} ${cy}, ${bx} ${by2}`;
-      paths.push({ d, color: motif.color, opacity: Math.min(1, motif.opacity + 0.25) });
+      paths.push({
+        d,
+        color: a.color,
+        opacity: Math.max(0.3, Math.min(1, (a.score + b.score) / 2)),
+      });
     }
   }
   rhymeWebPaths.value = paths;
 }
 
-watch([showRhymeWeb, localRhymeAnalysis], async () => {
+watch([showRhymeWeb, engineRhymeWordMap], async () => {
   if (!showRhymeWeb.value) {
     rhymeWebPaths.value = [];
     return;
@@ -1150,8 +1306,6 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   ro?.disconnect();
-  onLeftHandlePointerUp();
-  onResetDotPointerUp();
 });
 
 // ── SVG Export ───────────────────────────────────────────────────────────────
@@ -1220,38 +1374,6 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   cursor: help;
 }
 
-.pp-reset-dot {
-  --pp-reset-progress: 0;
-  position: absolute;
-  left: 10px;
-  bottom: 8px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid rgba(32, 126, 255, 0.75);
-  background: radial-gradient(circle at 35% 35%, #9fd0ff 0%, #2b8dff 50%, #1b64c8 100%);
-  box-shadow:
-    0 0 0 2px rgba(32, 126, 255, 0.2),
-    0 0 12px rgba(32, 126, 255, 0.45);
-  cursor: crosshair;
-  z-index: 24;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -5px;
-    border-radius: 50%;
-    background: conic-gradient(
-      rgba(32, 126, 255, 0.95) calc(var(--pp-reset-progress) * 360deg),
-      rgba(32, 126, 255, 0.12) 0
-    );
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
-    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
-    transition: background 0.08s linear;
-    pointer-events: none;
-  }
-}
-
 .pp-demo-tooltip {
   max-width: 320px;
   padding: 10px 12px;
@@ -1303,6 +1425,38 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   pointer-events: none;
   overflow: visible;
   z-index: 9;
+}
+
+// ── compact global metric chip (HTML overlay, not part of SVG export) ──────
+.pp-global-metric {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  pointer-events: none;
+  user-select: none;
+
+  &__label {
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(0, 0, 0, 0.65);
+    font-weight: 700;
+  }
+
+  &__value {
+    font-size: 0.82rem;
+    font-weight: 900;
+    color: rgba(0, 0, 0, 0.86);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 // ── empty ─────────────────────────────────────────────────────────────────────
@@ -1391,10 +1545,6 @@ $consonant-col: rgba(0, 0, 0, 0.75);
     background: rgba(255, 255, 255, 0.14);
     font-size: 0.66rem;
     letter-spacing: 0.02em;
-
-    &--hidden {
-      visibility: hidden;
-    }
   }
 
   &__hint {
@@ -1405,96 +1555,6 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   }
 }
 
-.pp-row__interactive {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-
-  &--guide-active .pp-cells {
-    box-shadow: 0 0 0 2px rgba(41, 121, 255, 0.25);
-    border-radius: 4px;
-  }
-}
-
-.pp-row__vertical-triangle {
-  position: absolute;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-
-  &--top {
-    top: -12px;
-  }
-
-  &--bottom {
-    bottom: -12px;
-  }
-}
-
-.pp-triangle {
-  width: 0;
-  height: 0;
-  pointer-events: none;
-
-  &--left {
-    position: absolute;
-    top: 50%;
-    left: -11px;
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-right: 8px solid rgba(41, 121, 255, 0.9);
-  }
-
-  &--right {
-    position: absolute;
-    top: 50%;
-    right: -11px;
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-left: 8px solid rgba(41, 121, 255, 0.9);
-  }
-
-  &--top {
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 8px solid rgba(41, 121, 255, 0.92);
-  }
-
-  &--bottom {
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 8px solid rgba(41, 121, 255, 0.92);
-  }
-}
-
-.pp-handle {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 1px solid rgba(41, 121, 255, 0.65);
-  background: rgba(41, 121, 255, 0.8);
-  box-shadow:
-    0 0 0 2px rgba(41, 121, 255, 0.15),
-    0 0 10px rgba(41, 121, 255, 0.35);
-  opacity: 0.22;
-  transition:
-    opacity 0.12s,
-    transform 0.12s,
-    box-shadow 0.12s;
-
-  &:hover {
-    opacity: 1;
-    transform: scale(1.12);
-  }
-
-  &--left {
-    cursor: all-scroll;
-  }
-}
-
 // ── cells strip ─────────────────────────────────────────────────────────────
 .pp-cells {
   position: relative;
@@ -1502,7 +1562,6 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
-  transition: transform 0.08s steps(1, end);
   // collapse shared borders between adjacent syllable cells only;
   // tab cells keep their own dashed border so multiple tabs stay visible
   > .pp-cell:not(.pp-cell--tab) + .pp-cell:not(.pp-cell--tab) {
@@ -1528,7 +1587,7 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   &__rhyme-bar {
     position: absolute;
     left: 0;
-    right: -1px;   // extends 1 px to bridge the collapsed inter-syllable border
+    right: -1px; // extends 1 px to bridge the collapsed inter-syllable border
     bottom: 0;
     height: 4px;
     pointer-events: none;
@@ -1544,7 +1603,7 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   &__rhyme-dot {
     position: absolute;
     left: 50%;
-    bottom: 2px;                    // bar center = 2 px from cell bottom (bar h=4 at bottom:0)
+    bottom: 2px; // bar center = 2 px from cell bottom (bar h=4 at bottom:0)
     transform: translate(-50%, 50%); // centers 13 px circle on that point
     width: 13px;
     height: 13px;
@@ -1568,7 +1627,7 @@ $consonant-col: rgba(0, 0, 0, 0.75);
     bottom: 2px;
     right: -2px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
+    background: rgba(0, 0, 0, 0.22);
     pointer-events: none;
   }
 
@@ -1586,39 +1645,6 @@ $consonant-col: rgba(0, 0, 0, 0.75);
   // ── stressed → 30% black dimming ─────────────────────────────────────────
   &--stressed {
     background: $stressed-bg;
-  }
-
-  &--module-hot {
-    box-shadow: inset 0 0 0 2px rgba(41, 121, 255, 0.55);
-    background: rgba(41, 121, 255, 0.08);
-  }
-
-  &--guide-up::before {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 8px solid rgba(41, 121, 255, 0.92);
-    pointer-events: none;
-  }
-
-  &--guide-down::after {
-    content: '';
-    position: absolute;
-    bottom: 2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 8px solid rgba(41, 121, 255, 0.92);
-    pointer-events: none;
   }
 
   // ── token row ──────────────────────────────────────────────────────────────

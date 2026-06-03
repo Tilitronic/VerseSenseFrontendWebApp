@@ -42,8 +42,8 @@ importers:
         specifier: ^6.2.0
         version: 6.2.0
       ipa-poetry-engine:
-        specifier: ^0.1.4
-        version: 0.1.4
+        specifier: ^0.2.0
+        version: 0.2.0
       ipa-symbols:
         specifier: ^1.0.8
         version: 1.0.8
@@ -2095,8 +2095,8 @@ packages:
     peerDependencies:
       fp-ts: ^2.5.0
 
-  ipa-poetry-engine@0.1.4:
-    resolution: {integrity: sha512-cnsw894fDZNA8xTXO2vy6Y0aCu2+JSGC4ZR/VKrR0yFGl/i5y2+zBYoR2zYo2PddShcuM7t+5aYQbTb7hfSBqQ==}
+  ipa-poetry-engine@0.2.0:
+    resolution: {integrity: sha512-mBg109/L6TDzWy3XB/5yZyLEjClmYA7aTtT0lU3UHJFZQniSGkGxDQsUcBgDLqOx+O6+mQBQ6G1KpFEUg8zEBg==}
     engines: {node: '>=18.0.0'}
 
   ipa-symbols@1.0.8:
@@ -5968,7 +5968,7 @@ snapshots:
     dependencies:
       fp-ts: 2.16.11
 
-  ipa-poetry-engine@0.1.4: {}
+  ipa-poetry-engine@0.2.0: {}
 
   ipa-symbols@1.0.8: {}
 

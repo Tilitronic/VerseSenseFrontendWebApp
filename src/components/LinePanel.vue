@@ -270,7 +270,13 @@ function stressTitle(tok: IWordToken, slot: CharSlot): string {
   if (readings && readings.length >= 2) {
     const variants = readings
       .map((r) => {
-        const def = r.morph.length > 0 ? r.morph.map((m) => m.definition).filter(Boolean).join(', ') : null;
+        const def =
+          r.morph.length > 0
+            ? r.morph
+                .map((m) => m.definition)
+                .filter(Boolean)
+                .join(', ')
+            : null;
         return def ? `${r.stressedForm} [${r.ipa}] — ${def}` : `${r.stressedForm} [${r.ipa}]`;
       })
       .join('\n');

@@ -17,9 +17,13 @@
               :key="gi"
               class="rp-pill"
               :style="pillStyle(group.motif)"
-              :title="`[${TIER_LABEL[group.motif.tier]}] ${group.motif.canonicalTokens.join('')}`"
-              >{{ group.tokens.join('') }}</span
+              :title="rhymeTitle(group)"
             >
+              <span class="rp-pill__text">{{ group.tokens.join('') }}</span>
+              <span v-if="group.structuralRhymeGroup" class="rp-pill__meta">
+                S:{{ group.structuralRhymeGroup }}
+              </span>
+            </span>
           </template>
           <!-- Line has no rhymes: show a faint dash -->
           <span v-else class="rp-line__empty">—</span>
@@ -40,6 +44,11 @@ import { transcribeWord } from 'src/services/phonetic/wordTranscription';
 import type { PhonemeMotif, MotifTier } from 'src/services/phonetic/rhyme/types';
 import type { IWordToken } from 'src/model/Token';
 
+const props = defineProps<{
+  rhymeMinLength?: number;
+  rhymeThreshold?: number;
+}>();
+
 const store = usePoetryStore();
 
 const TIER_LABEL: Record<MotifTier, string> = {
@@ -48,7 +57,14 @@ const TIER_LABEL: Record<MotifTier, string> = {
   structural: 'Structural',
 };
 
-const analysis = computed(() => analyzeRhymes(store.document, store.isLineConfirmed));
+const analysis = computed(() =>
+  analyzeRhymes(store.document, store.isLineConfirmed, {
+    minLength: Math.max(1, Math.floor(props.rhymeMinLength ?? 3)),
+    similarityThreshold: props.rhymeThreshold ?? 0,
+    mode: 'sounds',
+  }),
+);
+const analysisResult = computed(() => store.analysisResult);
 
 interface RhymeGroup {
   /** word-position order key so groups sort left-to-right */
@@ -56,6 +72,9 @@ interface RhymeGroup {
   motif: PhonemeMotif;
   /** The actual IPA tokens from this span (not canonical — the real occurrence) */
   tokens: string[];
+  rhymeGroup: string | null;
+  rhymeScore: number | null;
+  structuralRhymeGroup: string | null;
 }
 
 interface LineRow {
@@ -112,7 +131,6 @@ const lineRows = computed<LineRow[]>(() => {
           // Find the span on this line that contains this renderKey
           const span = motif.spans.find((s) => s.lineIdx === lineIdx && s.renderKeys.includes(rk));
           if (!span) continue;
-
           // Collect all renderKeys in this span as actual IPA tokens
           const tokens: string[] = [];
           for (const srk of span.renderKeys) {
@@ -126,7 +144,15 @@ const lineRows = computed<LineRow[]>(() => {
           }
 
           if (tokens.length > 0) {
-            groups.push({ orderKey: rk, motif, tokens });
+            const ann = analysisResult.value?.annotations[wt.id];
+            groups.push({
+              orderKey: rk,
+              motif,
+              tokens,
+              rhymeGroup: ann?.rhymeGroup ?? null,
+              rhymeScore: ann?.rhymeScore ?? null,
+              structuralRhymeGroup: ann?.structuralRhymeGroup ?? null,
+            });
           }
         }
       }
@@ -140,6 +166,18 @@ const lineRows = computed<LineRow[]>(() => {
 
 function pillStyle(motif: PhonemeMotif): Record<string, string> {
   return { background: motif.color };
+}
+
+function rhymeTitle(group: RhymeGroup): string {
+  const parts = [`[${TIER_LABEL[group.motif.tier]}] ${group.motif.canonicalTokens.join('')}`];
+  if (group.rhymeGroup) {
+    const score = group.rhymeScore === null ? 'n/a' : group.rhymeScore.toFixed(2);
+    parts.push(`engine ${group.rhymeGroup} (${score})`);
+  }
+  if (group.structuralRhymeGroup) {
+    parts.push(`structural ${group.structuralRhymeGroup}`);
+  }
+  return parts.join(' · ');
 }
 </script>
 
@@ -221,6 +259,7 @@ function pillStyle(motif: PhonemeMotif): Record<string, string> {
 .rp-pill {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 1px 5px 2px;
   border-radius: 4px;
   font-family: 'Noto Serif', 'Georgia', serif;
@@ -229,5 +268,19 @@ function pillStyle(motif: PhonemeMotif): Record<string, string> {
   white-space: nowrap;
   cursor: default;
   line-height: 1.4;
+
+  &__text {
+    min-width: 0;
+  }
+
+  &__meta {
+    flex-shrink: 0;
+    font-size: 0.55rem;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: rgba(0, 0, 0, 0.72);
+  }
 }
 </style>

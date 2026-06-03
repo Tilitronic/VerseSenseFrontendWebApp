@@ -64,6 +64,7 @@ async function getEngineApi(): Promise<EngineApi> {
   return engineApiPromise;
 }
 
+let latestAnalyzeId: string | null = null;
 let analysisQueue: Promise<void> = Promise.resolve();
 
 function post(msg: OutboundMessage): void {
@@ -91,13 +92,17 @@ self.onmessage = (event: MessageEvent<InboundMessage>) => {
   }
 
   if (message.type === 'analyze') {
+    latestAnalyzeId = message.id;
+    const msgId = message.id;
+    const msgStreamJson = message.streamJson;
     analysisQueue = analysisQueue.then(async () => {
+      if (msgId !== latestAnalyzeId) return;
       try {
         const api = await getEngineApi();
-        const resultJson = api.analyze(message.streamJson);
-        post({ type: 'analyze-result', id: message.id, ok: true, resultJson });
+        const resultJson = api.analyze(msgStreamJson);
+        post({ type: 'analyze-result', id: msgId, ok: true, resultJson });
       } catch (error) {
-        post({ type: 'error', id: message.id, ok: false, error: String(error) });
+        post({ type: 'error', id: msgId, ok: false, error: String(error) });
       }
     });
   }

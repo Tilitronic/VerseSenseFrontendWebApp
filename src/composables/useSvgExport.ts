@@ -12,9 +12,7 @@
  */
 
 import type { ILine, IWordToken } from 'src/model/Token';
-import {
-  ipaTokenStyle,
-} from 'src/services/phonetic/ipaColorMap';
+import { ipaTokenStyle } from 'src/services/phonetic/ipaColorMap';
 import type { TokenVisual } from 'src/services/phonetic/ipaColorMap';
 import { buildVisualizationLineItems } from 'src/services/phonetic/visualizationLine';
 
@@ -26,7 +24,7 @@ const NW = 26; // row-number column width (px)
 const BW = 22; // syl-count badge width (px)
 const CVW = 28; // C/V ratio badge width (px)
 const LEFT_MARGIN = NW + BW + CVW; // total left margin
-const RG = 5;  // vertical gap between rows (px)
+const RG = 5; // vertical gap between rows (px)
 const BLANK_H = 12; // blank-row height (px)
 const PAD = 12; // outer SVG padding (px)
 

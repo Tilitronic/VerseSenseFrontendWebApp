@@ -198,7 +198,7 @@ function isCoveredBy(
  *
  * Standard DTW O(n·m) DP with deletion/insertion cost = 0.5 (half a substitution).
  */
-function dtwDistance(a: string[], b: string[]): number {
+export function dtwDistance(a: string[], b: string[]): number {
   const n = a.length,
     m = b.length;
   if (n === 0 || m === 0) return 1;
