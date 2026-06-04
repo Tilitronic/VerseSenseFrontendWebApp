@@ -62,6 +62,9 @@
           <span class="lp-celltype__label">{{ c.label }}</span>
         </div>
       </div>
+      <p class="lp-note" style="margin-top: 8px">
+        Vertical lines indicate stress. A 3&thinsp;px right border marks the last syllable of a word.
+      </p>
     </section>
 
     <!-- ── Row badges ────────────────────────────────────────────────────── -->
@@ -85,6 +88,27 @@
         C:V ratio = consonants ÷ vowels in the line. A value of 2 means two consonants per vowel. ∞
         indicates a line with no vowels.
       </p>
+    </section>
+
+    <!-- ── Rhyme highlighting ────────────────────────────────────────────── -->
+    <section class="lp-section">
+      <h3 class="lp-section__title">Rhyme highlighting</h3>
+      <p class="lp-note">
+        Recurring rhyme groups are marked with a coloured bar at the bottom of each syllable cell
+        and a numbered dot. Same-colour bars belong to the same rhyme group.
+      </p>
+      <div class="lp-rhyme-ex">
+        <div class="lp-cell-ex">
+          <div class="lp-rhyme-bar" style="background: hsla(200,80%,55%,0.5)" />
+          <div class="lp-rhyme-dot">1</div>
+        </div>
+        <span class="lp-rhyme-ex__label">Rhyme group 1</span>
+        <div class="lp-cell-ex">
+          <div class="lp-rhyme-bar" style="background: hsla(28,80%,55%,0.5)" />
+          <div class="lp-rhyme-dot">2</div>
+        </div>
+        <span class="lp-rhyme-ex__label">Rhyme group 2</span>
+      </div>
     </section>
 
     <!-- ── Pattern opacity ───────────────────────────────────────────────── -->
@@ -118,9 +142,9 @@
 import { PSYCHO_GROUP_INFO, VOWEL_GROUP_INFO } from 'src/services/phonetic/ipaColorMap';
 
 const SHAPE_EXAMPLES = [
-  { label: 'Stops (p, b, t, d, k)', radius: '2px', height: '76%' },
-  { label: 'Affricates (ts, tʃ, dʒ)', radius: '4px', height: '70%' },
-  { label: 'Fricatives (s, ʃ, f, x)', radius: '8px', height: '64%' },
+  { label: 'Stops (p, b, t, d, k)', radius: '4px', height: '76%' },
+  { label: 'Affricates (ts, tʃ, dʒ)', radius: '6px', height: '74%' },
+  { label: 'Fricatives (s, ʃ, f, x)', radius: '8px', height: '68%' },
   { label: 'Sonorants / nasals (l, r, m, n)', radius: '999px', height: '80%' },
 ] as const;
 
@@ -278,7 +302,13 @@ $border-col: #000;
   flex-shrink: 0;
 
   &--stressed {
-    background: #c8c8c8;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(0,0,0,0.245) 0px,
+      rgba(0,0,0,0.245) 3px,
+      transparent 3px,
+      transparent 4px
+    );
   }
 
   &--tab {
@@ -318,6 +348,49 @@ $border-col: #000;
     text-align: center;
     max-width: 120px;
   }
+}
+
+// ── Rhyme example ─────────────────────────────────────────────────────────────
+
+.lp-rhyme-ex {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-top: 8px;
+}
+
+.lp-rhyme-ex__label {
+  font-size: 0.7rem;
+  color: $sub;
+}
+
+.lp-rhyme-bar {
+  position: absolute;
+  left: 0;
+  right: -1px;
+  bottom: 0;
+  height: 4px;
+  pointer-events: none;
+}
+
+.lp-rhyme-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #000;
+  color: #000;
+  font-size: 0.55rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  z-index: 1;
 }
 
 // ── Opacity ramp ──────────────────────────────────────────────────────────────
