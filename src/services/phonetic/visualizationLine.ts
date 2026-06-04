@@ -53,7 +53,7 @@ function zeroVowelTokens(tok: IWordToken): VisualizationToken[] {
   if (ipaTokens.length > 0) {
     return ipaTokens.map((symbol, index) => ({
       symbol,
-      renderKey: `${tok.id}:orphan:${index}`,
+      renderKey: `${tok.id}:0:${index}`,
     }));
   }
 
@@ -61,11 +61,11 @@ function zeroVowelTokens(tok: IWordToken): VisualizationToken[] {
   if (fallbackTokens.length > 0) {
     return fallbackTokens.map((symbol, index) => ({
       symbol,
-      renderKey: `${tok.id}:orphan:${index}`,
+      renderKey: `${tok.id}:0:${index}`,
     }));
   }
 
-  return [{ symbol: tok.text, renderKey: `${tok.id}:orphan:0` }];
+  return [{ symbol: tok.text, renderKey: `${tok.id}:0:0` }];
 }
 
 export function buildVisualizationLineItems(line: ILine): VisualizationLineItem[] {
