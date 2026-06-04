@@ -258,36 +258,76 @@ function renderSvgCell(
 
 // ── SVG row rendering ─────────────────────────────────────────────────────────
 
-function renderSvgRow(row: GridRow, y: number, styleMap: Map<string, TokenVisual>): string {
+function renderSvgRow(
+  row: GridRow,
+  y: number,
+  styleMap: Map<string, TokenVisual>,
+  showNumBadge: boolean,
+  showSylBadge: boolean,
+  showCvBadge: boolean,
+): string {
   if (row.kind === 'blank') return '';
 
-  const midY = (y + rowH(row) / 2).toFixed(1);
+  const midY = y + rowH(row) / 2;
   const parts: string[] = [];
 
-  // Row number
+  // Row number badge (rounded square)
+  const numSize = 20;
+  const numCX = NW / 2;
+  if (showNumBadge) {
+    const numX = (NW - numSize) / 2;
+    const numY = y + (CH - numSize) / 2;
+    parts.push(
+      `<rect x="${numX.toFixed(1)}" y="${numY.toFixed(1)}" ` +
+        `width="${numSize}" height="${numSize}" rx="4" fill="#000"/>`,
+    );
+  }
   parts.push(
-    `<text x="${NW - 4}" y="${midY}" ` +
-      `font-family="${FONT_UI}" font-size="9" fill="rgba(0,0,0,0.28)" ` +
-      `text-anchor="end" dominant-baseline="central">${row.lineIdx + 1}</text>`,
+    `<text x="${numCX.toFixed(1)}" y="${midY.toFixed(1)}" ` +
+      `font-family="${FONT_UI}" font-size="10" font-weight="700" ` +
+      `fill="${showNumBadge ? '#fff' : 'rgba(0,0,0,0.28)'}" ` +
+      `text-anchor="middle" dominant-baseline="central">${row.lineIdx + 1}</text>`,
   );
 
-  // Syllable count badge
   if (row.kind === 'content') {
+    // Syllable count badge (circle)
+    const sylCX = NW + BW / 2;
+    if (showSylBadge) {
+      parts.push(
+        `<circle cx="${sylCX.toFixed(1)}" cy="${midY.toFixed(1)}" r="9" fill="#000"/>`,
+      );
+    }
     parts.push(
-      `<text x="${NW + BW - 3}" y="${midY}" ` +
-        `font-family="${FONT_UI}" font-size="8" fill="rgba(0,0,0,0.4)" ` +
-        `text-anchor="end" dominant-baseline="central">${row.sylCount}</text>`,
+      `<text x="${sylCX.toFixed(1)}" y="${midY.toFixed(1)}" ` +
+        `font-family="${FONT_UI}" font-size="8" font-weight="700" ` +
+        `fill="${showSylBadge ? '#fff' : 'rgba(0,0,0,0.4)'}" ` +
+        `text-anchor="middle" dominant-baseline="central">${row.sylCount}</text>`,
     );
+
+    // C/V ratio badge (diamond)
+    const cvCX = NW + BW + CVW / 2;
+    const cvHalf = 10;
+    if (showCvBadge) {
+      parts.push(
+        `<polygon points="` +
+          `${(cvCX).toFixed(1)},${(midY - cvHalf).toFixed(1)} ` +
+          `${(cvCX + cvHalf).toFixed(1)},${(midY).toFixed(1)} ` +
+          `${(cvCX).toFixed(1)},${(midY + cvHalf).toFixed(1)} ` +
+          `${(cvCX - cvHalf).toFixed(1)},${(midY).toFixed(1)}" ` +
+          `fill="#000"/>`,
+      );
+    }
     parts.push(
-      `<text x="${NW + BW + CVW - 3}" y="${midY}" ` +
-        `font-family="${FONT_UI}" font-size="7.5" fill="rgba(0,0,0,0.32)" ` +
-        `text-anchor="end" dominant-baseline="central">${esc(row.cvRatio)}</text>`,
+      `<text x="${cvCX.toFixed(1)}" y="${midY.toFixed(1)}" ` +
+        `font-family="${FONT_UI}" font-size="7.5" font-weight="700" ` +
+        `fill="${showCvBadge ? '#fff' : 'rgba(0,0,0,0.32)'}" ` +
+        `text-anchor="middle" dominant-baseline="central">${esc(row.cvRatio)}</text>`,
     );
   }
 
   if (row.kind === 'pending') {
     parts.push(
-      `<text x="${LEFT_MARGIN + 6}" y="${midY}" ` +
+      `<text x="${(LEFT_MARGIN + 6).toFixed(1)}" y="${midY.toFixed(1)}" ` +
         `font-family="${FONT_UI}" font-size="11" fill="rgba(0,0,0,0.12)" ` +
         `dominant-baseline="central">· · ·</text>`,
     );
@@ -317,6 +357,9 @@ function renderSvgRow(row: GridRow, y: number, styleMap: Map<string, TokenVisual
  * @param tokenStyleMap     Pre-computed token → TokenVisual map (from PhoneticPanel)
  * @param visualizerVersion VerseSense build version string
  * @param analyzerVersion   ipa-poetry-engine version string (from analysisResult.analyzer.version)
+ * @param showNumBadge      Whether to render the row-number badge background
+ * @param showSylBadge      Whether to render the syllable-count badge background
+ * @param showCvBadge       Whether to render the C/V-ratio badge background
  */
 export function generateVisualizationSvg(
   lines: ILine[],
@@ -324,6 +367,9 @@ export function generateVisualizationSvg(
   tokenStyleMap: Map<string, TokenVisual>,
   visualizerVersion = '',
   analyzerVersion = '',
+  showNumBadge = true,
+  showSylBadge = true,
+  showCvBadge = true,
 ): string {
   const rows = buildRows(lines, isLineConfirmed);
   const gh = gridHeight(rows);
@@ -348,7 +394,7 @@ export function generateVisualizationSvg(
   out.push('<g id="phonetic-grid">');
   let y = gridStartY;
   for (const row of rows) {
-    out.push(renderSvgRow(row, y, tokenStyleMap));
+    out.push(renderSvgRow(row, y, tokenStyleMap, showNumBadge, showSylBadge, showCvBadge));
     y += rowH(row) + RG;
   }
   out.push('</g>');

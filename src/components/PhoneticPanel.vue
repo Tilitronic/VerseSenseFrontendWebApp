@@ -95,12 +95,6 @@
               <span v-if="showNumBadge" class="pp-row__num">{{ lineIdx + 1 }}</span>
               <span v-if="showSylBadge" class="pp-row__syl">{{ lineSyllableCount(line) }}</span>
               <span v-if="showCvBadge" class="pp-row__cv">{{ lineCvRatio(line) }}</span>
-              <span
-                v-if="lineRhythmLabel(lineIdx)"
-                class="pp-row__rhythm"
-                :title="lineRhythmTitle(lineIdx)"
-                >{{ lineRhythmLabel(lineIdx) }}</span
-              >
               <div class="pp-cells">
                 <template
                   v-for="(item, itemIdx) in visualizationItems(line)"
@@ -217,10 +211,10 @@ const bindTabs = defineModel<boolean>('bindTabs', { default: true });
 const showRhymes = defineModel<boolean>('showRhymes', { default: false });
 const showRhymeWeb = defineModel<boolean>('showRhymeWeb', { default: false });
 const rhymeMinLength = defineModel<number>('rhymeMinLength', { default: 3 });
-const rhymeThreshold = defineModel<number>('rhymeThreshold', { default: 0.6 });
+const rhymeThreshold = defineModel<number>('rhymeThreshold', { default: 0.4 });
 const showGlobalMetric = defineModel<boolean>('showGlobalMetric', { default: false });
 const showSounds = defineModel<boolean>('showSounds', { default: true });
-const alliterationThreshold = defineModel<number>('alliterationThreshold', { default: 0.35 });
+const alliterationThreshold = defineModel<number>('alliterationThreshold', { default: 0.4 });
 const showNumBadge = defineModel<boolean>('showNumBadge', { default: true });
 const showSylBadge = defineModel<boolean>('showSylBadge', { default: true });
 const showCvBadge = defineModel<boolean>('showCvBadge', { default: true });
@@ -451,40 +445,6 @@ const pauseStrengthByWordId = computed<Map<string, number>>(() => {
   }
   return map;
 });
-
-const rhythmByEngineLineIndex = computed(() => {
-  const map = new Map<number, StreamAnalysisResult['rhythm'][number]>();
-  for (const line of analysis.value?.rhythm ?? []) {
-    map.set(line.lineIndex, line);
-  }
-  return map;
-});
-
-function confirmedLineOrdinal(lineIdx: number): number {
-  let ordinal = -1;
-  for (let i = 0; i <= lineIdx; i++) {
-    const line = visualizerDocument.value.lines[i];
-    if (line && isLineConfirmed(line.id)) ordinal++;
-  }
-  return ordinal;
-}
-
-function lineRhythmLabel(lineIdx: number): string {
-  const ordinal = confirmedLineOrdinal(lineIdx);
-  if (ordinal < 0) return '';
-  const rhythm = rhythmByEngineLineIndex.value.get(ordinal);
-  if (!rhythm) return '';
-  const foot = rhythm.period === 2 ? '2-beat' : '3-beat';
-  return `${foot} · ${rhythm.clausula} · ${Math.round(rhythm.confidence * 100)}%`;
-}
-
-function lineRhythmTitle(lineIdx: number): string {
-  const ordinal = confirmedLineOrdinal(lineIdx);
-  if (ordinal < 0) return '';
-  const rhythm = rhythmByEngineLineIndex.value.get(ordinal);
-  if (!rhythm) return '';
-  return `Period ${rhythm.period}, phase ${rhythm.phase}, clausula ${rhythm.clausula}, confidence ${rhythm.confidence.toFixed(2)}, syllables ${rhythm.syllableCount}`;
-}
 
 const overallMetric = computed<number | null>(() => {
   const global = analysis.value?.structurality?.global;
@@ -1320,6 +1280,9 @@ function exportSvg(): void {
     tokenStyleMap.value,
     '',
     analyzerVersion,
+    showNumBadge.value,
+    showSylBadge.value,
+    showCvBadge.value,
   );
   downloadSvg(svg, `phonetic-${hash}.svg`);
 }
@@ -1509,8 +1472,7 @@ $consonant-col: rgba(0, 0, 0, 0.75);
 
   &__num,
   &__syl,
-  &__cv,
-  &__rhythm {
+  &__cv {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
@@ -1536,15 +1498,6 @@ $consonant-col: rgba(0, 0, 0, 0.75);
 
   &__cv {
     clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  }
-
-  &__rhythm {
-    width: 84px;
-    padding: 0 10px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.14);
-    font-size: 0.66rem;
-    letter-spacing: 0.02em;
   }
 
   &__hint {

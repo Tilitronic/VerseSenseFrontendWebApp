@@ -241,15 +241,15 @@
               <q-list dense class="panel__menu-list">
                 <q-item clickable @click="showSounds = !showSounds">
                   <q-item-section avatar>
-                    <q-icon name="palette" :color="showSounds ? 'positive' : 'grey-6'" />
+                    <q-icon name="palette" :color="showSounds ? 'primary' : 'grey-6'" />
                   </q-item-section>
-                  <q-item-section>{{ $t('phonetic.soundsColor') }}</q-item-section>
+                  <q-item-section>{{ $t('phonetic.highlight') }}</q-item-section>
                 </q-item>
                 <q-item clickable @click="showSoundWeb = !showSoundWeb">
                   <q-item-section avatar>
-                    <q-icon name="hub" :color="showSoundWeb ? 'positive' : 'grey-6'" />
+                    <q-icon name="hub" :color="showSoundWeb ? 'primary' : 'grey-6'" />
                   </q-item-section>
-                  <q-item-section>{{ $t('phonetic.soundsWeb') }}</q-item-section>
+                  <q-item-section>{{ $t('phonetic.web') }}</q-item-section>
                 </q-item>
                 <q-separator />
                 <q-item>
@@ -277,20 +277,20 @@
               size="sm"
               class="panel__web-btn panel__web-btn--dropdown"
               :class="{ 'panel__web-btn--active': showRhymes || showRhymeWeb }"
-              :label="$t('phonetic.rhymesHighlight')"
+              :label="$t('phonetic.rhymes')"
             >
               <q-list dense class="panel__menu-list">
                 <q-item clickable @click="showRhymes = !showRhymes">
                   <q-item-section avatar>
-                    <q-icon name="check_circle" :color="showRhymes ? 'positive' : 'grey-6'" />
+                    <q-icon name="palette" :color="showRhymes ? 'primary' : 'grey-6'" />
                   </q-item-section>
-                  <q-item-section>{{ $t('phonetic.rhymesHighlight') }}</q-item-section>
+                  <q-item-section>{{ $t('phonetic.highlight') }}</q-item-section>
                 </q-item>
                 <q-item clickable @click="showRhymeWeb = !showRhymeWeb">
                   <q-item-section avatar>
-                    <q-icon name="hub" :color="showRhymeWeb ? 'positive' : 'grey-6'" />
+                    <q-icon name="hub" :color="showRhymeWeb ? 'primary' : 'grey-6'" />
                   </q-item-section>
-                  <q-item-section>{{ $t('phonetic.rhymeWeb') }}</q-item-section>
+                  <q-item-section>{{ $t('phonetic.web') }}</q-item-section>
                 </q-item>
                 <q-separator />
                 <q-item>
@@ -337,19 +337,31 @@
               <q-list dense class="panel__menu-list">
                 <q-item clickable @click="showNumBadge = !showNumBadge">
                   <q-item-section avatar>
-                    <q-icon name="crop_square" :color="showNumBadge ? 'positive' : 'grey-6'" />
+                    <span :class="showNumBadge ? 'text-positive' : 'text-grey-6'">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <rect x="2" y="2" width="12" height="12" rx="2" fill="currentColor" />
+                      </svg>
+                    </span>
                   </q-item-section>
                   <q-item-section>{{ $t('phonetic.rowNum') }}</q-item-section>
                 </q-item>
                 <q-item clickable @click="showSylBadge = !showSylBadge">
                   <q-item-section avatar>
-                    <q-icon name="circle" :color="showSylBadge ? 'positive' : 'grey-6'" />
+                    <span :class="showSylBadge ? 'text-positive' : 'text-grey-6'">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="8" r="6" fill="currentColor" />
+                      </svg>
+                    </span>
                   </q-item-section>
                   <q-item-section>{{ $t('phonetic.syllables') }}</q-item-section>
                 </q-item>
                 <q-item clickable @click="showCvBadge = !showCvBadge">
                   <q-item-section avatar>
-                    <q-icon name="diamond" :color="showCvBadge ? 'positive' : 'grey-6'" />
+                    <span :class="showCvBadge ? 'text-positive' : 'text-grey-6'">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <polygon points="8,0 16,8 8,16 0,8" fill="currentColor" />
+                      </svg>
+                    </span>
                   </q-item-section>
                   <q-item-section>{{ $t('phonetic.cvRatio') }}</q-item-section>
                 </q-item>
@@ -636,10 +648,10 @@ const bindTabIndent = ref(true);
 const showRhymes = ref(true);
 const showRhymeWeb = ref(false);
 const rhymeMinLength = ref(3);
-const rhymeThreshold = ref(0.6);
+const rhymeThreshold = ref(0.4);
 const showGlobalMetricOverlay = ref(false);
 const showSounds = ref(true);
-const alliterationThreshold = ref(0.35);
+const alliterationThreshold = ref(0.4);
 const showRowSettings = ref(true);
 const showNumBadge = ref(true);
 const showSylBadge = ref(true);
