@@ -221,14 +221,20 @@ function renderSvgCell(
     );
   }
 
-  const bg = cell.stressed ? '#c8c8c8' : '#ffffff';
   const parts: string[] = [];
 
-  // Cell body
+  // Cell body (always white — stressed adds dot overlay on top)
   parts.push(
     `<rect x="${x}" y="${y}" width="${CW}" height="${CH}" ` +
-      `fill="${bg}" stroke="#000" stroke-width="1"/>`,
+      `fill="#ffffff" stroke="#000" stroke-width="1"/>`,
   );
+
+  // Dot overlay for stressed syllables
+  if (cell.stressed) {
+    parts.push(
+      `<rect x="${x}" y="${y}" width="${CW}" height="${CH}" fill="url(#sd)"/>`,
+    );
+  }
 
   // Word-last thick right border overlay
   if (cell.wordLast) {
@@ -248,7 +254,7 @@ function renderSvgCell(
     );
     parts.push(
       `<text x="${(t.x + t.w / 2).toFixed(1)}" y="${(t.y + t.h / 2).toFixed(1)}" ` +
-        `font-family="${FONT_IPA}" font-size="9" fill="rgba(0,0,0,0.82)" ` +
+        `font-family="${FONT_IPA}" font-size="9" font-weight="600" fill="rgba(0,0,0,0.85)" ` +
         `text-anchor="middle" dominant-baseline="central">${esc(t.symbol)}</text>`,
     );
   }
@@ -385,6 +391,15 @@ export function generateVisualizationSvg(
   out.push(
     `<svg xmlns="http://www.w3.org/2000/svg" ` +
       `width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`,
+  );
+
+  // Stressed-syllable dot pattern
+  out.push(
+    `<defs>` +
+      `<pattern id="sd" width="4" height="8" patternUnits="userSpaceOnUse">` +
+        `<rect x="0" y="0" width="3" height="8" fill="rgba(0,0,0,0.245)"/>` +
+      `</pattern>` +
+    `</defs>`,
   );
 
   // White background

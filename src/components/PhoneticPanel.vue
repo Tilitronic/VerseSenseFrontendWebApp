@@ -211,7 +211,7 @@ const bindTabs = defineModel<boolean>('bindTabs', { default: true });
 const showRhymes = defineModel<boolean>('showRhymes', { default: false });
 const showRhymeWeb = defineModel<boolean>('showRhymeWeb', { default: false });
 const rhymeMinLength = defineModel<number>('rhymeMinLength', { default: 3 });
-const rhymeThreshold = defineModel<number>('rhymeThreshold', { default: 0.4 });
+const rhymeThreshold = defineModel<number>('rhymeThreshold', { default: 0.5 });
 const showGlobalMetric = defineModel<boolean>('showGlobalMetric', { default: false });
 const showSounds = defineModel<boolean>('showSounds', { default: true });
 const alliterationThreshold = defineModel<number>('alliterationThreshold', { default: 0.4 });
@@ -1300,8 +1300,6 @@ $cell-w: 52px; // fixed cell width  (left/right sides)
 $cell-h: 38px; // fixed cell height (top/bottom sides — taller than wide)
 $border-col: #000000;
 $cell-bg: transparent;
-$stressed-bg: rgba(0, 0, 0, 0.3);
-$stressed-fg: #ffffff;
 $text-dim: rgba(0, 0, 0, 0.3);
 $text-faint: rgba(0, 0, 0, 0.18);
 $vowel-col: #b8860b; // dark goldenrod — readable on white
@@ -1595,9 +1593,15 @@ $consonant-col: rgba(0, 0, 0, 0.75);
     border-right: 3px solid $border-col;
   }
 
-  // ── stressed → 30% black dimming ─────────────────────────────────────────
+  // ── stressed → vertical-line pattern (visible yet transparent for sound highlights)
   &--stressed {
-    background: $stressed-bg;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(0,0,0,0.245) 0px,
+      rgba(0,0,0,0.245) 3px,
+      transparent 3px,
+      transparent 4px
+    );
   }
 
   // ── token row ──────────────────────────────────────────────────────────────
@@ -1623,7 +1627,8 @@ $consonant-col: rgba(0, 0, 0, 0.75);
     height: auto;
     line-height: 1.1;
     font-family: 'Noto Serif', 'Georgia', serif;
-    font-size: 0.72rem; // small enough that 3–4 tokens fit in $cell-w
+    font-size: 0.72rem;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
 

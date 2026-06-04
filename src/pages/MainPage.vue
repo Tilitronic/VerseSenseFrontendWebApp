@@ -645,10 +645,10 @@ const hasConfirmedLines = computed(() =>
 const showSoundWeb = ref(false);
 const showAlignRight = ref(false);
 const bindTabIndent = ref(true);
-const showRhymes = ref(true);
+const showRhymes = ref(false);
 const showRhymeWeb = ref(false);
 const rhymeMinLength = ref(3);
-const rhymeThreshold = ref(0.4);
+const rhymeThreshold = ref(0.5);
 const showGlobalMetricOverlay = ref(false);
 const showSounds = ref(true);
 const alliterationThreshold = ref(0.4);
