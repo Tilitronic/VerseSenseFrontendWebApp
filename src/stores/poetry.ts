@@ -1684,7 +1684,27 @@ export const usePoetryStore = defineStore('poetry', () => {
     };
   }
 
+  let lastAnalysisKey = '';
+
+  function analysisInputsKey(): string {
+    const parts: string[] = [];
+    for (const line of document.value.lines) {
+      for (const tok of line.tokens) {
+        if (tok.kind !== 'WORD') continue;
+        if (!isLineConfirmed(line.id)) continue;
+        parts.push(`${tok.id}:${tok.stressIndex ?? 'n'}:${tok.language}`);
+      }
+    }
+    parts.push(`confirmed:${[...confirmedWords.value].sort().join(',')}`);
+    parts.push(`pending:${[...pendingStressIds.value.keys()].sort().join(',')}`);
+    return parts.join('|');
+  }
+
   async function analyzeConfirmedLines() {
+    const key = analysisInputsKey();
+    if (key === lastAnalysisKey) return;
+    lastAnalysisKey = key;
+
     const runSeq = ++analysisRunSeq;
     try {
       const result = await Promise.resolve(
@@ -1698,7 +1718,9 @@ export const usePoetryStore = defineStore('poetry', () => {
       if (runSeq !== analysisRunSeq) return;
 
       if (!result) {
-        phoneticLog.warn('analyzePoem returned null (no confirmed words in stream) — keeping previous result');
+        phoneticLog.warn(
+          'analyzePoem returned null (no confirmed words in stream) — keeping previous result',
+        );
         return;
       }
       analysisResult.value = mergeAnalysisResult(analysisResult.value, result);

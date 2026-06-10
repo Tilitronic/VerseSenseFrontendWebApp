@@ -24,13 +24,14 @@ type PendingRequest = {
 };
 
 class PhoneticEngineBackend {
-  private static readonly INIT_TIMEOUT_MS = 120000;
-  private static readonly ANALYZE_TIMEOUT_MS = 120000;
+  private static readonly INIT_TIMEOUT_MS = 60000;
+  private static readonly ANALYZE_TIMEOUT_MS = 60000;
   private worker: Worker | null = null;
   private pending = new Map<string, PendingRequest>();
   private nextId = 0;
   private initPromise: Promise<void> | null = null;
   private ready = false;
+  private analyzeAbort: AbortController | null = null;
 
   private createId(): string {
     this.nextId += 1;
@@ -135,6 +136,12 @@ class PhoneticEngineBackend {
   async analyze(streamJson: string): Promise<StreamAnalysisResult> {
     await this.initialize();
 
+    // Cancel any in-flight analysis — we only care about the latest result.
+    this.analyzeAbort?.abort();
+    const abortCtl = new AbortController();
+    this.analyzeAbort = abortCtl;
+    const signal = abortCtl.signal;
+
     const id = this.createId();
     const payload: AnalyzeRequestMessage = { type: 'analyze', id, streamJson };
 
@@ -144,13 +151,25 @@ class PhoneticEngineBackend {
         reject(new Error('Phonetic engine analyze timed out'));
       }, PhoneticEngineBackend.ANALYZE_TIMEOUT_MS);
 
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.pending.delete(id);
+      };
+
+      signal.addEventListener('abort', () => {
+        cleanup();
+        reject(new Error('Phonetic engine analyze cancelled'));
+      }, { once: true });
+
       this.pending.set(id, {
         resolve: (value) => {
-          clearTimeout(timeout);
+          if (signal.aborted) return;
+          cleanup();
           resolve(String(value));
         },
         reject: (reason) => {
-          clearTimeout(timeout);
+          if (signal.aborted) return;
+          cleanup();
           reject(reason instanceof Error ? reason : new Error(String(reason)));
         },
       });

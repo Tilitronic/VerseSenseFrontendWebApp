@@ -64,12 +64,13 @@ async function getEngineApi(): Promise<EngineApi> {
   return engineApiPromise;
 }
 
-let latestAnalyzeId: string | null = null;
-let analysisQueue: Promise<void> = Promise.resolve();
-
 function post(msg: OutboundMessage): void {
   self.postMessage(msg);
 }
+
+let latestAnalyzeId: string | null = null;
+let pendingStreamJson: string | null = null;
+let isAnalyzing = false;
 
 self.onmessage = (event: MessageEvent<InboundMessage>) => {
   const message = event.data;
@@ -93,17 +94,33 @@ self.onmessage = (event: MessageEvent<InboundMessage>) => {
 
   if (message.type === 'analyze') {
     latestAnalyzeId = message.id;
-    const msgId = message.id;
-    const msgStreamJson = message.streamJson;
-    analysisQueue = analysisQueue.then(async () => {
-      if (msgId !== latestAnalyzeId) return;
-      try {
-        const api = await getEngineApi();
-        const resultJson = api.analyze(msgStreamJson);
-        post({ type: 'analyze-result', id: msgId, ok: true, resultJson });
-      } catch (error) {
-        post({ type: 'error', id: msgId, ok: false, error: String(error) });
-      }
-    });
+    pendingStreamJson = message.streamJson;
+    if (!isAnalyzing) {
+      isAnalyzing = true;
+      void processAnalysisLoop();
+    }
   }
 };
+
+async function processAnalysisLoop(): Promise<void> {
+  while (pendingStreamJson !== null) {
+    const id = latestAnalyzeId!;
+    const streamJson = pendingStreamJson;
+    pendingStreamJson = null;
+
+    try {
+      const api = await getEngineApi();
+      if (id !== latestAnalyzeId) continue;
+      const resultJson = api.analyze(streamJson);
+      await new Promise<void>((r) => setTimeout(r, 0));
+      if (id === latestAnalyzeId && pendingStreamJson === null) {
+        post({ type: 'analyze-result', id, ok: true, resultJson });
+      }
+    } catch (error) {
+      if (id === latestAnalyzeId) {
+        post({ type: 'error', id, ok: false, error: String(error) });
+      }
+    }
+  }
+  isAnalyzing = false;
+}
