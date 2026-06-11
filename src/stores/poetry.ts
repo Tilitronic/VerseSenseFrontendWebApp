@@ -1645,43 +1645,11 @@ export const usePoetryStore = defineStore('poetry', () => {
    * Derives rhyme patterns, rhythm, pause annotations, and echo density.
    * Result is cached in analysisResult. Non-fatal — logs errors but doesn't throw.
    */
-  function areJsonEqual(a: unknown, b: unknown): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-
   function mergeAnalysisResult(
     prev: StreamAnalysisResult | null,
     next: StreamAnalysisResult,
   ): StreamAnalysisResult {
-    if (!prev) return next;
-
-    const annotations = areJsonEqual(prev.annotations, next.annotations)
-      ? prev.annotations
-      : next.annotations;
-    const clusters = areJsonEqual(prev.clusters, next.clusters) ? prev.clusters : next.clusters;
-    const rhythm = areJsonEqual(prev.rhythm, next.rhythm) ? prev.rhythm : next.rhythm;
-    const echo = areJsonEqual(prev.echo, next.echo) ? prev.echo : next.echo;
-    const pauses = areJsonEqual(prev.pauses, next.pauses) ? prev.pauses : next.pauses;
-
-    if (
-      prev.version === next.version &&
-      annotations === prev.annotations &&
-      clusters === prev.clusters &&
-      rhythm === prev.rhythm &&
-      echo === prev.echo &&
-      pauses === prev.pauses
-    ) {
-      return prev;
-    }
-
-    return {
-      ...next,
-      annotations,
-      clusters,
-      rhythm,
-      echo,
-      pauses,
-    };
+    return next;
   }
 
   let lastAnalysisKey = '';

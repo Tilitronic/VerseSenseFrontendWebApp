@@ -146,7 +146,14 @@ function normalisePunct(raw: string): string | null {
   return null; // unknown / exotic — skip
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// ── Syllable cache (session-scoped) ──────────────────────────────────────────
+// Cache key is a content hash of the token state that affects transcription.
+// Cleared when a word's text, language, or stress changes.
+const _syllableCache = new Map<string, IpaStreamSyllable[]>();
+
+function syllableCacheKey(tok: IWordToken): string {
+  return `${tok.id}:${tok.text}:${tok.language}:${tok.stressIndex ?? 'n'}`;
+}
 
 function resolveStressSource(
   tok: IWordToken,
@@ -159,14 +166,26 @@ function resolveStressSource(
 }
 
 function wordToIpaSyllables(tok: IWordToken): IpaStreamSyllable[] {
+  const key = syllableCacheKey(tok);
+  const cached = _syllableCache.get(key);
+  if (cached) return cached;
+
   const tw = transcribeWord(tok);
-  return tw.syllables.map((syl) => ({
+  const result = tw.syllables.map((syl) => ({
     ipa: syl.ipa,
     tokens: [...syl.ipaTokens],
     grapheme: syl.text,
     stressed: syl.stressed,
     isOpen: syl.isOpen,
   }));
+
+  // Bound cache at 1000 entries — beyond that, old entries are evicted.
+  if (_syllableCache.size >= 1000) {
+    const firstKey = _syllableCache.keys().next().value;
+    if (firstKey !== undefined) _syllableCache.delete(firstKey);
+  }
+  _syllableCache.set(key, result);
+  return result;
 }
 
 // ── Builder ───────────────────────────────────────────────────────────────────

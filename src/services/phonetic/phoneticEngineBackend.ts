@@ -26,12 +26,15 @@ type PendingRequest = {
 class PhoneticEngineBackend {
   private static readonly INIT_TIMEOUT_MS = 60000;
   private static readonly ANALYZE_TIMEOUT_MS = 60000;
+  private static readonly MAX_INIT_RETRIES = 3;
   private worker: Worker | null = null;
   private pending = new Map<string, PendingRequest>();
   private nextId = 0;
   private initPromise: Promise<void> | null = null;
   private ready = false;
   private analyzeAbort: AbortController | null = null;
+  private initRetries = 0;
+  private permanentlyDead = false;
 
   private createId(): string {
     this.nextId += 1;
@@ -77,24 +80,31 @@ class PhoneticEngineBackend {
     };
 
     worker.onerror = (event) => {
-      const err = new Error(event.message || 'Phonetic engine worker crashed');
-      for (const req of this.pending.values()) req.reject(err);
-      this.pending.clear();
-      this.resetWorkerState();
+      this.onWorkerCrash(new Error(event.message || 'Phonetic engine worker crashed'));
     };
 
     worker.onmessageerror = () => {
-      const err = new Error('Phonetic engine worker message deserialization failed');
-      for (const req of this.pending.values()) req.reject(err);
-      this.pending.clear();
-      this.resetWorkerState();
+      this.onWorkerCrash(new Error('Phonetic engine worker message deserialization failed'));
     };
 
     this.worker = worker;
     return worker;
   }
 
+  private onWorkerCrash(error: Error): void {
+    this.initRetries++;
+    for (const req of this.pending.values()) req.reject(error);
+    this.pending.clear();
+    this.resetWorkerState();
+    if (this.initRetries >= PhoneticEngineBackend.MAX_INIT_RETRIES) {
+      this.permanentlyDead = true;
+    }
+  }
+
   async initialize(): Promise<void> {
+    if (this.permanentlyDead) {
+      throw new Error('Phonetic engine permanently disabled after repeated crashes');
+    }
     if (this.ready) return;
     if (this.initPromise) return this.initPromise;
 
@@ -114,6 +124,7 @@ class PhoneticEngineBackend {
       this.pending.set(id, {
         resolve: () => {
           clearTimeout(timeout);
+          this.initRetries = 0;
           resolve();
         },
         reject: (reason) => {
@@ -134,6 +145,9 @@ class PhoneticEngineBackend {
   }
 
   async analyze(streamJson: string): Promise<StreamAnalysisResult> {
+    if (this.permanentlyDead) {
+      throw new Error('Phonetic engine is unavailable after repeated crashes');
+    }
     await this.initialize();
 
     // Cancel any in-flight analysis — we only care about the latest result.
