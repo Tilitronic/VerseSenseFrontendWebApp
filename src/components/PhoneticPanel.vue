@@ -478,10 +478,10 @@ const tokenStyleMap = computed<Map<string, TokenVisual>>(() => {
   const map = new Map<string, TokenVisual>();
   const threshold = Math.max(0.05, Math.min(0.8, alliterationThreshold.value));
   for (const { token, flatIdx, renderKey } of indexedTokens.value) {
-    const rawOpacity =
-      echoOpacityByRenderKeyFromLayer.value.get(renderKey) ??
-      echoByRenderKey.value.get(renderKey)?.opacity ??
-      echoByFlatIndex.value.get(flatIdx)?.opacity;
+    const fromLayer = echoOpacityByRenderKeyFromLayer.value.get(renderKey);
+    const fromEcho = echoByRenderKey.value.get(renderKey)?.opacity;
+    const fromFlat = echoByFlatIndex.value.get(flatIdx)?.opacity;
+    const rawOpacity = Math.max(fromLayer ?? 0, fromEcho ?? 0, fromFlat ?? 0) || undefined;
     if (rawOpacity === undefined || rawOpacity < threshold) continue;
     const normalised = (rawOpacity - threshold) / Math.max(0.0001, 1 - threshold);
     const visual = ipaTokenStyle(token, Math.max(0.05, Math.min(1, normalised)));

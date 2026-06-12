@@ -25,14 +25,13 @@ type PendingRequest = {
 
 class PhoneticEngineBackend {
   private static readonly INIT_TIMEOUT_MS = 60000;
-  private static readonly ANALYZE_TIMEOUT_MS = 60000;
+  private static readonly ANALYZE_TIMEOUT_MS = 120000;
   private static readonly MAX_INIT_RETRIES = 3;
   private worker: Worker | null = null;
   private pending = new Map<string, PendingRequest>();
   private nextId = 0;
   private initPromise: Promise<void> | null = null;
   private ready = false;
-  private analyzeAbort: AbortController | null = null;
   private initRetries = 0;
   private permanentlyDead = false;
 
@@ -150,40 +149,23 @@ class PhoneticEngineBackend {
     }
     await this.initialize();
 
-    // Cancel any in-flight analysis — we only care about the latest result.
-    this.analyzeAbort?.abort();
-    const abortCtl = new AbortController();
-    this.analyzeAbort = abortCtl;
-    const signal = abortCtl.signal;
-
     const id = this.createId();
     const payload: AnalyzeRequestMessage = { type: 'analyze', id, streamJson };
 
     const resultJson = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
+        this.resetWorkerState();
         reject(new Error('Phonetic engine analyze timed out'));
       }, PhoneticEngineBackend.ANALYZE_TIMEOUT_MS);
 
-      const cleanup = () => {
-        clearTimeout(timeout);
-        this.pending.delete(id);
-      };
-
-      signal.addEventListener('abort', () => {
-        cleanup();
-        reject(new Error('Phonetic engine analyze cancelled'));
-      }, { once: true });
-
       this.pending.set(id, {
         resolve: (value) => {
-          if (signal.aborted) return;
-          cleanup();
+          clearTimeout(timeout);
           resolve(String(value));
         },
         reject: (reason) => {
-          if (signal.aborted) return;
-          cleanup();
+          clearTimeout(timeout);
           reject(reason instanceof Error ? reason : new Error(String(reason)));
         },
       });

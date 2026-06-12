@@ -253,8 +253,11 @@ export const usePoetryStore = defineStore('poetry', () => {
   let stressDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let rebuildDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let analysisRunSeq = 0;
+  let lastAnalysisKey = '';
+  let _analysisInFlight = false;
   const STRESS_DEBOUNCE_MS = 600;
   const REBUILD_DEBOUNCE_MS = 120;
+  const ANALYZER_DEBOUNCE_MS = 1200;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -849,6 +852,12 @@ export const usePoetryStore = defineStore('poetry', () => {
         reason: 'rebuildDocument:debounced',
       });
     }, STRESS_DEBOUNCE_MS);
+
+    // Clear stale analysis — the rebuilt document has new token IDs,
+    // so the previous analysis result's PhonemeRef.wordId values no
+    // longer match any current token.  The watcher will re-trigger
+    // analysis on the next tick.
+    analysisResult.value = null;
   }
 
   /**
@@ -1117,7 +1126,7 @@ export const usePoetryStore = defineStore('poetry', () => {
       if (analysisDebounceTimer) clearTimeout(analysisDebounceTimer);
       analysisDebounceTimer = setTimeout(() => {
         void analyzeConfirmedLines();
-      }, 300);
+      }, ANALYZER_DEBOUNCE_MS);
     },
     { deep: false },
   );
@@ -1242,10 +1251,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     return map;
   });
 
-  // AbortController for the current async stress resolution pass.
-  // Replaced each time resolveAllStressAsync() is called so an in-flight
-  // ML call for a word the user has already edited is silently discarded.
-  let _asyncStressAbort: AbortController | null = null;
+  // Monotonically increasing sequence counter for async stress passes.
+  // Each new pass increments this; completed passes check it before
+  // applying patches so stale results from a superseded pass are dropped.
   let _asyncStressPassSeq = 0;
 
   // ── Expose ─────────────────────────────────────────────────────────────────
@@ -1275,11 +1283,6 @@ export const usePoetryStore = defineStore('poetry', () => {
     reason?: string;
   }): Promise<void> {
     const passId = ++_asyncStressPassSeq;
-    // Abort any previous in-progress async pass.
-    _asyncStressAbort?.abort();
-    const ctl = new AbortController();
-    _asyncStressAbort = ctl;
-    const signal = ctl.signal;
 
     const hasUaWasm = uaWasmReady() && appStore.useDbStress && appStore.isLanguageEnabled('ua');
     const hasUaMl = !!stressResolver.value && appStore.useMlStress;
@@ -1348,22 +1351,15 @@ export const usePoetryStore = defineStore('poetry', () => {
     >();
 
     // ── English stress lookup (CMU → FreeDictionary API fallback) ──────────
-    // await cmuDictReady so the synchronous CMU path inside resolveEnStress
-    // is always available.  OOV words transparently hit the FreeDictionary API
-    // (one parallel fetch per word, results cached for the session).
     if (enCandidates.length > 0) {
       await cmuDictReady;
-      if (signal.aborted) {
-        stressAsyncLog.debug(`[pass ${passId}] aborted waiting for CMU dict — stopping`);
+      if (passId !== _asyncStressPassSeq) {
+        stressAsyncLog.debug(`[pass ${passId}] superseded — dropping EN results`);
         return;
       }
       const enResults = await Promise.allSettled(
-        enCandidates.map((tok) => resolveEnStress(tok.text, signal)),
+        enCandidates.map((tok) => resolveEnStress(tok.text)),
       );
-      if (signal.aborted) {
-        stressAsyncLog.debug(`[pass ${passId}] aborted during English resolution — stopping`);
-        return;
-      }
       let enResolved = 0;
       enResults.forEach((result, i) => {
         const tok = enCandidates[i]!;
@@ -1387,19 +1383,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
 
     // ── Batch Polish WASM lookup ────────────────────────────────────────────
-    // Always use batch regardless of count — even a single-word batch is more
-    // efficient than a per-token sequential await and avoids the inflight-map
-    // overhead of getPolishStressInfo.
     const polishInfoByWordId = new Map<string, PolishStressInfo | null>();
     if (plCandidates.length > 0) {
-      const batch = await getPolishStressInfoBatch(
-        plCandidates.map((tok) => tok.text),
-        signal,
-      );
-      if (signal.aborted) {
-        stressAsyncLog.debug(`[pass ${passId}] aborted during Polish lookupBatch — stopping`);
-        return;
-      }
+      const batch = await getPolishStressInfoBatch(plCandidates.map((tok) => tok.text));
       plCandidates.forEach((tok, idx) => {
         polishInfoByWordId.set(tok.id, batch[idx] ?? null);
       });
@@ -1409,8 +1395,6 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
 
     // ── Batch UA WASM lookup ────────────────────────────────────────────────
-    // Resolves all unresolved Ukrainian words in one synchronous WASM call.
-    // This is always faster and more correct than resolving one-at-a-time.
     const wasmPatchedIds = new Set<string>();
     if (uaCandidates.length > 0 && hasUaWasm) {
       const batchResults = uaWasmLookupBatch(uaCandidates.map((t) => normalizeUaWord(t.text)));
@@ -1418,24 +1402,8 @@ export const usePoetryStore = defineStore('poetry', () => {
         const result = batchResults[i] ?? null;
         if (result !== null && result.readings.length > 0) {
           const stresses = result.readings.map((r) => r.syllableIndex);
-          // Treat as confirmed when all readings agree on the same syllable.
-          // Multiple readings with the same syllableIndex are grammatical
-          // variants of the same pronunciation, NOT heteronyms.
           const uniqueStresses = [...new Set(stresses)];
 
-          // ── Variative vs heteronym classification ───────────────────────
-          // When WASM returns multiple unique stress positions we need to
-          // decide whether both are free variants (same word, both always
-          // valid — e.g. по́милка / поми́лка) or true heteronyms (different
-          // words / meanings selected by context — e.g. за́мок / замо́к).
-          //
-          // Heuristic using morph fingerprint (lemma + feats + definition):
-          //   • If every reading's morph fingerprint is identical AND at least
-          //     one morph entry carries non-empty feature data → 'variative'.
-          //     (Same grammatical form with two valid accents, e.g. по́милка/поми́лка.)
-          //   • Otherwise → conservative 'heteronym'.
-          //     This covers: different grammatical forms (бло́хи Gen.Sg vs блохи́ Nom.Pl),
-          //     different meanings (за́мок castle vs замо́к lock), and words with no feats.
           let wasmSource: 'heteronym' | 'variative' = 'heteronym';
           if (uniqueStresses.length > 1) {
             const morphFingerprint = (r: { morph: UaMorphEntry[] }) =>
@@ -1485,7 +1453,6 @@ export const usePoetryStore = defineStore('poetry', () => {
             stresses: uniqueStresses,
           };
           if (!confirmed) {
-            // One representative stressedForm/ipa per unique syllable position.
             const seen = new Set<number>();
             patch.readings = result.readings
               .filter((r) => {
@@ -1510,12 +1477,8 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
 
     for (const tok of candidateTokens) {
-      if (signal.aborted) {
-        stressAsyncLog.debug(`[pass ${passId}] aborted — stopping`);
-        return;
-      }
-
       const textAtDispatch = tok.text;
+      const stressAtDispatch = tok.stressIndex;
 
       if (tok.language === 'pl') {
         const info = polishInfoByWordId.get(tok.id) ?? null;
@@ -1569,18 +1532,23 @@ export const usePoetryStore = defineStore('poetry', () => {
         continue;
       }
       stressAsyncLog.info(`accenting “${tok.text}”…`);
-      const resolution = await resolver.resolve(tok.text, signal);
+      const resolution = await resolver.resolve(tok.text);
 
-      if (signal.aborted) {
-        stressAsyncLog.debug('aborted while awaiting resolve — stopping');
+      // Discard stale result if the pass was superseded.
+      if (passId !== _asyncStressPassSeq) {
+        stressAsyncLog.debug(`[pass ${passId}] superseded — dropping ML result for "${tok.text}"`);
         return;
       }
 
-      // Validate the token still exists as a WORD and hasn't been edited since we dispatched.
+      // Discard if word was edited (text changed) or stress was manually set.
       const currentTok = document.value.tokenIndex.get(tok.id);
       const currentWord = currentTok?.kind === 'WORD' ? currentTok : null;
       if (!currentWord || currentWord.text !== textAtDispatch) {
         stressAsyncLog.debug(`"${tok.id}" changed — discarding result`);
+        continue;
+      }
+      if (currentWord.stressIndex !== stressAtDispatch) {
+        stressAsyncLog.debug(`"${tok.id}" stress was manually set — discarding ML result`);
         continue;
       }
 
@@ -1595,6 +1563,12 @@ export const usePoetryStore = defineStore('poetry', () => {
           stresses: resolution.stresses ?? [],
         });
       }
+    }
+
+    // Discard all patches if this pass was superseded.
+    if (passId !== _asyncStressPassSeq) {
+      stressAsyncLog.debug(`[pass ${passId}] superseded — dropping all patches`);
+      return;
     }
 
     stressAsyncLog.info(`accented ${patches.size} word${patches.size === 1 ? '' : 's'}`);
@@ -1652,8 +1626,6 @@ export const usePoetryStore = defineStore('poetry', () => {
     return next;
   }
 
-  let lastAnalysisKey = '';
-
   function analysisInputsKey(): string {
     const parts: string[] = [];
     for (const line of document.value.lines) {
@@ -1669,16 +1641,40 @@ export const usePoetryStore = defineStore('poetry', () => {
   }
 
   async function analyzeConfirmedLines() {
+    if (_analysisInFlight) return;
     const key = analysisInputsKey();
     if (key === lastAnalysisKey) return;
     lastAnalysisKey = key;
 
+    _analysisInFlight = true;
     const runSeq = ++analysisRunSeq;
+    // Snapshot the document and confirmation state at call time so the
+    // entire IPA stream is built against a single, consistent state.
+    // This avoids mismatches where isLineConfirmed reads live refs
+    // that may have advanced since analysisInputsKey() ran.
+    const docAtCall = document.value;
+    const confirmedAtCall = new Set(confirmedWords.value);
+    const pendingAtCall = new Map(pendingStressIds.value);
+    function isLineAtCall(lineId: string): boolean {
+      const line = docAtCall.lines.find((l) => l.id === lineId);
+      if (!line) return false;
+      const words = line.tokens.filter((t): t is IWordToken => t.kind === 'WORD');
+      if (words.length === 0) return false;
+      for (const tok of words) {
+        const vc = countVowels(tok.text, tok.language);
+        if (vc === 0) continue;
+        if (tok.stressIndex === null) return false;
+        const { lockedLanguage } = getWordScriptInfo(tok.text);
+        if (lockedLanguage === null && !confirmedAtCall.has(tok.id)) return false;
+      }
+      return true;
+    }
+
     try {
       const result = await Promise.resolve(
-        analyzePoem(document.value, isLineConfirmed, {
-          pendingStressIds: pendingStressIds.value,
-          confirmedWords: confirmedWords.value,
+        analyzePoem(docAtCall, isLineAtCall, {
+          pendingStressIds: pendingAtCall,
+          confirmedWords: confirmedAtCall,
         }),
       );
 
@@ -1695,6 +1691,13 @@ export const usePoetryStore = defineStore('poetry', () => {
     } catch (error) {
       console.error('Phonetic analysis failed:', error);
       phoneticLog.warn('keeping previous analysis result despite error');
+    } finally {
+      _analysisInFlight = false;
+      const newKey = analysisInputsKey();
+      if (newKey !== lastAnalysisKey) {
+        lastAnalysisKey = '';
+        void analyzeConfirmedLines();
+      }
     }
   }
 
