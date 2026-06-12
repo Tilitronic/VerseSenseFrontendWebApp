@@ -1,7 +1,9 @@
-import { buildIpaStream, type IpaStream } from 'src/services/phonetic/ipaStreamExport';
+import { buildIpaStream, type IpaStream, type IpaStreamWord } from 'src/services/phonetic/ipaStreamExport';
 import { phoneticEngineBackend } from 'src/services/phonetic/phoneticEngineBackend';
 import type { IPoetryDocument } from 'src/model/Token';
 import type { StreamAnalysisResult } from './analysisTypes';
+
+const analysisLog = console.log.bind(console, '[phonetic]');
 
 /**
  * Bridge between IPA Stream export and phonetic analysis engine.
@@ -34,8 +36,15 @@ export async function analyzePoem(
   // Step 2: Skip empty streams
   if (stream.metadata.totalWordCount === 0) return null;
 
-  // Step 2: Pass to worker-backed analysis engine
-  return phoneticEngineBackend.analyze(JSON.stringify(stream));
+  // Log stream summary for diagnostics
+  const streamWords = stream.stream.filter((s): s is IpaStreamWord => s.type === 'word');
+  const json = JSON.stringify(stream);
+  analysisLog(`stream: %d words, %d chars JSON`, streamWords.length, json.length);
+  // Expose full JSON for console inspection
+  (self as unknown as Record<string, unknown>).__ipaStreamJson = json;
+
+  // Step 3: Pass to worker-backed analysis engine
+  return phoneticEngineBackend.analyze(json);
 }
 
 /**

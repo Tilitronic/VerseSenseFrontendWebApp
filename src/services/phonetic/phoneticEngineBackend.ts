@@ -63,6 +63,11 @@ class PhoneticEngineBackend {
       this.pending.delete(message.id);
 
       if (!message.ok) {
+        console.error(
+          `[engineBackend] analyze error id=${message.id} err="${message.error}"`,
+          `ready=${this.ready} retries=${this.initRetries} dead=${this.permanentlyDead}`,
+        );
+        this.resetWorkerState();
         request.reject(new Error(message.error));
         return;
       }
@@ -147,29 +152,38 @@ class PhoneticEngineBackend {
     if (this.permanentlyDead) {
       throw new Error('Phonetic engine is unavailable after repeated crashes');
     }
-    await this.initialize();
 
-    const id = this.createId();
-    const payload: AnalyzeRequestMessage = { type: 'analyze', id, streamJson };
+    const doAnalyze = async (): Promise<string> => {
+      await this.initialize();
 
-    const resultJson = await new Promise<string>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pending.delete(id);
-        this.resetWorkerState();
-        reject(new Error('Phonetic engine analyze timed out'));
-      }, PhoneticEngineBackend.ANALYZE_TIMEOUT_MS);
+      const id = this.createId();
+      const payload: AnalyzeRequestMessage = { type: 'analyze', id, streamJson };
 
-      this.pending.set(id, {
-        resolve: (value) => {
-          clearTimeout(timeout);
-          resolve(String(value));
-        },
-        reject: (reason) => {
-          clearTimeout(timeout);
-          reject(reason instanceof Error ? reason : new Error(String(reason)));
-        },
+      return new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          this.pending.delete(id);
+          this.resetWorkerState();
+          reject(new Error('Phonetic engine analyze timed out'));
+        }, PhoneticEngineBackend.ANALYZE_TIMEOUT_MS);
+
+        this.pending.set(id, {
+          resolve: (value) => {
+            clearTimeout(timeout);
+            resolve(String(value));
+          },
+          reject: (reason) => {
+            clearTimeout(timeout);
+            reject(reason instanceof Error ? reason : new Error(String(reason)));
+          },
+        });
+        this.getWorker().postMessage(payload as OutboundMessage);
       });
-      this.getWorker().postMessage(payload as OutboundMessage);
+    };
+
+    const resultJson = await doAnalyze().catch(async () => {
+      console.warn('[engineBackend] retry: resetting worker and retrying analyze once');
+      this.resetWorkerState();
+      return doAnalyze();
     });
 
     return JSON.parse(resultJson) as StreamAnalysisResult;

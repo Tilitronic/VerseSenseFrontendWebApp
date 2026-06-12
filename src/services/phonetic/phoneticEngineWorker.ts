@@ -51,7 +51,10 @@ async function getEngineApi(): Promise<EngineApi> {
   if (engineApi) return engineApi;
   if (engineApiPromise) return engineApiPromise;
 
-  engineApiPromise = import('ipa-poetry-engine').then((engine) => {
+  engineApiPromise = import('ipa-poetry-engine').then(async (engine) => {
+    // 0.2.2+ requires explicit WASM init before calling engine functions
+    const init = (engine as { default?: () => Promise<unknown> }).default;
+    if (init) await init();
     const api: EngineApi = {
       analyze: engine.analyze,
       version: engine.version,
@@ -111,14 +114,25 @@ async function processAnalysisLoop(): Promise<void> {
     try {
       const api = await getEngineApi();
       if (id !== latestAnalyzeId) continue;
+      const streamSize = streamJson.length;
+      const streamPreview = streamJson.slice(0, 200).replace(/\n/g, '\\n');
+      console.log(`[engineWorker] analyze: id=${id} inputSize=${streamSize} preview="${streamPreview}…"`);
+      const t0 = performance.now();
       const resultJson = api.analyze(streamJson);
+      const dt = (performance.now() - t0).toFixed(1);
+      console.log(`[engineWorker] analyze done: id=${id} took=${dt}ms outputSize=${resultJson.length}`);
       await new Promise<void>((r) => setTimeout(r, 0));
       if (id === latestAnalyzeId && pendingStreamJson === null) {
         post({ type: 'analyze-result', id, ok: true, resultJson });
       }
     } catch (error) {
       if (id === latestAnalyzeId) {
-        post({ type: 'error', id, ok: false, error: String(error) });
+        const errStr = String(error);
+        const errDetails = error instanceof Error && error.stack
+          ? `stack=${error.stack.slice(0, 500)}`
+          : 'no-stack';
+        console.error(`[engineWorker] analyze FAILED: id=${id} err="${errStr}" ${errDetails}`);
+        post({ type: 'error', id, ok: false, error: errStr });
       }
     }
   }
