@@ -145,7 +145,7 @@ function rowH(row: GridRow): number {
 }
 
 function gridHeight(rows: GridRow[]): number {
-  return rows.reduce((sum, r) => sum + rowH(r) + RG, 0);
+  return rows.reduce((sum, r, i) => sum + rowH(r) + (i < rows.length - 1 ? RG : 0), 0);
 }
 
 function maxCells(rows: GridRow[]): number {
@@ -378,11 +378,15 @@ export function generateVisualizationSvg(
   showCvBadge = true,
 ): string {
   const rows = buildRows(lines, isLineConfirmed);
+  // Trim trailing blank rows — they render nothing but inflate height with dead space
+  while (rows.length > 0 && rows[rows.length - 1]?.kind === 'blank') {
+    rows.pop();
+  }
   const gh = gridHeight(rows);
   const mc = maxCells(rows);
   const contentW = LEFT_MARGIN + mc * CW;
   const svgW = contentW + PAD * 2;
-  const svgH = PAD + gh + PAD + 14; // grid + bottom padding + watermark row
+  const svgH = PAD + gh + 11; // 7px watermark font + 4px bottom margin
 
   const gridStartY = PAD;
 
@@ -408,9 +412,9 @@ export function generateVisualizationSvg(
   // ── Grid rows ───────────────────────────────────────────────────────────────
   out.push('<g id="phonetic-grid">');
   let y = gridStartY;
-  for (const row of rows) {
-    out.push(renderSvgRow(row, y, tokenStyleMap, showNumBadge, showSylBadge, showCvBadge));
-    y += rowH(row) + RG;
+  for (let ri = 0; ri < rows.length; ri++) {
+    out.push(renderSvgRow(rows[ri]!, y, tokenStyleMap, showNumBadge, showSylBadge, showCvBadge));
+    if (ri < rows.length - 1) y += rowH(rows[ri]!) + RG;
   }
   out.push('</g>');
 

@@ -853,11 +853,11 @@ export const usePoetryStore = defineStore('poetry', () => {
       });
     }, STRESS_DEBOUNCE_MS);
 
-    // Clear stale analysis — the rebuilt document has new token IDs,
-    // so the previous analysis result's PhonemeRef.wordId values no
-    // longer match any current token.  The watcher will re-trigger
-    // analysis on the next tick.
-    analysisResult.value = null;
+    // Clear stale analysis only when there are confirmed lines —
+    // empty/trailing lines don't need re-analysis.
+    if (newConfirmed.size > 0) {
+      analysisResult.value = null;
+    }
   }
 
   /**
